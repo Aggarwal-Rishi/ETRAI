@@ -1,0 +1,26 @@
+{
+  "name": "etrai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ETRAI - AI Fact-Checking & Verification Tool Monorepo",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "prisma:generate": "cd backend && npx prisma generate",
+    "prisma:migrate": "cd backend && npx prisma migrate dev"
+  },
+  "keywords": [
+    "ai",
+    "fact-checking",
+    "verification",
+    "gpt-4o",
+    "react",
+    "express",
+    "prisma",
+    "postgresql"
+  ],
+  "author": "ETRAI Team",
+  "license": "MIT"
+}

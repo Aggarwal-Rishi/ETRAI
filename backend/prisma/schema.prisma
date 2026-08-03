@@ -1,0 +1,61 @@
+// Prisma Schema for ETRAI Fact-Checking & Verification Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  analyses     Analysis[]
+
+  @@map("users")
+}
+
+model Analysis {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  inputType      InputType
+  inputSource    String         @db.Text
+  selectedTypes  AnalysisType[]
+  status         AnalysisStatus @default(PENDING)
+  summary        String?        @db.Text
+  overallMetrics Json?          // Scores per category (e.g. { factCheckingScore: 82, fakeNewsScore: 45, businessReportScore: 90 })
+  reportData     Json?          // Full report storage: claims array, source evidence links, category breakdowns, AI recommendation
+  errorMessage   String?        @db.Text
+  truncated      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([userId])
+  @@map("analyses")
+}
+
+enum InputType {
+  URL
+  FILE
+  TEXT
+}
+
+enum AnalysisType {
+  FACT_CHECKING
+  FAKE_NEWS_DETECTION
+  BUSINESS_REPORT
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

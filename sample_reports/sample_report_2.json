@@ -1,0 +1,64 @@
+{
+  "id": "report_sample_fake_news_detect",
+  "sourceTitle": "Pasted Text: Viral Medical & Health Claim Statement",
+  "inputType": "TEXT",
+  "selectedTypes": ["FACT_CHECKING", "FAKE_NEWS_DETECTION"],
+  "status": "COMPLETED",
+  "scores": {
+    "factCheckingScore": 42,
+    "fakeNewsScore": 35
+  },
+  "breakdown": {
+    "totalClaims": 8,
+    "verified": 3,
+    "suspicious": 3,
+    "false": 2
+  },
+  "summary": "The submitted content contains significant sensationalism, clickbait phrasing, and unverified medical assertions. 5 out of 8 claims were either false or unconfirmed.",
+  "recommendation": "High Risk: Content exhibits classic manipulation tactics and misleading headlines. Do not distribute without primary medical literature confirmation.",
+  "manipulationAnalysis": {
+    "verdict": "LOW_TRUST",
+    "manipulationRisk": "HIGH",
+    "keyHighlights": [
+      "2 claims explicitly refuted by WHO and CDC public health bulletins",
+      "3 unverified claims relying on anonymous or anecdotal testimonials",
+      "Clickbait framing and emotionally loaded vocabulary detected throughout text"
+    ]
+  },
+  "claims": [
+    {
+      "claimId": "claim_1",
+      "claimText": "A newly discovered herbal extract guarantees 100% immunity against seasonal respiratory viruses.",
+      "category": "Factual Assertion",
+      "status": "False",
+      "confidence": 98,
+      "explanation": "Refuted by health regulatory agencies. No scientific trial data supports 100% immunity claims.",
+      "sources": [
+        {
+          "title": "Snopes: Unproven Herbal Immunity Claims",
+          "url": "https://www.snopes.com/fact-check/herbal-immunity-cure-myth",
+          "snippet": "Medical experts confirm no single herbal supplement provides complete respiratory virus immunity.",
+          "domain": "snopes.com"
+        }
+      ]
+    },
+    {
+      "claimId": "claim_2",
+      "claimText": "Clinical trial results were conducted across 3 major university medical centers in 2024.",
+      "category": "Statistical Metric",
+      "status": "Suspicious",
+      "confidence": 65,
+      "explanation": "No trial registration numbers or peer-reviewed publication records could be verified in PubMed registries.",
+      "sources": [
+        {
+          "title": "FactCheck.org Health Review",
+          "url": "https://www.factcheck.org/health/unregistered-trials",
+          "snippet": "Unregistered clinical trials cannot be independently validated against medical standards.",
+          "domain": "factcheck.org"
+        }
+      ]
+    }
+  ],
+  "truncated": false,
+  "generatedAt": "2026-08-03T11:30:00.000Z"
+}
