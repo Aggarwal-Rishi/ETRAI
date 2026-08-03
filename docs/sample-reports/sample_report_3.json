@@ -1,0 +1,49 @@
+{
+  "id": "report_sample_clean_energy_tech",
+  "sourceTitle": "URL: https://energy-policy.example.org/articles/clean-energy-grid-2026",
+  "inputType": "URL",
+  "selectedTypes": ["FACT_CHECKING", "FAKE_NEWS_DETECTION", "BUSINESS_REPORT"],
+  "status": "COMPLETED",
+  "scores": {
+    "factCheckingScore": 95,
+    "fakeNewsScore": 90,
+    "businessReportScore": 94
+  },
+  "breakdown": {
+    "totalClaims": 12,
+    "verified": 11,
+    "suspicious": 1,
+    "false": 0
+  },
+  "summary": "Outstanding factual precision and sourcing credibility. 11 out of 12 claims were fully verified across government energy statistics and official grid operator press releases.",
+  "recommendation": "Very High Confidence: Safe for editorial citation and policy analysis.",
+  "manipulationAnalysis": {
+    "verdict": "HIGH_TRUST",
+    "manipulationRisk": "LOW",
+    "keyHighlights": [
+      "11 claims verified against primary Department of Energy and IEA database entries",
+      "0 false claims or clickbait manipulation patterns detected",
+      "Statistical metrics match published grid capacity charts"
+    ]
+  },
+  "claims": [
+    {
+      "claimId": "claim_1",
+      "claimText": "Solar and wind energy accounted for over 32% of total electricity generation in 2025.",
+      "category": "Statistical Metric",
+      "status": "Verified",
+      "confidence": 96,
+      "explanation": "Cross-referenced with official energy statistics published by the International Energy Agency.",
+      "sources": [
+        {
+          "title": "BBC News: Global Renewable Energy Generation Milestones",
+          "url": "https://www.bbc.com/news/world-energy-milestone-2025",
+          "snippet": "IEA data confirms renewable sources surpassed 30% of total electrical production.",
+          "domain": "bbc.com"
+        }
+      ]
+    }
+  ],
+  "truncated": false,
+  "generatedAt": "2026-08-03T12:45:00.000Z"
+}

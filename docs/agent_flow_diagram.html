@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ETRAI — Interactive 4-Agent Pipeline Flow Diagram</title>
+  <style>
+    :root {
+      --bg: #030712;
+      --card-bg: #0b1329;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --brand: #3b82f6;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --rose: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .diagram-container {
+      width: 100%;
+      max-width: 1100px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    /* Flow Animations */
+    .flow-line {
+      stroke-dasharray: 8 6;
+      animation: flow 20s linear infinite;
+    }
+
+    @keyframes flow {
+      from { stroke-dashoffset: 200; }
+      to { stroke-dashoffset: 0; }
+    }
+
+    .node {
+      cursor: pointer;
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    .node:hover {
+      transform: translateY(-4px);
+      filter: drop-shadow(0 10px 15px rgba(59, 130, 246, 0.3));
+    }
+
+    .node rect {
+      transition: stroke 0.25s ease, fill 0.25s ease;
+    }
+
+    .node:hover rect {
+      stroke: var(--brand);
+    }
+
+    /* Modal / Detail Panel */
+    .detail-panel {
+      margin-top: 2rem;
+      width: 100%;
+      max-width: 1100px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: none;
+    }
+
+    .detail-panel.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.75rem;
+    }
+
+    .detail-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #60a5fa;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .close-btn:hover { color: #fff; }
+
+    .detail-body p {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      margin-bottom: 0.75rem;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+    }
+
+    .pill-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .pill-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pill-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .pill-purple { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>ETRAI — Interactive 4-Agent Verification Pipeline</h1>
+    <p>Click on any agent node below to inspect its exact prompt strategy, processing logic, input/output data contracts, and error fallbacks.</p>
+  </header>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 1000 360" xmlns="http://www.w3.org/2000/svg">
+      
+      <defs>
+        <!-- Arrowhead Marker -->
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6"/>
+        </marker>
+      </defs>
+
+      <!-- Connecting Lines with Animated Dash -->
+      <line x1="210" y1="180" x2="270" y2="180" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrow)" class="flow-line" />
+      <line x1="450" y1="180" x2="510" y2="180" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrow)" class="flow-line" />
+      <line x1="690" y1="180" x2="750" y2="180" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrow)" class="flow-line" />
+
+      <!-- Input Node -->
+      <g class="node" onclick="showDetails('input')">
+        <rect x="20" y="110" width="190" height="140" rx="14" fill="#0f172a" stroke="#334155" stroke-width="2" />
+        <text x="115" y="145" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="700">USER INPUT</text>
+        <text x="115" y="175" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="800">URL / File / Text</text>
+        <text x="115" y="200" text-anchor="middle" fill="#64748b" font-size="11">PDF, DOCX, TXT, Web</text>
+        <text x="115" y="225" text-anchor="middle" fill="#3b82f6" font-size="11" font-weight="600">Multi-Select Types</text>
+      </g>
+
+      <!-- Agent 1: Content Reader -->
+      <g class="node" onclick="showDetails('agent1')">
+        <rect x="270" y="110" width="180" height="140" rx="14" fill="#0f172a" stroke="#1d4ed8" stroke-width="2" />
+        <text x="360" y="140" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="800">AGENT 1</text>
+        <text x="360" y="165" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800">Content Reader</text>
+        <text x="360" y="195" text-anchor="middle" fill="#94a3b8" font-size="11">Parses & Cleans Text</text>
+        <text x="360" y="215" text-anchor="middle" fill="#f59e0b" font-size="11">Token Truncation (&lt;12k)</text>
+      </g>
+
+      <!-- Agent 2: Claim Extractor -->
+      <g class="node" onclick="showDetails('agent2')">
+        <rect x="510" y="110" width="180" height="140" rx="14" fill="#0f172a" stroke="#7c3aed" stroke-width="2" />
+        <text x="600" y="140" text-anchor="middle" fill="#c084fc" font-size="11" font-weight="800">AGENT 2</text>
+        <text x="600" y="165" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800">Claim Extractor</text>
+        <text x="600" y="195" text-anchor="middle" fill="#94a3b8" font-size="11">GPT-4o Assertion Filter</text>
+        <text x="600" y="215" text-anchor="middle" fill="#34d399" font-size="11" font-weight="700">Strict Cap: 25 Claims</text>
+      </g>
+
+      <!-- Agent 3: Fact Verification Agent -->
+      <g class="node" onclick="showDetails('agent3')">
+        <rect x="750" y="50" width="220" height="120" rx="14" fill="#0f172a" stroke="#059669" stroke-width="2" />
+        <text x="860" y="80" text-anchor="middle" fill="#34d399" font-size="11" font-weight="800">AGENT 3</text>
+        <text x="860" y="105" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800">Fact Verifier</text>
+        <text x="860" y="130" text-anchor="middle" fill="#94a3b8" font-size="11">Serper API + Trusted Domains</text>
+        <text x="860" y="150" text-anchor="middle" fill="#60a5fa" font-size="11">Verified / Suspicious / False</text>
+      </g>
+
+      <!-- Agent 4: Report Generator -->
+      <g class="node" onclick="showDetails('agent4')">
+        <rect x="750" y="200" width="220" height="120" rx="14" fill="#0f172a" stroke="#d97706" stroke-width="2" />
+        <text x="860" y="230" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="800">AGENT 4</text>
+        <text x="860" y="255" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800">Report Generator</text>
+        <text x="860" y="280" text-anchor="middle" fill="#94a3b8" font-size="11">Per-Category Scoring</text>
+        <text x="860" y="300" text-anchor="middle" fill="#a78bfa" font-size="11">Recharts Payload & Summary</text>
+      </g>
+
+      <!-- Vertical Branching Line to Agent 4 -->
+      <line x1="860" y1="170" x2="860" y2="200" stroke="#3b82f6" stroke-dasharray="4 4" stroke-width="2" />
+
+    </svg>
+  </div>
+
+  <!-- Detail Information Panel -->
+  <div id="detailPanel" class="detail-panel">
+    <div class="detail-header">
+      <div class="detail-title" id="panelTitle">Agent Details</div>
+      <button class="close-btn" onclick="closeDetails()">&times;</button>
+    </div>
+    <div class="detail-body" id="panelContent">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <script>
+    const data = {
+      input: {
+        title: "User Input Payload",
+        pills: ["URL Fetch", "File Upload", "Pasted Text"],
+        html: `
+          <p><strong>Supported Inputs:</strong> Webpage URL, PDF file, DOCX document, or pasted text string.</p>
+          <p><strong>Validation Rules:</strong> Minimum 35 words required for pasted text. Files must be .pdf, .docx, or .txt (up to 15MB limit).</p>
+          <p><strong>Multi-Select Analysis Types:</strong> Fact Checking, Fake News Detection, and Business Report Verification.</p>
+        `
+      },
+      agent1: {
+        title: "Agent 1 – Content Reader",
+        pills: ["pdf-parse", "mammoth", "cheerio/fetch", "Token Truncator"],
+        html: `
+          <p><strong>Role:</strong> Extracts clean, unformatted plain text from diverse document formats and URLs.</p>
+          <p><strong>URL Fallback:</strong> If direct HTTP fetch encounters paywalls or bot blocks, Agent 1 attempts Google Cache and proxy fallbacks before throwing a clear 422 error.</p>
+          <p><strong>Truncation Handler:</strong> Text exceeding ~12,000 tokens (~48,000 characters) is truncated to fit GPT-4o context windows safely. Appends a truncation banner to final reports.</p>
+        `
+      },
+      agent2: {
+        title: "Agent 2 – Claim Extractor",
+        pills: ["GPT-4o Structured Prompt", "Strict 25 Cap", "Factual Assertion Filtering"],
+        html: `
+          <p><strong>Role:</strong> Parses document text and isolates key quantitative figures, dates, financial assertions, and verifiable statements.</p>
+          <p><strong>Capping Guardrail:</strong> Capped strictly at <strong>25 claims</strong> to optimize API latency and cost while preserving document coverage.</p>
+          <p><strong>Fallback Mode:</strong> If OpenAI API key is unconfigured, uses a pattern-matching heuristic algorithm to extract factual sentences for offline testing.</p>
+        `
+      },
+      agent3: {
+        title: "Agent 3 – Fact Verification Agent",
+        pills: ["Serper Search API", "Trusted Domain Filters", "3-Label Classifier"],
+        html: `
+          <p><strong>Role:</strong> Queries Serper API for each extracted claim against trusted search filters (e.g. reuters.com, apnews.com, bbc.com, factcheck.org, snopes.com, .gov, .edu).</p>
+          <p><strong>Labeling Taxonomy:</strong> Assigns one of three labels:
+            <span class="pill pill-emerald">Verified</span>
+            <span class="pill pill-amber">Suspicious</span>
+            <span class="pill pill-purple">False</span>
+          </p>
+          <p><strong>Evidence Payload:</strong> Attaches exact source links with article titles, URLs, and relevant snippets for direct user verification.</p>
+        `
+      },
+      agent4: {
+        title: "Agent 4 – Report Generator",
+        pills: ["Multi-Category Scoring", "Recharts Data Payload", "AI Executive Summary"],
+        html: `
+          <p><strong>Role:</strong> Synthesizes verification data and generates separate category scores (0-100%) without blending them into a single generic score.</p>
+          <p><strong>Outputs:</strong>
+            <ul>
+              <li><strong>Fact Checking Score:</strong> Weighted ratio of verified claims.</li>
+              <li><strong>Fake News Score:</strong> Manipulation pattern analysis & credibility rating.</li>
+              <li><strong>Business Report Score:</strong> Accuracy of financial figures, dates, and numbers.</li>
+            </ul>
+          </p>
+          <p><strong>Deliverable:</strong> Pushes live completion state via SSE stream and stores full report in PostgreSQL history database.</p>
+        `
+      }
+    };
+
+    function showDetails(key) {
+      const info = data[key];
+      if (!info) return;
+
+      document.getElementById('panelTitle').innerText = info.title;
+      
+      let pillsHtml = info.pills.map(p => `<span class="pill pill-blue">${p}</span>`).join('');
+      document.getElementById('panelContent').innerHTML = `<div style="margin-bottom:1rem;">${pillsHtml}</div>` + info.html;
+      
+      const panel = document.getElementById('detailPanel');
+      panel.classList.add('active');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeDetails() {
+      document.getElementById('detailPanel').classList.remove('active');
+    }
+  </script>
+</body>
+</html>

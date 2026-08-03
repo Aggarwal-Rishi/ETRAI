@@ -1,0 +1,80 @@
+{
+  "id": "report_sample_tech_q3_2025",
+  "sourceTitle": "URL: https://tech-news.example.com/reports/q3-ai-market-analysis",
+  "inputType": "URL",
+  "selectedTypes": ["FACT_CHECKING", "BUSINESS_REPORT"],
+  "status": "COMPLETED",
+  "scores": {
+    "factCheckingScore": 88,
+    "businessReportScore": 92
+  },
+  "breakdown": {
+    "totalClaims": 10,
+    "verified": 8,
+    "suspicious": 1,
+    "false": 1
+  },
+  "summary": "The submitted Q3 AI Market Analysis exhibits high factual accuracy with 8 out of 10 claims independently verified against official corporate filings and trusted financial news agencies.",
+  "recommendation": "High Confidence: Verified against primary SEC filings and Reuters financial releases. Safe for strategic planning.",
+  "manipulationAnalysis": {
+    "verdict": "HIGH_TRUST",
+    "manipulationRisk": "LOW",
+    "keyHighlights": [
+      "8 claims verified against primary news and regulatory archives",
+      "Financial figures align with reported quarterly metrics within 0.2% margin",
+      "1 claim regarding competitor acquisition unconfirmed"
+    ]
+  },
+  "claims": [
+    {
+      "claimId": "claim_1",
+      "claimText": "Global enterprise spend on generative AI models reached $14.2 billion in Q3 2025.",
+      "category": "Financial Claim",
+      "status": "Verified",
+      "confidence": 92,
+      "explanation": "Cross-referenced against Gartner and IDC Q3 2025 technology expenditure reports.",
+      "sources": [
+        {
+          "title": "Reuters: Tech Market Quarterly Expenditure Overview",
+          "url": "https://www.reuters.com/business/tech-expenditure-q3-2025",
+          "snippet": "Enterprise spending on generative models scaled to $14.2B in Q3, reflecting accelerated adoption.",
+          "domain": "reuters.com"
+        }
+      ]
+    },
+    {
+      "claimId": "claim_2",
+      "claimText": "Over 78% of Fortune 500 companies have deployed at least one internal AI verification system.",
+      "category": "Statistical Metric",
+      "status": "Verified",
+      "confidence": 89,
+      "explanation": "Confirmed by industry survey records published in Q3 2025 technology adoption index.",
+      "sources": [
+        {
+          "title": "AP News: Enterprise AI Integration Index",
+          "url": "https://apnews.com/article/enterprise-ai-index-2025",
+          "snippet": "Audit data shows Fortune 500 integration rates exceeding 75% across compliance departments.",
+          "domain": "apnews.com"
+        }
+      ]
+    },
+    {
+      "claimId": "claim_3",
+      "claimText": "Company X guaranteed 100% error-free automated claim auditing with zero human intervention required.",
+      "category": "Factual Assertion",
+      "status": "False",
+      "confidence": 95,
+      "explanation": "Directly contradicted by official company documentation which specifies human-in-the-loop oversight.",
+      "sources": [
+        {
+          "title": "FactCheck.org: Analysis of Absolute AI Promises",
+          "url": "https://www.factcheck.org/reports/ai-accuracy-claims",
+          "snippet": "Official technical specifications emphasize that human verification remains essential for accuracy.",
+          "domain": "factcheck.org"
+        }
+      ]
+    }
+  ],
+  "truncated": false,
+  "generatedAt": "2026-08-03T10:15:00.000Z"
+}
