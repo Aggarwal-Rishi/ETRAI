@@ -49,13 +49,12 @@ async function testPipeline() {
   });
 
   // Test 3: Agent 3 - Fact Verification Agent
-  await runTest('Agent 3 (Fact Verifier) verifies claims and attaches source evidence', async () => {
+  await runTest('Agent 3 (Fact Verifier) verifies claims with strict grounding', async () => {
     const claims = await extractClaims(sampleText);
     const verified = await verifyClaims(claims);
     assert.strictEqual(verified.length, claims.length);
     assert.ok(['Verified', 'Suspicious', 'False'].includes(verified[0].status), 'Status must be valid label');
     assert.ok(Array.isArray(verified[0].sources), 'Sources must be an array');
-    assert.ok(verified[0].sources.length > 0, 'Sources array must contain evidence links');
   });
 
   // Test 4: Agent 4 - Report Generator Multi-Category Scoring

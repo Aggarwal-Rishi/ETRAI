@@ -135,7 +135,7 @@ export default function ResultsPage() {
             <h2 className="text-xl font-bold text-white">Verification Execution Failed</h2>
             <p className="text-sm text-slate-300">{error}</p>
             <Link
-              to="/new-analysis"
+              to="/analysis"
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl"
             >
               <ArrowLeft className="w-4 h-4" /> Try Another Analysis
@@ -358,7 +358,7 @@ export default function ResultsPage() {
                 </p>
 
                 {/* Source Links */}
-                {c.sources && c.sources.length > 0 && (
+                {c.sources && c.sources.length > 0 ? (
                   <div className="pl-7 pt-1 space-y-2">
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Source Evidence Links:</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -378,6 +378,10 @@ export default function ResultsPage() {
                         </a>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="pl-7 text-xs text-slate-500 italic">
+                    No reliable source found to confirm or refute this claim.
                   </div>
                 )}
               </div>
