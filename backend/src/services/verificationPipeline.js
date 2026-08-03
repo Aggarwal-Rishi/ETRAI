@@ -9,6 +9,9 @@ const { dbService, prisma } = require('../utils/prisma');
  * Orchestrates the full 4-agent verification pipeline
  */
 async function runVerificationPipeline({ jobId, userId, inputType, text, url, file, selectedTypes }) {
+  const inputSourceStr = inputType === 'URL' ? url : inputType === 'FILE' ? (file ? file.originalname : 'Uploaded file') : text ? text.substring(0, 150) : 'Input Source';
+  const sourceTitle = inputType === 'URL' ? `URL: ${url}` : inputType === 'FILE' ? `File: ${file ? file.originalname : 'Document'}` : 'Pasted Text Analysis';
+
   try {
     // ----------------------------------------------------
     // Step 1: Content Reader (Agent 1)
@@ -57,7 +60,7 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     });
 
     const reportData = await generateReport({
-      sourceTitle: contentRes.sourceTitle,
+      sourceTitle: contentRes.sourceTitle || sourceTitle,
       extractedText: contentRes.extractedText,
       verifiedClaims,
       selectedTypes,
@@ -67,16 +70,15 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     // ----------------------------------------------------
     // Step 5: Save Full Analysis Record to Database
     // ----------------------------------------------------
-    const inputSourceStr = inputType === 'URL' ? url : inputType === 'FILE' ? (file ? file.originalname : 'Uploaded file') : text.substring(0, 150);
-
     let savedRecord = null;
-    try {
-      if (prisma) {
+
+    if (process.env.DATABASE_URL && prisma) {
+      try {
         savedRecord = await prisma.analysis.create({
           data: {
             id: jobId,
             userId,
-            title: contentRes.sourceTitle,
+            title: contentRes.sourceTitle || sourceTitle,
             inputType,
             inputSource: inputSourceStr,
             selectedTypes,
@@ -87,16 +89,16 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
             truncated: contentRes.truncated
           }
         });
+      } catch (dbErr) {
+        // Fallthrough to memory store if Postgres is offline
       }
-    } catch (dbErr) {
-      console.warn('[DB Save Fallback]: Storing analysis record in memory store.', dbErr.message);
     }
 
     if (!savedRecord) {
       savedRecord = {
         id: jobId,
         userId,
-        title: contentRes.sourceTitle,
+        title: contentRes.sourceTitle || sourceTitle,
         inputType,
         inputSource: inputSourceStr,
         selectedTypes,
@@ -123,6 +125,38 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
   } catch (error) {
     console.error(`[Pipeline Job Error ${jobId}]:`, error.message);
     
+    // Save FAILED analysis record to database history
+    const failedRecord = {
+      id: jobId,
+      userId,
+      title: sourceTitle,
+      inputType,
+      inputSource: inputSourceStr,
+      selectedTypes,
+      status: 'FAILED',
+      errorMessage: error.message,
+      createdAt: new Date().toISOString()
+    };
+
+    if (process.env.DATABASE_URL && prisma) {
+      try {
+        await prisma.analysis.create({
+          data: {
+            id: jobId,
+            userId,
+            title: sourceTitle,
+            inputType,
+            inputSource: inputSourceStr,
+            selectedTypes,
+            status: 'FAILED',
+            errorMessage: error.message
+          }
+        });
+      } catch (e) {}
+    }
+
+    dbService.saveAnalysisFallback(failedRecord);
+
     emitProgress(jobId, {
       status: 'FAILED',
       progress: 100,
