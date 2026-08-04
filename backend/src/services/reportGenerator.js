@@ -51,7 +51,13 @@ function calculateCategoryScores(verifiedClaims, selectedTypes) {
  */
 async function generateReport({ sourceTitle, extractedText, verifiedClaims, selectedTypes, truncated }) {
   const { scores, breakdown } = calculateCategoryScores(verifiedClaims, selectedTypes);
+  const totalClaims = Math.max(breakdown.totalClaims, 1);
+  const accuracyRate = Math.round((breakdown.verified / totalClaims) * 100);
   
+  // Mathematical overall trust badge synchronization
+  const mathVerdict = accuracyRate >= 70 ? 'HIGH_TRUST' : accuracyRate >= 35 ? 'MODERATE_TRUST' : 'LOW_TRUST';
+  const mathRisk = accuracyRate >= 70 ? 'LOW' : accuracyRate >= 35 ? 'MEDIUM' : 'HIGH';
+
   const openAiKey = process.env.OPENAI_API_KEY;
   const hasOpenAi = openAiKey && !openAiKey.includes('your_openai_api_key');
   
@@ -75,8 +81,6 @@ Return ONLY a JSON object with:
 {
   "summary": "2-3 sentence executive summary of overall accuracy and key findings",
   "recommendation": "Clear actionable advice for the reader (e.g. Verified with high confidence / Needs cross-referencing / Potential fabricated clickbait detected)",
-  "verdict": "HIGH_TRUST" | "MODERATE_TRUST" | "LOW_TRUST",
-  "manipulationRisk": "LOW" | "MEDIUM" | "HIGH",
   "keyHighlights": ["Highlight 1", "Highlight 2", "Highlight 3"]
 }`;
 
@@ -91,9 +95,13 @@ Return ONLY a JSON object with:
       summary = parsed.summary;
       recommendation = parsed.recommendation;
       manipulationAnalysis = {
-        verdict: parsed.verdict || (breakdown.verified > breakdown.false ? 'HIGH_TRUST' : 'LOW_TRUST'),
-        manipulationRisk: parsed.manipulationRisk || (breakdown.false > 0 ? 'HIGH' : 'LOW'),
-        keyHighlights: parsed.keyHighlights || []
+        verdict: mathVerdict,
+        manipulationRisk: mathRisk,
+        keyHighlights: parsed.keyHighlights || [
+          `${breakdown.verified} claims verified against top-tier trusted sources`,
+          `${breakdown.suspicious} claims flagged for insufficient primary documentation`,
+          `${breakdown.false} claims contradicted or unrecorded across independent factual archives`
+        ]
       };
     } catch (e) {
       // Fallthrough to rule-based synthesis
@@ -102,12 +110,10 @@ Return ONLY a JSON object with:
 
   // Fallback rule-based summary generation
   if (!summary) {
-    const accuracyRate = Math.round((breakdown.verified / Math.max(breakdown.totalClaims, 1)) * 100);
-    
-    if (accuracyRate >= 75) {
+    if (accuracyRate >= 70) {
       summary = `The submitted content demonstrates strong factual accuracy with ${breakdown.verified} out of ${breakdown.totalClaims} claims independently verified against trusted sources.`;
       recommendation = `High Confidence: Content is well-supported by primary news and official data registries. Ready for decision-making or publication.`;
-    } else if (accuracyRate >= 40) {
+    } else if (accuracyRate >= 35) {
       summary = `The content contains a mix of verified facts and unconfirmed assertions. ${breakdown.suspicious} claims require additional cross-referencing.`;
       recommendation = `Moderate Caution: Verify suspicious claims against primary corporate filings or official government statistics before sharing.`;
     } else {
@@ -116,8 +122,8 @@ Return ONLY a JSON object with:
     }
 
     manipulationAnalysis = {
-      verdict: accuracyRate >= 75 ? 'HIGH_TRUST' : accuracyRate >= 40 ? 'MODERATE_TRUST' : 'LOW_TRUST',
-      manipulationRisk: accuracyRate >= 75 ? 'LOW' : accuracyRate >= 40 ? 'MEDIUM' : 'HIGH',
+      verdict: mathVerdict,
+      manipulationRisk: mathRisk,
       keyHighlights: [
         `${breakdown.verified} claims verified against top-tier trusted sources`,
         `${breakdown.suspicious} claims flagged for insufficient primary documentation`,
