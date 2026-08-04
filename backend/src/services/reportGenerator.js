@@ -1,7 +1,7 @@
 const OpenAI = require('openai');
 
 /**
- * Calculates category scores based on verified claims data
+ * Single Source of Truth: Calculates category scores mathematically directly from per-claim verdicts
  */
 function calculateCategoryScores(verifiedClaims, selectedTypes) {
   const total = Math.max(verifiedClaims.length, 1);
@@ -12,29 +12,27 @@ function calculateCategoryScores(verifiedClaims, selectedTypes) {
   const scores = {};
 
   if (selectedTypes.includes('FACT_CHECKING')) {
-    // Fact checking score weighting
-    const rawScore = ((verifiedCount * 1.0 + suspiciousCount * 0.4 + falseCount * 0.0) / total) * 100;
-    scores.factCheckingScore = Math.min(Math.max(Math.round(rawScore), 15), 98);
+    // Pure mathematical percentage of verified claims out of total claims
+    scores.factCheckingScore = Math.round((verifiedCount / total) * 100);
   }
 
   if (selectedTypes.includes('FAKE_NEWS_DETECTION')) {
-    // Fake news detection score checks manipulation tactics & source credibility
-    const credibilityPenalty = (falseCount * 25) + (suspiciousCount * 10);
-    const rawScore = 100 - (credibilityPenalty / total);
-    scores.fakeNewsScore = Math.min(Math.max(Math.round(rawScore), 12), 96);
+    // Fake News & Source Credibility Index (Higher % = Higher Factual Trust / Credibility)
+    // Verified = 1.0 weight, Suspicious = 0.2 partial weight, False = 0.0 weight
+    const rawCredibility = ((verifiedCount * 1.0 + suspiciousCount * 0.2 + falseCount * 0.0) / total) * 100;
+    scores.fakeNewsScore = Math.round(rawCredibility);
   }
 
   if (selectedTypes.includes('BUSINESS_REPORT')) {
-    // Business report score focuses on financial & statistical accuracy
+    // Business Metric Precision Score: Percentage of verified financial/numerical claims
     const businessClaims = verifiedClaims.filter(c => 
-      c.category.includes('Metric') || c.category.includes('Financial') || c.category.includes('Statement')
+      c.category.includes('Metric') || c.category.includes('Financial') || c.category.includes('Statement') || c.category.includes('Data')
     );
-    const bTotal = Math.max(businessClaims.length, 1);
-    const bVerified = businessClaims.filter(c => c.status === 'Verified').length;
-    const bFalse = businessClaims.filter(c => c.status === 'False').length;
+    const bClaims = businessClaims.length > 0 ? businessClaims : verifiedClaims;
+    const bTotal = Math.max(bClaims.length, 1);
+    const bVerified = bClaims.filter(c => c.status === 'Verified').length;
 
-    const rawScore = ((bVerified * 1.0 - bFalse * 0.5) / bTotal) * 100;
-    scores.businessReportScore = Math.min(Math.max(Math.round(rawScore), 20), 99);
+    scores.businessReportScore = Math.round((bVerified / bTotal) * 100);
   }
 
   return {
@@ -69,14 +67,14 @@ Analyze the verification results below and generate an executive summary, verdic
 
 Document Title: ${sourceTitle}
 Selected Types: ${selectedTypes.join(', ')}
-Category Scores: ${JSON.stringify(scores)}
+Calculated Category Scores: ${JSON.stringify(scores)}
 Claims Breakdown: ${JSON.stringify(breakdown)}
 Claims Evidence: ${JSON.stringify(verifiedClaims.slice(0, 10))}
 
 Return ONLY a JSON object with:
 {
   "summary": "2-3 sentence executive summary of overall accuracy and key findings",
-  "recommendation": "Clear actionable advice for the reader (e.g. Verified with high confidence / Needs cross-referencing / Potential clickbait detected)",
+  "recommendation": "Clear actionable advice for the reader (e.g. Verified with high confidence / Needs cross-referencing / Potential fabricated clickbait detected)",
   "verdict": "HIGH_TRUST" | "MODERATE_TRUST" | "LOW_TRUST",
   "manipulationRisk": "LOW" | "MEDIUM" | "HIGH",
   "keyHighlights": ["Highlight 1", "Highlight 2", "Highlight 3"]
@@ -93,8 +91,8 @@ Return ONLY a JSON object with:
       summary = parsed.summary;
       recommendation = parsed.recommendation;
       manipulationAnalysis = {
-        verdict: parsed.verdict || 'MODERATE_TRUST',
-        manipulationRisk: parsed.manipulationRisk || 'LOW',
+        verdict: parsed.verdict || (breakdown.verified > breakdown.false ? 'HIGH_TRUST' : 'LOW_TRUST'),
+        manipulationRisk: parsed.manipulationRisk || (breakdown.false > 0 ? 'HIGH' : 'LOW'),
         keyHighlights: parsed.keyHighlights || []
       };
     } catch (e) {
@@ -109,21 +107,21 @@ Return ONLY a JSON object with:
     if (accuracyRate >= 75) {
       summary = `The submitted content demonstrates strong factual accuracy with ${breakdown.verified} out of ${breakdown.totalClaims} claims independently verified against trusted sources.`;
       recommendation = `High Confidence: Content is well-supported by primary news and official data registries. Ready for decision-making or publication.`;
-    } else if (accuracyRate >= 45) {
+    } else if (accuracyRate >= 40) {
       summary = `The content contains a mix of verified facts and unconfirmed assertions. ${breakdown.suspicious} claims require additional cross-referencing.`;
       recommendation = `Moderate Caution: Verify suspicious claims against primary corporate filings or official government statistics before sharing.`;
     } else {
-      summary = `Multiple significant inaccuracies were detected (${breakdown.false} false claims and ${breakdown.suspicious} unverified claims).`;
-      recommendation = `High Risk: Content exhibits characteristics of misleading or unverified reporting. Thorough revision is recommended.`;
+      summary = `Significant inaccuracies were detected (${breakdown.false} false claims and ${breakdown.suspicious} unverified claims out of ${breakdown.totalClaims} total claims).`;
+      recommendation = `High Risk: Content exhibits clear characteristics of fabricated reporting or unverified misinformation. Thorough revision is strongly recommended.`;
     }
 
     manipulationAnalysis = {
-      verdict: accuracyRate >= 75 ? 'HIGH_TRUST' : accuracyRate >= 45 ? 'MODERATE_TRUST' : 'LOW_TRUST',
-      manipulationRisk: accuracyRate >= 75 ? 'LOW' : accuracyRate >= 45 ? 'MEDIUM' : 'HIGH',
+      verdict: accuracyRate >= 75 ? 'HIGH_TRUST' : accuracyRate >= 40 ? 'MODERATE_TRUST' : 'LOW_TRUST',
+      manipulationRisk: accuracyRate >= 75 ? 'LOW' : accuracyRate >= 40 ? 'MEDIUM' : 'HIGH',
       keyHighlights: [
         `${breakdown.verified} claims verified against top-tier trusted sources`,
         `${breakdown.suspicious} claims flagged for insufficient primary documentation`,
-        `${breakdown.false} claims contradicted by independent factual records`
+        `${breakdown.false} claims contradicted or unrecorded across independent factual archives`
       ]
     };
   }

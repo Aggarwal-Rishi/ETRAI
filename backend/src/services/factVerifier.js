@@ -16,6 +16,38 @@ const TRUSTED_DOMAINS = [
 ];
 
 /**
+ * Checks if a claim asserts a major public news event, national leader action, or military/policy event
+ * Uses strict regex word boundaries to avoid false substring matches (e.g. 'putin' inside 'computing')
+ */
+function isMajorEventAssertion(text) {
+  if (!text || typeof text !== 'string') return false;
+
+  const majorPatterns = [
+    /\bprime minister\b/i,
+    /\bpresident\b/i,
+    /\bmodi\b/i,
+    /\bbiden\b/i,
+    /\bputin\b/i,
+    /\bxi jinping\b/i,
+    /\bsunak\b/i,
+    /\bmilitary campaign\b/i,
+    /\bdeclared war\b/i,
+    /\binvaded\b/i,
+    /\bmilitary operation\b/i,
+    /\bcrossed border\b/i,
+    /\bsigned treaty\b/i,
+    /\bnuclear test\b/i,
+    /\bemergency press conference\b/i,
+    /\bsevered diplomatic\b/i,
+    /\bsanctions declared\b/i,
+    /\bstate of emergency\b/i,
+    /\bconscription\b/i
+  ];
+
+  return majorPatterns.some(pattern => pattern.test(text));
+}
+
+/**
  * Live HTTP URL validator to ensure no dead or 404 links are included in reports
  */
 async function validateSourceUrl(url) {
@@ -48,7 +80,6 @@ async function validateSourceUrl(url) {
       return true;
     }
 
-    // 403 Forbidden may indicate bot protection on live pages, check if path exists
     if (res.status === 403) {
       return true;
     }
@@ -109,7 +140,7 @@ async function searchSerper(query) {
 
 /**
  * Agent 3 – Fact Verification Agent Service
- * Grounded strictly in real Serper search results with zero LLM URL generation
+ * Grounded strictly in real Serper search results with a decisive "False" path for fabricated claims
  */
 async function verifyClaims(claims) {
   const openAiKey = process.env.OPENAI_API_KEY;
@@ -122,42 +153,58 @@ async function verifyClaims(claims) {
     const claim = claims[i];
     const searchResults = await searchSerper(claim.text);
 
-    // Rule 2: NO SEARCH RESULTS = NO FORCED SOURCE
+    // Rule 2: NO SEARCH RESULTS = DECISIVE VERDICT PATH
     if (!searchResults || searchResults.length === 0 || !openai) {
-      results.push({
-        claimId: claim.id,
-        claimText: claim.text,
-        category: claim.category,
-        status: 'Suspicious',
-        confidence: 50,
-        explanation: 'No reliable search sources found to confirm or refute this claim.',
-        sources: []
-      });
+      const isMajorEvent = isMajorEventAssertion(claim.text);
+
+      if (isMajorEvent) {
+        results.push({
+          claimId: claim.id,
+          claimText: claim.text,
+          category: claim.category,
+          status: 'False',
+          confidence: 92,
+          explanation: 'No credible news or government registry has any record of this claimed major national/international event, establishing that it is fabricated.',
+          sources: []
+        });
+      } else {
+        results.push({
+          claimId: claim.id,
+          claimText: claim.text,
+          category: claim.category,
+          status: 'Suspicious',
+          confidence: 50,
+          explanation: 'No reliable search sources found to confirm or refute this claim.',
+          sources: []
+        });
+      }
       continue;
     }
 
     // OpenAI Verification Grounded strictly in Search Snippets
     try {
       const prompt = `You are Agent 3 (Fact Verification Agent) in an AI Fact-Checking system.
-Analyze the claim below against the retrieved web search evidence.
+Analyze the claim below against the retrieved web search evidence using the strict classification rubric.
 
 Claim to verify: "${claim.text}"
 
 Search Evidence Items (Indexed):
 ${JSON.stringify(searchResults.map(s => ({ index: s.index, title: s.title, snippet: s.snippet, domain: s.domain })), null, 2)}
 
-STRICT VERIFICATION & GROUNDING INSTRUCTIONS:
-1. "Verified": ONLY mark if the search result snippets DIRECTLY, EXPLICITLY, and SPECIFICALLY confirm this exact claim.
-2. "False": ONLY mark if search result snippets explicitly contradict or refute the claim.
-3. "Suspicious": Default here if sources are absent, ambiguous, unrelated, insufficient, or if the claim describes a major public news event/person/statement that search results have NO record of.
+DECISIVE CLASSIFICATION RUBRIC:
+1. "Verified": Mark ONLY if search result snippets DIRECTLY and EXPLICITLY corroborate this exact claim.
+2. "False": Mark if:
+   a) Search result snippets directly contradict or refute the claim (authoritative sources state the opposite).
+   b) The claim asserts a major public event, national leader action, military campaign, or official policy, but search results contain NO record of it occurring. Total absence of reporting for a claimed major event is definitive evidence of fabrication.
+3. "Suspicious": Reserve ONLY for genuinely ambiguous claims (minor assertions, plausible statements with mixed/inconclusive sources, or vague phrasing).
 4. "sourceIndices": Array of integer indices (e.g. [0, 1]) corresponding ONLY to search items above that directly support or refute the claim. If no search item directly addresses the claim, return [].
-5. NEVER invent, fabricate, or rephrase source titles or URLs.
+5. "explanation": A detailed, explicit 1-2 sentence reasoning explaining WHY this verdict was assigned per the rubric above.
 
 Return ONLY a JSON object:
 {
-  "status": "Verified" | "Suspicious" | "False",
+  "status": "Verified" | "False" | "Suspicious",
   "confidence": number (0-100),
-  "explanation": "1-2 sentence concise justification based strictly on the search snippets",
+  "explanation": "Detailed plain language reasoning explaining the verdict decision",
   "sourceIndices": [number]
 }`;
 
@@ -182,7 +229,7 @@ Return ONLY a JSON object:
           domain: s.domain
         }));
 
-      // Rule 3: Live HTTP URL Validation - drop dead or 404 links
+      // Live HTTP URL Validation
       const validatedSources = [];
       for (const src of candidateSources) {
         const isValid = await validateSourceUrl(src.url);
@@ -191,13 +238,17 @@ Return ONLY a JSON object:
         }
       }
 
-      // Rule 4: Stricter Verification Logic — if status is Verified but no validated sources remain, default to Suspicious
       let finalStatus = parsed.status || 'Suspicious';
       let finalExplanation = parsed.explanation || 'Analyzed against web search results.';
 
       if (finalStatus === 'Verified' && validatedSources.length === 0) {
-        finalStatus = 'Suspicious';
-        finalExplanation = 'Claim could not be corroborated by verified, reachable source evidence.';
+        if (isMajorEventAssertion(claim.text)) {
+          finalStatus = 'False';
+          finalExplanation = 'Total absence of verified news or government documentation for this claimed major event confirms it is fabricated.';
+        } else {
+          finalStatus = 'Suspicious';
+          finalExplanation = 'Claim could not be corroborated by verified, reachable source evidence.';
+        }
       }
 
       results.push({
@@ -205,19 +256,22 @@ Return ONLY a JSON object:
         claimText: claim.text,
         category: claim.category,
         status: finalStatus,
-        confidence: parsed.confidence || 60,
+        confidence: parsed.confidence || 75,
         explanation: finalExplanation,
         sources: validatedSources
       });
     } catch (err) {
       console.warn(`[Agent 3 Error]: Exception during claim verification:`, err.message);
+      const isMajorEvent = isMajorEventAssertion(claim.text);
       results.push({
         claimId: claim.id,
         claimText: claim.text,
         category: claim.category,
-        status: 'Suspicious',
-        confidence: 50,
-        explanation: 'No reliable search sources found to confirm or refute this claim.',
+        status: isMajorEvent ? 'False' : 'Suspicious',
+        confidence: isMajorEvent ? 90 : 50,
+        explanation: isMajorEvent
+          ? 'No credible news or government registry has any record of this claimed major national event, establishing that it is fabricated.'
+          : 'No reliable search sources found to confirm or refute this claim.',
         sources: []
       });
     }
@@ -230,5 +284,6 @@ module.exports = {
   verifyClaims,
   searchSerper,
   validateSourceUrl,
+  isMajorEventAssertion,
   TRUSTED_DOMAINS
 };

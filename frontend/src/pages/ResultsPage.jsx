@@ -14,7 +14,7 @@ import {
   RefreshCw,
   Info
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function ResultsPage() {
   const { id } = useParams();
@@ -150,6 +150,26 @@ export default function ResultsPage() {
 
   const filteredClaims = claims ? claims.filter(c => claimFilter === 'ALL' || c.status === claimFilter) : [];
 
+  // Dominant verdict math for donut chart center display
+  const totalClaimsCount = Math.max(breakdown?.totalClaims || 1, 1);
+  const vPct = Math.round(((breakdown?.verified || 0) / totalClaimsCount) * 100);
+  const sPct = Math.round(((breakdown?.suspicious || 0) / totalClaimsCount) * 100);
+  const fPct = Math.round(((breakdown?.false || 0) / totalClaimsCount) * 100);
+
+  let dominantCategory = 'Verified';
+  let dominantPct = vPct;
+  let dominantColor = '#10B981';
+
+  if (fPct > vPct && fPct >= sPct) {
+    dominantCategory = 'False';
+    dominantPct = fPct;
+    dominantColor = '#EF4444';
+  } else if (sPct > vPct && sPct > fPct) {
+    dominantCategory = 'Suspicious';
+    dominantPct = sPct;
+    dominantColor = '#F59E0B';
+  }
+
   return (
     <div className="min-h-screen bg-slateDark-950 text-slate-100 flex flex-col">
       <Navbar />
@@ -189,7 +209,7 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* Per-Category Score Visualizations */}
+        {/* Per-Category Score Visualizations (Single Source of Truth) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {scores.factCheckingScore !== undefined && (
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between">
@@ -206,10 +226,10 @@ export default function ResultsPage() {
 
           {scores.fakeNewsScore !== undefined && (
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col justify-between">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fake News & Credibility</div>
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Source & Content Credibility</div>
               <div className="flex items-baseline gap-2 my-2">
                 <span className="text-3xl sm:text-4xl font-extrabold text-white">{scores.fakeNewsScore}%</span>
-                <span className="text-xs text-brand-400 font-medium">Low manipulation index</span>
+                <span className="text-xs text-brand-400 font-medium">Factual trust index</span>
               </div>
               <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
                 <div className="bg-brand-500 h-full rounded-full" style={{ width: `${scores.fakeNewsScore}%` }} />
@@ -222,7 +242,7 @@ export default function ResultsPage() {
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Business Metric Precision</div>
               <div className="flex items-baseline gap-2 my-2">
                 <span className="text-3xl sm:text-4xl font-extrabold text-white">{scores.businessReportScore}%</span>
-                <span className="text-xs text-amber-400 font-medium">Numerical & date accuracy</span>
+                <span className="text-xs text-amber-400 font-medium">Numerical & data accuracy</span>
               </div>
               <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
                 <div className="bg-amber-500 h-full rounded-full" style={{ width: `${scores.businessReportScore}%` }} />
@@ -249,21 +269,21 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          {/* Recharts Claims Breakdown Pie Chart */}
+          {/* Recharts Donut Chart with Dominant Center Display */}
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2 w-full">
               <PieIcon className="w-4 h-4 text-brand-400" /> Claims Status Breakdown
             </h3>
             
-            <div className="w-full h-48 my-2">
+            <div className="relative w-full h-48 my-2 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={45}
-                    outerRadius={65}
+                    innerRadius={50}
+                    outerRadius={70}
                     paddingAngle={4}
                     dataKey="value"
                   >
@@ -272,24 +292,37 @@ export default function ResultsPage() {
                     ))}
                   </Pie>
                   <Tooltip
+                    formatter={(value, name) => [
+                      `${value} claim(s) (${Math.round((value / totalClaimsCount) * 100)}%)`,
+                      name
+                    ]}
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
                   />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }} />
                 </PieChart>
               </ResponsiveContainer>
+
+              {/* Prominent Overlay in Center of Donut */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: dominantColor }}>
+                  {dominantPct}%
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {dominantCategory}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 w-full text-center text-xs pt-2 border-t border-slate-800">
               <div>
-                <div className="font-bold text-emerald-400">{breakdown?.verified}</div>
+                <div className="font-bold text-emerald-400">{breakdown?.verified} <span className="text-[10px] font-medium text-slate-400">({vPct}%)</span></div>
                 <div className="text-slate-500">Verified</div>
               </div>
               <div>
-                <div className="font-bold text-amber-400">{breakdown?.suspicious}</div>
+                <div className="font-bold text-amber-400">{breakdown?.suspicious} <span className="text-[10px] font-medium text-slate-400">({sPct}%)</span></div>
                 <div className="text-slate-500">Suspicious</div>
               </div>
               <div>
-                <div className="font-bold text-red-400">{breakdown?.false}</div>
+                <div className="font-bold text-red-400">{breakdown?.false} <span className="text-[10px] font-medium text-slate-400">({fPct}%)</span></div>
                 <div className="text-slate-500">False</div>
               </div>
             </div>

@@ -87,7 +87,7 @@ async function testPipeline() {
       selectedTypes: ['FACT_CHECKING', 'BUSINESS_REPORT']
     });
 
-    assert.ok(report.scores.factCheckingScore && report.scores.businessReportScore);
+    assert.ok(report.scores.factCheckingScore !== undefined && report.scores.businessReportScore !== undefined);
     assert.ok(report.claims.length > 0);
   });
 
