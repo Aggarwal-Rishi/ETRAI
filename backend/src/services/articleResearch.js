@@ -117,13 +117,13 @@ async function performArticleDeepResearch(articleContext, claims = []) {
 
   // 3. Synthesize Article-Level Research Summary via Gemini or fallback
   let summary = '';
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
   if (isKeyValid(geminiKey) && articleEvidencePool.length > 0) {
     try {
       const { GoogleGenAI } = require('@google/genai');
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
 
       const prompt = `You are Agent 0 (Article-Level Deep Researcher). Synthesize an Article-Level Research Summary based ONLY on retrieved evidence. State clearly what authoritative sources confirm about this story, or if coverage is missing.
 

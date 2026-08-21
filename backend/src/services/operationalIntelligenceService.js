@@ -24,8 +24,6 @@ const crypto = require('crypto');
 const COST_RATES = {
   GEMINI_INPUT_PER_1K: 0.000125,
   GEMINI_OUTPUT_PER_1K: 0.000375,
-  OPENAI_INPUT_PER_1K: 0.0015,
-  OPENAI_OUTPUT_PER_1K: 0.002,
   SERPER_PER_QUERY: 0.001,
   USD_TO_INR: 83.5
 };
@@ -240,7 +238,7 @@ class OperationalIntelligenceEngine {
   /**
    * Records model invocation telemetry
    */
-  recordModelCall(jobId, { provider = 'GEMINI', model = 'gemini-2.5', promptTokens = 500, completionTokens = 300, durationMs = 800, success = true, error = null }) {
+  recordModelCall(jobId, { provider = 'GEMINI', model = 'gemini-flash-lite-latest', promptTokens = 500, completionTokens = 300, durationMs = 800, success = true, error = null }) {
     if (provider === 'GEMINI') {
       this.metrics.models.geminiCalls++;
       if (!success) this.metrics.models.geminiFailures++;
@@ -257,9 +255,9 @@ class OperationalIntelligenceEngine {
     if (durationMs) this.metrics.modelLatencies.push(durationMs);
     if (this.metrics.modelLatencies.length > 500) this.metrics.modelLatencies.shift();
 
-    // Cost computation
-    const rateIn = provider === 'GEMINI' ? COST_RATES.GEMINI_INPUT_PER_1K : COST_RATES.OPENAI_INPUT_PER_1K;
-    const rateOut = provider === 'GEMINI' ? COST_RATES.GEMINI_OUTPUT_PER_1K : COST_RATES.OPENAI_OUTPUT_PER_1K;
+    // Cost computation (Gemini Rates)
+    const rateIn = COST_RATES.GEMINI_INPUT_PER_1K;
+    const rateOut = COST_RATES.GEMINI_OUTPUT_PER_1K;
     const modelCost = (promptTokens / 1000) * rateIn + (completionTokens / 1000) * rateOut;
 
     this.metrics.totalEstimatedCostUsd += modelCost;
@@ -390,7 +388,7 @@ class OperationalIntelligenceEngine {
         },
         externalApis: this.metrics.externalApis,
         cost: {
-          totalEstimatedCostUsd: Math.round(this.metrics.totalEstimatedCostUsd * 1000) / 1000,
+          totalEstimatedCostUsd: Math.round(this.metrics.totalEstimatedCostUsd * 100000) / 100000,
           totalEstimatedCostInr: this.metrics.totalEstimatedCostInr
         },
         pipelineLatency: {

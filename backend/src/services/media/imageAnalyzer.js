@@ -7,7 +7,7 @@ const { getProviderStatus, isKeyValid } = require('../providerManager');
  * Separates OBSERVED facts from INFERRED context. Identifies potential manipulation indicators.
  */
 async function analyzeImage(fileInfo, buffer = null, url = null, options = {}) {
-  const geminiKey = options.openAiKey || options.geminiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  const geminiKey = options.geminiKey || process.env.GEMINI_API_KEY;
   const hasGemini = isKeyValid(geminiKey);
 
   if (!hasGemini) {
@@ -38,7 +38,7 @@ async function analyzeImage(fileInfo, buffer = null, url = null, options = {}) {
 
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
 
     const promptText = `Analyze this image objectively for factual verification and forensic inspection.
 

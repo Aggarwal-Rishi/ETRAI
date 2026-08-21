@@ -41,9 +41,6 @@ const config = {
   serper: {
     apiKey: process.env.SERPER_API_KEY || ''
   },
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || ''
-  },
   limits: {
     maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '10', 10),
     maxSearchQueriesPerClaim: parseInt(process.env.MAX_SEARCH_QUERIES_PER_CLAIM || '4', 10),
@@ -69,7 +66,7 @@ function validateConfig() {
       errors.push('JWT_SECRET must be set to a strong, unique secret (at least 32 characters) in production mode.');
     }
     if (!config.gemini.apiKey) {
-      warnings.push('GEMINI_API_KEY is not set. Agent 2 claim extraction will run in fallback mode.');
+      warnings.push('GEMINI_API_KEY is not set. Agents 1-4 will run in deterministic fallback mode.');
     }
     if (!config.serper.apiKey) {
       warnings.push('SERPER_API_KEY is not set. Agent 3 web retrieval will run in fallback mode.');
@@ -94,8 +91,7 @@ function getSanitizedConfigSummary() {
     clientUrl: config.clientUrl,
     geminiConfigured: Boolean(config.gemini.apiKey && config.gemini.apiKey.length > 5),
     geminiModel: config.gemini.model,
-    serperConfigured: Boolean(config.serper.apiKey && config.serper.apiKey.length > 5),
-    openaiConfigured: Boolean(config.openai.apiKey && config.openai.apiKey.length > 5)
+    serperConfigured: Boolean(config.serper.apiKey && config.serper.apiKey.length > 5)
   };
 }
 

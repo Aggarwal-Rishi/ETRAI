@@ -47,20 +47,21 @@ function analyzeSentiment(text) {
 }
 
 /**
- * Cross-checks VADER sentiment intensity with GPT-4o assessed emotional intensity
+ * Cross-checks VADER sentiment intensity with Google Gemini assessed emotional intensity
  * Returns status flag and final intensity score
  */
-function crossCheckSentiment(vaderIntensity, gptIntensity) {
-  const gptVal = typeof gptIntensity === 'number' ? Math.min(1.0, Math.max(0.0, gptIntensity)) : vaderIntensity;
-  const diff = Math.abs(vaderIntensity - gptVal);
+function crossCheckSentiment(vaderIntensity, aiIntensity) {
+  const geminiVal = typeof aiIntensity === 'number' ? Math.min(1.0, Math.max(0.0, aiIntensity)) : vaderIntensity;
+  const diff = Math.abs(vaderIntensity - geminiVal);
   const isUncertain = diff > 0.4;
 
   // Use average intensity or higher intensity as baseline score
-  const finalIntensity = Number(((vaderIntensity + gptVal) / 2).toFixed(3));
+  const finalIntensity = Number(((vaderIntensity + geminiVal) / 2).toFixed(3));
 
   return {
     vaderIntensity,
-    gptIntensity: gptVal,
+    geminiIntensity: geminiVal,
+    gptIntensity: geminiVal, // Backward compatibility alias
     difference: Number(diff.toFixed(3)),
     isUncertain,
     sentimentStatus: isUncertain ? 'uncertain' : 'confirmed',

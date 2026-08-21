@@ -1,15 +1,15 @@
 /**
  * Provider Manager Service for ETRAI
  * Centralizes provider availability checks, environment modes, test fixture provisioning,
- * and standard OpenAI client initialization with timeout guardrails.
+ * and standard Google Gemini (@google/genai) client initialization with timeout guardrails.
  * 
  * Rules:
  * - NEVER expose raw API key secrets.
  * - Mode: REAL (production default) or MOCK (only when ETRAI_TEST_MODE=mock).
  * - Real mode with missing keys MUST return UNAVAILABLE without fabricating evidence.
  * - Mock mode ONLY uses fixture evidence clearly marked as test-fixture.local.
- * - Agent 2 (claimExtractor) now uses Gemini. Other agents (factVerifier, reportGenerator,
- *   imageAnalyzer, videoAnalyzer, correctionsService) still use OpenAI where configured.
+ * - All agents (Agent 1 Intake/Vision, Agent 2 Claim Extraction, Agent 3 Fact Verification,
+ *   Agent 4 Report Synthesis, Forensics, Corrections) use Google Gemini.
  */
 
 function isKeyValid(key) {

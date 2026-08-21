@@ -205,7 +205,7 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     };
   }
 
-  const geminiKey = options.geminiKey || options.openAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  const geminiKey = options.geminiKey || process.env.GEMINI_API_KEY;
   const hasGemini = isKeyValid(geminiKey);
 
   if (!hasGemini) {
@@ -228,7 +228,7 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
 
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
 
     const response = await ai.models.generateContent({
       model: modelName,

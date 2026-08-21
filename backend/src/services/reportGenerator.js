@@ -121,7 +121,7 @@ async function generateReport({
   const { scores, factualAccuracyScore, evidenceConfidence, articleVerdict, manipulationRisk, manipulationScore, breakdown } = canonicalData;
 
   const providerStatus = getProviderStatus();
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
   const hasGemini = isKeyValid(geminiKey);
 
   let aiSummaryMode = 'DETERMINISTIC_FALLBACK';
@@ -135,7 +135,7 @@ async function generateReport({
   if (hasGemini && geminiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
 
       const mediaPromptSection = mediaAnalysis ? `
 Media Payload Verification Details:
