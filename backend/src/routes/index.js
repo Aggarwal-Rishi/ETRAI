@@ -9,6 +9,7 @@ const sourcesRoutes = require('./sources');
 const newsRoutes = require('./news');
 const fakeNewsRoutes = require('./fakeNews');
 const searchRoutes = require('./search');
+const dashboardRoutes = require('./dashboard');
 const workspaceRoutes = require('./workspaces');
 const accountRoutes = require('./accountSecurity');
 const billingRoutes = require('./billing');
@@ -16,6 +17,7 @@ const observabilityRoutes = require('./observability');
 
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
+router.use('/dashboard', dashboardRoutes);
 router.use('/verify', verifyRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/sources', sourcesRoutes);
