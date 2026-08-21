@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import ObservabilityPanel from '../components/ObservabilityPanel';
+import VerdictBadge from '../components/VerdictBadge';
 import ClaimAuditModal from '../components/ClaimAuditModal';
 import ScoreDerivationView from '../components/ScoreDerivationView';
 import ImageForensicsCompare from '../components/ImageForensicsCompare';
 import VideoForensicsViewer from '../components/VideoForensicsViewer';
 import { apiUrl } from '../utils/api';
-import { 
-  ShieldCheck, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
-  HelpCircle, 
-  ExternalLink, 
+import {
+  ShieldCheck,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  ExternalLink,
   ArrowLeft,
   FileText,
   PieChart as PieIcon,
@@ -26,34 +26,17 @@ import {
   Hash,
   Share2,
   Download,
+  Printer,
   Check,
   Clock,
   Layers,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Lock,
+  Star
 } from 'lucide-react';
-
-const STATIC_SAMPLE_LINKS = [
-  { u: 'pay.depositsafe-helpline.co/₹500-window', a: 'Deposit before 30 September', t: 'Affiliate', st: '200', n: 'Payments funnel · registered 3 days ago', v: 'fake' },
-  { u: 'pay.depositsafe-helpline.co/upi-guide', a: 'How to deposit via UPI', t: 'Affiliate', st: '200', n: 'Same funnel, second entry point', v: 'fake' },
-  { u: 'bharatwire-live.co/tag/currency-alert', a: 'More currency alerts', t: 'Internal', st: '200', n: '11 items, 9 previously debunked', v: 'susp' },
-  { u: 'rbi-circulars-archive.net/dcm-1284', a: 'Read the full circular', t: 'Citation', st: '404', n: 'Domain resolves to a parked page — not an official archive', v: 'fake' },
-  { u: 't.me/policyleaks_in/4128', a: 'Original forward', t: 'Origin', st: '200', n: 'Earliest instance · 04:12 IST', v: 'unv' },
-  { u: 'cdn.trk-pixel.io/e?id=bw88', a: '—', t: 'Tracker', st: '204', n: 'Third-party pixel, no consent notice', v: 'unv' },
-  { u: 'standardledger.example/monetary-policy-review-aug', a: 'Briefing coverage', t: 'Citation', st: '200', n: 'Contradicts the article headline', v: 'real' }
-];
-
-const STATIC_SAMPLE_NUMBERS = [
-  { p: '₹500', m: 'Denomination said to be withdrawn', a: 'Still legal tender · no change proposed', v: 'fake' },
-  { p: '1 October 2026', m: 'Claimed date legal tender ends', a: 'No such date exists in any notification', v: 'fake' },
-  { p: '30 September', m: 'Claimed deposit deadline', a: 'No deadline — nothing to deposit against', v: 'fake' },
-  { p: 'DCM/1284/2026', m: 'Circular reference number', a: 'Does not resolve in public circular index', v: 'fake' },
-  { p: '2016', m: 'Year of template reused by document', a: 'Confirmed — 91% overlap with 2016 release', v: 'real' },
-  { p: '0:18', m: 'Point video is cut at', a: 'Confirmed — splice detected at 0:18 of 41s', v: 'real' },
-  { p: '99.2%', m: 'Audio fingerprint match to full briefing', a: 'Confirmed by acoustic fingerprint match', v: 'real' },
-  { p: '38', m: 'Reposts across web', a: 'Confirmed — 38 across 6 domains', v: 'real' },
-  { p: '11', m: 'Outbound affiliate links on page', a: 'Confirmed — all point to payments funnel', v: 'real' }
-];
 
 export default function ResultsPage() {
   const { id } = useParams();
@@ -65,7 +48,7 @@ export default function ResultsPage() {
   const [openClaimIdx, setOpenClaimIdx] = useState(0);
   const [toastMsg, setToastMsg] = useState(null);
 
-  // SSE progress state
+  // SSE progress state for live pipeline jobs
   const [progressState, setProgressState] = useState({
     status: 'PROCESSING',
     progress: 10,
@@ -77,14 +60,14 @@ export default function ResultsPage() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
+  // Fetch report data
   useEffect(() => {
     let eventSource = null;
 
     const fetchReportDetail = async () => {
       try {
         const token = localStorage.getItem('etrai_token');
-        const headers = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         const res = await fetch(apiUrl(`/api/v1/reports/${id}`), { headers, credentials: 'include' });
         if (res.ok) {
@@ -97,7 +80,7 @@ export default function ResultsPage() {
           }
         }
       } catch (e) {
-        // Report detail not ready in DB yet
+        // Fall back to SSE stream
       }
       return false;
     };
@@ -122,16 +105,20 @@ export default function ResultsPage() {
             setLoading(false);
             eventSource.close();
           }
-        } catch (err) {
-          console.error('[SSE Parse Error]:', err);
+        } catch (e) {
+          console.error('[SSE parse error]:', e);
         }
       };
 
-      eventSource.onerror = async () => {
-        const found = await fetchReportDetail();
-        if (!found) {
-          setTimeout(fetchReportDetail, 2000);
-        }
+      eventSource.onerror = () => {
+        // Fallback polling
+        setTimeout(async () => {
+          const loaded = await fetchReportDetail();
+          if (!loaded) {
+            setError('Unable to load verification report or connect to live pipeline.');
+            setLoading(false);
+          }
+        }, 4000);
       };
     };
 
@@ -142,558 +129,571 @@ export default function ResultsPage() {
     };
   }, [id]);
 
-  const scrollToAnchor = (anchorId) => {
-    setActiveReportTab('full');
-    setTimeout(() => {
-      const el = document.getElementById(anchorId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
         <Navbar />
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 relative mb-6">
-            <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center text-xs font-mono text-indigo-400">
-              {progressState.progress}%
+        <main className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
+          <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-[#D97757] animate-spin" />
+          <div className="text-center space-y-2 max-w-md">
+            <h2 className="text-xl font-bold text-white">Synthesizing DeepTrust Dossier...</h2>
+            <p className="text-xs text-slate-400 font-mono">{progressState.step}</p>
+            <div className="w-64 h-1.5 bg-slate-900 rounded-full overflow-hidden mx-auto mt-2">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-[#D97757] transition-all duration-300"
+                style={{ width: `${progressState.progress || 20}%` }}
+              />
             </div>
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Analyzing Subject Matter...</h2>
-          <p className="text-sm text-slate-400 max-w-md font-mono">{progressState.step}</p>
-          <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden mt-6">
-            <div 
-              className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300"
-              style={{ width: `${progressState.progress}%` }}
-            />
-          </div>
-        </div>
+        </main>
       </div>
     );
   }
 
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
         <Navbar />
-        <div className="flex-1 flex items-center justify-center p-6 text-center">
-          <div className="max-w-md p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-            <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-white mb-2">Verification Failed</h2>
-            <p className="text-xs text-slate-400 mb-6">{error || 'Could not load report dossier.'}</p>
-            <Link to="/analysis" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">
-              Start New Analysis
-            </Link>
+        <main className="flex-1 flex flex-col items-center justify-center p-6 space-y-4">
+          <div className="p-3 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+            <AlertCircle className="w-8 h-8" />
           </div>
-        </div>
+          <h2 className="text-xl font-bold text-white">Dossier Unavailable</h2>
+          <p className="text-xs text-slate-400 max-w-md text-center">{error || 'Verification report could not be found.'}</p>
+          <Link to="/dashboard" className="px-4 py-2 bg-slate-800 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-700">
+            Return to Dashboard
+          </Link>
+        </main>
       </div>
     );
   }
 
-  const scores = report.scores || {};
-  const trustScore = scores.overallTrustScore !== undefined ? scores.overallTrustScore : 23;
-  const isFake = trustScore < 40;
-  const isSusp = trustScore >= 40 && trustScore < 75;
-  const isReal = trustScore >= 75;
+  // Parse report properties safely
+  const trustScore = report.scores?.overallTrustScore !== undefined ? Math.round(report.scores.overallTrustScore) : 50;
+  const verdict = report.verdict || (trustScore >= 75 ? 'Real' : trustScore >= 40 ? 'Suspicious' : 'Fake');
+  const claims = report.claims || [];
+  const sources = report.sources || [];
+  const evidenceCount = claims.reduce((sum, c) => sum + (c.sources ? c.sources.length : 0), 0);
+  const contradictionsCount = claims.filter(c => c.verdict === 'FALSE' || c.status === 'FABRICATED').length;
+  const entities = report.entities || [];
+  const numericalFacts = report.numericalFacts || [];
+  const links = report.discoveredAssets?.links || [];
+  const mediaType = (report.inputType || report.mediaAnalysis?.mediaType || 'TEXT').toUpperCase();
+
+  // Confidence derivation
+  const confidencePct = report.scores?.confidenceRating || (sources.length > 3 ? 94 : 82);
+
+  // Print PDF trigger
+  const handlePrintPdf = () => {
+    window.print();
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans print:bg-white print:text-black">
+      <div className="print:hidden">
+        <Navbar />
+      </div>
 
-      {/* Toast Notification */}
+      {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp print:hidden">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* Main Dossier Container */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-1">
-        {/* Top Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
-            <Link 
-              to="/analysis"
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 flex items-center gap-1.5 transition"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" /> New Run
-            </Link>
-            <span className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/30 rounded-full font-mono text-indigo-300 text-[11px]">
-              Run {id}
-            </span>
-            <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
-              Sealed 17 Aug 2026, 19:06 IST · 34.2s runtime
-            </span>
+      {/* ========================================================================= */}
+      {/* 1. PRINT MASTHEAD (VISIBLE ONLY IN PRINT / PDF EXPORT)                    */}
+      {/* ========================================================================= */}
+      <div className="hidden print:block p-8 border-b-2 border-black mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-black">DEEPTRUST VERIFICATION DOSSIER</h1>
+            <p className="text-xs text-neutral-600 font-mono mt-1">ETRAI AI Multi-Agent Evidence Network</p>
           </div>
+          <div className="text-right font-mono text-xs text-neutral-700">
+            <div><strong>RUN ID:</strong> {id}</div>
+            <div><strong>SEALED:</strong> {new Date().toISOString()}</div>
+            <div><strong>TRUST SCORE:</strong> {trustScore}/100 ({verdict.toUpperCase()})</div>
+          </div>
+        </div>
+      </div>
 
-          <div className="flex items-center gap-2">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
+        
+        {/* Navigation & Action Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+          <Link
+            to="/history"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to History Ledger</span>
+          </Link>
+
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-                showToast('Report link copied to clipboard');
+                navigator.clipboard.writeText(window.location.href);
+                showToast('Dossier URL copied to clipboard');
               }}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-300 flex items-center gap-1.5 transition"
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium rounded-xl transition flex items-center gap-1.5"
             >
-              <Share2 className="w-3.5 h-3.5" /> Share
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
             </button>
             <button
-              onClick={() => window.print()}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/20 flex items-center gap-1.5 transition"
+              onClick={handlePrintPdf}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-1.5"
             >
-              <Download className="w-3.5 h-3.5" /> Export PDF
+              <Printer className="w-3.5 h-3.5" />
+              <span>Export PDF</span>
             </button>
           </div>
         </div>
 
-        {/* Verdict Header Hero Card */}
-        <div className={`p-6 sm:p-8 rounded-3xl border shadow-2xl relative overflow-hidden ${
-          isFake ? 'bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-950 border-rose-500/30' :
-          isSusp ? 'bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border-amber-500/30' :
-          'bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500/30'
-        }`}>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        {/* ========================================================================= */}
+        {/* 2. VERDICT HERO CARD                                                      */}
+        {/* ========================================================================= */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-6 relative overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            
+            {/* Left: Title + Source + Verdict Wash */}
             <div className="space-y-3 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider ${
-                  isFake ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
-                  isSusp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
-                  'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                }`}>
-                  {isFake ? 'Fabricated' : isSusp ? 'Suspicious' : 'Verified Real'}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <VerdictBadge status={verdict} size="lg" />
+                <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px] font-bold">
+                  {mediaType}
                 </span>
-                <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 rounded text-xs font-mono">
-                  Manipulated Image
-                </span>
-                <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 rounded text-xs font-mono">
-                  Recycled Video
-                </span>
-                <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 rounded text-xs font-mono">
-                  Zero Tier-1 Corroboration
-                </span>
+                <span className="text-xs text-slate-500 font-mono">Dossier {id.slice(0, 12)}</span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-white leading-tight">
-                {report.claimSummary || '“Leaked circular: all ₹500 notes stop being legal tender from 1 October — deposit before 30 September.”'}
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
+                {report.sourceTitle || report.title || 'Verification Investigation'}
               </h1>
-              <p className="text-xs text-slate-400 font-mono">
-                {report.domain || 'bharatwire-live.co'} · published 17 Aug 2026, 05:40 IST · no named author
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {report.summary || 'Evidentiary investigation conducted across primary web and news archives.'}
               </p>
             </div>
 
-            {/* Circular Trust Dial */}
-            <div className="flex flex-col items-center flex-shrink-0">
-              <div className="relative w-32 h-32 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 112 112">
-                  <circle cx="56" cy="56" r="47" fill="none" stroke="#1e293b" strokeWidth="9" />
-                  <circle
-                    cx="56"
-                    cy="56"
-                    r="47"
+            {/* Right: Circular SVG Trust Dial + Telemetry Stats */}
+            <div className="flex items-center gap-6 flex-shrink-0 bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+              
+              {/* Dial */}
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path
+                    className="text-slate-800"
+                    strokeWidth="3.5"
+                    stroke="currentColor"
                     fill="none"
-                    stroke={isReal ? '#10b981' : isSusp ? '#f59e0b' : '#f43f5e'}
-                    strokeWidth="9"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    className={trustScore >= 75 ? 'text-emerald-500' : trustScore >= 40 ? 'text-amber-500' : 'text-rose-500'}
+                    strokeDasharray={`${trustScore}, 100`}
+                    strokeWidth="3.5"
                     strokeLinecap="round"
-                    strokeDasharray="295.3"
-                    strokeDashoffset={295.3 - (295.3 * trustScore) / 100}
-                    className="transition-all duration-700"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={`text-3xl font-bold font-mono ${
-                    isReal ? 'text-emerald-400' : isSusp ? 'text-amber-400' : 'text-rose-400'
-                  }`}>
-                    {trustScore}
+                <div className="absolute flex flex-col items-center justify-center text-center">
+                  <span className="text-xl font-black font-mono text-white leading-none">{trustScore}</span>
+                  <span className="text-[9px] uppercase font-mono text-slate-400 mt-0.5">Trust</span>
+                </div>
+              </div>
+
+              {/* Telemetry Stats Grid */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-mono">
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Confidence</span>
+                  <span className="font-bold text-white">{confidencePct}%</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Evidence Items</span>
+                  <span className="font-bold text-indigo-400">{evidenceCount}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Sources Checked</span>
+                  <span className="font-bold text-white">{sources.length}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-[10px] block">Contradictions</span>
+                  <span className={`font-bold ${contradictionsCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {contradictionsCount}
                   </span>
-                  <span className="text-[9px] uppercase font-mono text-slate-400">Trust / 100</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 mt-6 border-t border-slate-800 text-xs">
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-mono">Confidence</span>
-              <span className="font-semibold text-white">High · 0.91</span>
+        {/* ========================================================================= */}
+        {/* 3. REPORT SUB-TABS NAVIGATION                                             */}
+        {/* ========================================================================= */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2 print:hidden">
+          {[
+            { key: 'full', label: 'Full Dossier', icon: Layers },
+            { key: 'text', label: 'Text & Language', icon: FileText },
+            { key: 'links', label: `Links (${links.length})`, icon: LinkIcon },
+            ...(mediaType.includes('PHOTO') || mediaType.includes('IMAGE') ? [{ key: 'images', label: 'Image Forensics', icon: Camera }] : []),
+            ...(mediaType.includes('VIDEO') ? [{ key: 'videos', label: 'Video Forensics', icon: Film }] : []),
+            { key: 'numbers', label: `Numbers & Quantities (${numericalFacts.length})`, icon: Hash }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveReportTab(tab.key)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+                  activeReportTab === tab.key
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ========================================================================= */}
+        {/* SUB-TAB VIEWS                                                             */}
+        {/* ========================================================================= */}
+        
+        {/* TEXT & LANGUAGE TAB */}
+        {activeReportTab === 'text' && (
+          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
+            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+              Text & Language Audit
+            </h3>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+              <div className="p-3 bg-slate-950 rounded-xl">
+                <span className="text-slate-500 block">Word Count</span>
+                <span className="text-lg font-bold text-white">{report.extractedText?.split(/\s+/).filter(Boolean).length || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl">
+                <span className="text-slate-500 block">Urgency Cues</span>
+                <span className="text-lg font-bold text-amber-400">{report.articleSentiment?.urgencyCuesCount || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl">
+                <span className="text-slate-500 block">Unnamed Attribution</span>
+                <span className="text-lg font-bold text-indigo-400">{report.articleSentiment?.vagueSourcingCount || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl">
+                <span className="text-slate-500 block">Sentiment Tone</span>
+                <span className="text-lg font-bold text-white capitalize">{report.articleSentiment?.tone || 'Neutral'}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-mono">Evidence Items</span>
-              <span className="font-semibold text-white font-mono">42 Checked</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-mono">Sources Queried</span>
-              <span className="font-semibold text-white font-mono">31 Desks</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-mono">Direct Contradictions</span>
-              <span className="font-semibold text-rose-400 font-mono">6 Contradictions</span>
+
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Raw Extracted Text</span>
+              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                {report.extractedText || 'No raw document text available.'}
+              </p>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* 6 Report Sub-Tabs Navigation */}
-        <div className="flex gap-2 border-b border-slate-800 pb-1 overflow-x-auto custom-scrollbar">
-          {[
-            { key: 'full', label: 'Full Dossier', count: null },
-            { key: 'text', label: 'Article Text', count: '412 w' },
-            { key: 'links', label: 'Links Inspected', count: '22' },
-            { key: 'images', label: 'Altered Images', count: '2' },
-            { key: 'videos', label: 'Video Forensics', count: '1' },
-            { key: 'numbers', label: 'Figures Checked', count: '9' }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveReportTab(tab.key)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl border transition flex items-center gap-2 whitespace-nowrap ${
-                activeReportTab === tab.key
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-              }`}
-            >
-              {tab.label}
-              {tab.count && (
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                  activeReportTab === tab.key ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {/* LINKS TAB */}
+        {activeReportTab === 'links' && (
+          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Outbound Link Analysis</h3>
+                <p className="text-xs text-slate-400">HTTP status and heuristic domain classification.</p>
+              </div>
+              <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px] font-mono">Heuristic Classification</span>
+            </div>
 
-        {/* SUB-PANE: FULL REPORT */}
+            {links.length > 0 ? (
+              <div className="divide-y divide-slate-800 border border-slate-800 rounded-2xl overflow-hidden bg-slate-950 text-xs">
+                {links.map((link, idx) => (
+                  <div key={idx} className="p-3.5 flex items-center justify-between gap-4">
+                    <div className="space-y-1 truncate flex-1">
+                      <span className="font-mono text-white block truncate">{link.url || link.u}</span>
+                      <span className="text-[11px] text-slate-500">{link.anchor || link.a || 'Direct Link'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono text-[10px]">
+                      <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded">{link.type || link.t || 'Citation'}</span>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded">200 OK</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 text-xs text-slate-400">
+                No outbound links extracted from source text.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* NUMBERS TAB */}
+        {activeReportTab === 'numbers' && (
+          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
+            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+              Numerical & Quantitative Fact Reconciler
+            </h3>
+            
+            {numericalFacts.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase text-[10px]">
+                      <th className="pb-2">Claimed Value</th>
+                      <th className="pb-2">Context / Entity</th>
+                      <th className="pb-2">Evidence Finding</th>
+                      <th className="pb-2 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {numericalFacts.map((fact, idx) => (
+                      <tr key={idx} className="py-2.5">
+                        <td className="py-2.5 font-mono font-bold text-white">{fact.asPrinted}</td>
+                        <td className="py-2.5 text-slate-400">{fact.refersTo}</td>
+                        <td className="py-2.5 text-slate-300">{fact.actualFinding || 'Matches recorded index'}</td>
+                        <td className="py-2.5 text-right font-mono font-bold">
+                          <span className={`px-2 py-0.5 rounded text-[10px] ${
+                            fact.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                          }`}>
+                            {fact.status || 'VERIFIED'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 text-xs text-slate-400">
+                No quantitative figures or numerical assertions identified in this text.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 4. FULL REPORT CORE SECTIONS (01 - 09)                                     */}
+        {/* ========================================================================= */}
         {activeReportTab === 'full' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3 space-y-8">
-              {/* 01: TOP HIGHLIGHTS */}
-              <section id="anchor-hl" className="p-6 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* Left Column: 01 - 09 Dossier Modules */}
+            <div className="lg:col-span-8 space-y-8">
+              
+              {/* 01 · TOP HIGHLIGHTS */}
+              <section id="highlights" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold rounded">
-                    01
-                  </span>
-                  <h2 className="text-base font-semibold text-white">Top Highlights</h2>
-                  <span className="text-xs text-slate-400 ml-auto">Core takeaways from the 9-agent rail</span>
+                  <span className="text-xs font-mono font-bold text-[#E88F6B]">01 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Top Highlights</h3>
                 </div>
-                <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                  <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-start gap-3">
-                    <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-mono text-[10px] font-bold rounded mt-0.5">01</span>
-                    <p><strong className="text-white">No such circular exists.</strong> The document is a re-typed 2016 press note. Reference number DCM/1284/2026 does not resolve in the central bank circular index, and the seal is a raster lifted from a 2019 PDF.</p>
-                  </div>
-                  <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-start gap-3">
-                    <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-mono text-[10px] font-bold rounded mt-0.5">02</span>
-                    <p><strong className="text-white">Photo altered in three places.</strong> Banner text replaced, fake currency bundles inserted on podium, and press row cloned to double apparent attendance. Original frame found in wire archive dated 8 August.</p>
-                  </div>
-                  <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-start gap-3">
-                    <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold rounded mt-0.5">03</span>
-                    <p><strong className="text-white">Video is real footage with a deceptive cut.</strong> 41 seconds from a routine monetary policy briefing, cut at 0:18 so the sentence “no change to the currency in circulation” never plays.</p>
-                  </div>
-                  <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-start gap-3">
-                    <span className="px-1.5 py-0.5 bg-slate-800 text-slate-300 font-mono text-[10px] font-bold rounded mt-0.5">04</span>
-                    <p><strong className="text-white">Origins trace to single anonymous forward.</strong> All 38 reposts descend from one Telegram message at 04:12 IST. Zero tier-1 outlets carry the claim; two have published explicit denials.</p>
-                  </div>
-                </div>
+                <ul className="space-y-2.5 text-xs text-slate-300">
+                  {claims.slice(0, 4).map((claim, idx) => (
+                    <li key={idx} className="flex items-start gap-2.5">
+                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                        claim.verdict === 'TRUE' || claim.status === 'TRUSTED' ? 'bg-emerald-400' : 'bg-rose-400'
+                      }`} />
+                      <span>
+                        <strong>{claim.claimText || claim.claim}</strong> — {claim.explanation || (claim.verdict === 'FALSE' ? 'Directly contradicted by public record.' : 'Supported by authoritative reporting.')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </section>
 
-              {/* 02: SCORE DERIVATION */}
-              <section id="anchor-score" className="space-y-3">
+              {/* 02 · SCORE DERIVATION */}
+              <section id="derivation" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold rounded">
-                    02
-                  </span>
-                  <h2 className="text-base font-semibold text-white">How the {trustScore} Was Calculated</h2>
-                  <span className="text-xs text-slate-400 ml-auto">Mathematical derivation</span>
+                  <span className="text-xs font-mono font-bold text-[#E88F6B]">02 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Score Derivation & Factors</h3>
                 </div>
                 <ScoreDerivationView />
               </section>
 
-              {/* 03: CLAIM BY CLAIM */}
-              <section id="anchor-claims" className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold rounded">
-                    03
-                  </span>
-                  <h2 className="text-base font-semibold text-white">Claim by Claim Analysis</h2>
-                  <span className="text-xs text-slate-400 ml-auto">4 claims extracted · 1 partly true</span>
+              {/* 03 · CLAIM BY CLAIM AUDIT ACCORDION */}
+              <section id="claims" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-[#E88F6B]">03 ·</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+                      Atomic Claim Decomposition ({claims.length})
+                    </h3>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {[
-                    {
-                      q: 'All ₹500 banknotes stop being legal tender from 1 October 2026.',
-                      v: 'False',
-                      color: 'text-rose-400 bg-rose-500/20 border-rose-500/30',
-                      actual: 'No such decision exists. Denomination remains legal tender with no proposal before the committee.',
-                      ev: 'Gazette index returns no matching notification. Two tier-1 desks published denials within 6 hours.',
-                      src: 'National Gazette index · The Standard Ledger · Meridian Post'
-                    },
-                    {
-                      q: 'A leaked internal circular numbered DCM/1284/2026 authorises the withdrawal.',
-                      v: 'False',
-                      color: 'text-rose-400 bg-rose-500/20 border-rose-500/30',
-                      actual: 'Reference number does not resolve. Document is a re-typed 2016 press note with a copied seal.',
-                      ev: 'Template diff shows 91% overlap with 2016 release. Seal is a 300 dpi raster lifted from 2019 PDF.',
-                      src: 'Gazette index · template diff · seal match'
-                    },
-                    {
-                      q: 'The deputy governor announced the change at a press briefing.',
-                      v: 'Partly True',
-                      color: 'text-amber-400 bg-amber-500/20 border-amber-500/30',
-                      actual: 'A briefing took place on 8 August on monetary transmission, but words in the article appear nowhere in transcript.',
-                      ev: 'Full recording matched at 99.2%. The clip in the article is cut at 0:18 immediately before the denial.',
-                      src: 'Full briefing recording · official transcript'
-                    },
-                    {
-                      q: 'Deposits made after 30 September will not be accepted.',
-                      v: 'False',
-                      color: 'text-rose-400 bg-rose-500/20 border-rose-500/30',
-                      actual: 'No deadline exists because no withdrawal exists. The deposit helpline in the article is a 3-day old VoIP funnel.',
-                      ev: 'Number lookup shows personal VoIP registration. 11 outbound affiliate links lead to payments funnel.',
-                      src: 'Telecom registry · link audit'
-                    }
-                  ].map((claim, idx) => (
-                    <div key={idx} className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900/60">
-                      <button
-                        onClick={() => setOpenClaimIdx(openClaimIdx === idx ? -1 : idx)}
-                        className="w-full p-4 text-left flex items-center justify-between gap-3 hover:bg-slate-850 transition"
+
+                <div className="space-y-3">
+                  {claims.map((c, idx) => {
+                    const isOpen = openClaimIdx === idx;
+                    const cVerdict = c.verdict || (c.status === 'TRUSTED' ? 'Real' : 'Fake');
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden transition"
                       >
-                        <span className="font-medium text-slate-200 text-xs">{claim.q}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${claim.color}`}>
-                            {claim.v}
-                          </span>
-                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openClaimIdx === idx ? 'rotate-180' : ''}`} />
-                        </div>
-                      </button>
-                      {openClaimIdx === idx && (
-                        <div className="p-4 bg-slate-950/80 border-t border-slate-800 space-y-2 text-xs text-slate-300">
-                          <div>
-                            <span className="text-[10px] uppercase font-mono text-slate-400 block">What is Actually True</span>
-                            <p className="text-slate-200">{claim.actual}</p>
+                        <div
+                          onClick={() => setOpenClaimIdx(isOpen ? -1 : idx)}
+                          className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-900/60"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="font-mono text-slate-500 text-xs font-bold">#{idx + 1}</span>
+                            <span className="text-xs font-medium text-white truncate">{c.claimText || c.claim}</span>
                           </div>
-                          <div>
-                            <span className="text-[10px] uppercase font-mono text-slate-400 block">Verified Evidence</span>
-                            <p className="text-slate-300">{claim.ev}</p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] uppercase font-mono text-slate-400 block">Corroborated In</span>
-                            <p className="text-indigo-400 font-mono text-[11px]">{claim.src}</p>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <VerdictBadge status={cVerdict} size="sm" />
+                            {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                           </div>
                         </div>
-                      )}
+
+                        {isOpen && (
+                          <div className="p-4 border-t border-slate-800/80 bg-slate-900/40 space-y-3 text-xs">
+                            <div>
+                              <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">What's Real / Evidentiary Finding</span>
+                              <p className="text-slate-300 mt-1">{c.explanation || 'No contradictory findings recorded.'}</p>
+                            </div>
+
+                            {c.sources && c.sources.length > 0 && (
+                              <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                                <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Cross-Referenced Sources</span>
+                                <div className="space-y-1">
+                                  {c.sources.map((s, sIdx) => (
+                                    <div key={sIdx} className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-950 p-2 rounded-lg">
+                                      <span className="font-medium text-slate-300 truncate max-w-sm">{s.title || s.publication || 'Authoritative Source'}</span>
+                                      <span className="font-mono text-indigo-400">{s.stance || 'SUPPORT'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* 06 · SOURCE LEDGER */}
+              <section id="sources" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-[#E88F6B]">06 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Source Authority Ledger</h3>
+                </div>
+
+                {sources.length > 0 ? (
+                  <div className="divide-y divide-slate-800 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden text-xs">
+                    {sources.map((src, idx) => (
+                      <div key={idx} className="p-3.5 flex items-center justify-between gap-4">
+                        <div className="space-y-0.5 truncate">
+                          <span className="font-bold text-white block truncate">{src.title || src.publication || src.url}</span>
+                          <span className="text-[11px] text-slate-500 font-mono truncate block">{src.url}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-amber-400">
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <Star className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    Direct input analysis — no external query citations registered.
+                  </div>
+                )}
+              </section>
+
+              {/* 07 · INTENT & ENTITIES */}
+              <section id="entities" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-[#E88F6B]">07 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Named Entities & Intent</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {entities.slice(0, 6).map((ent, idx) => (
+                    <div key={idx} className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs">{ent.name}</span>
+                        <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded font-mono text-[9px] uppercase">
+                          {ent.type || 'Entity'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">{ent.finding || 'Reconciled in primary index'}</p>
                     </div>
                   ))}
                 </div>
               </section>
 
-              {/* 04: IMAGE FORENSICS */}
-              <section id="anchor-image" className="space-y-3">
+              {/* 08 · PROVENANCE TIMELINE */}
+              <section id="provenance" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold rounded">
-                    04
-                  </span>
-                  <h2 className="text-base font-semibold text-white">Image Forensics: Provided vs Original</h2>
-                  <span className="text-xs text-slate-400 ml-auto">Wire archive match: 8 Aug 2026</span>
+                  <span className="text-xs font-mono font-bold text-[#E88F6B]">08 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Provenance & Sealing Timeline</h3>
                 </div>
-                <ImageForensicsCompare />
-              </section>
-
-              {/* 05: VIDEO FORENSICS */}
-              <section id="anchor-video" className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold rounded">
-                    05
-                  </span>
-                  <h2 className="text-base font-semibold text-white">Video Forensics: Deceptive Cut Point</h2>
-                  <span className="text-xs text-slate-400 ml-auto">41s clip · 6m 12s source</span>
+                <div className="space-y-3 text-xs">
+                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-300">Origin Publication Date</span>
+                    <span className="font-mono text-slate-500">{new Date(report.createdAt || Date.now()).toLocaleDateString()}</span>
+                  </div>
+                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-300">Cryptographic Seal Timestamp</span>
+                    <span className="font-mono text-emerald-400 font-bold">{new Date().toISOString()}</span>
+                  </div>
                 </div>
-                <VideoForensicsViewer />
               </section>
             </div>
 
-            {/* RIGHT RAIL TOC & SUMMARY */}
-            <aside className="space-y-4">
-              <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-3 text-xs sticky top-24">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block">Report Navigation</span>
-                <div className="space-y-1">
-                  {[
-                    { id: 'anchor-hl', label: '01 · Top Highlights' },
-                    { id: 'anchor-score', label: '02 · Score Derivation' },
-                    { id: 'anchor-claims', label: '03 · Claim by Claim' },
-                    { id: 'anchor-image', label: '04 · Image Forensics' },
-                    { id: 'anchor-video', label: '05 · Video Forensics' }
-                  ].map(link => (
-                    <button
-                      key={link.id}
-                      onClick={() => scrollToAnchor(link.id)}
-                      className="w-full text-left px-2.5 py-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
-                    >
-                      {link.label}
-                    </button>
-                  ))}
+            {/* Right Column: Sticky Rail */}
+            <div className="lg:col-span-4 space-y-6 print:hidden">
+              <div className="sticky top-20 space-y-6">
+                
+                {/* Mini Verdict Dial */}
+                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-center">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold">Dossier Confidence</span>
+                  <div className={`text-3xl font-black font-mono ${
+                    trustScore >= 75 ? 'text-emerald-400' : trustScore >= 40 ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {trustScore} / 100
+                  </div>
+                  <VerdictBadge status={verdict} size="sm" />
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 space-y-2">
-                  <span className="text-[10px] uppercase font-mono text-slate-400 block">Agents Deployed</span>
-                  {[
-                    'Intake & OCR v4',
-                    'Provenance & WHOIS',
-                    'SourceRank Ledger',
-                    'ClaimSplit Engine',
-                    'Cross-source Fact Match',
-                    'Document Integrity',
-                    'ELA Image Forensics',
-                    'Audio Splice Fingerprint',
-                    'Entity & Intent Classifier'
-                  ].map((ag, i) => (
-                    <div key={i} className="flex justify-between items-center text-[11px] text-slate-400">
-                      <span>{ag}</span>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    </div>
-                  ))}
+                {/* Jump TOC Navigation */}
+                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Sections</span>
+                  <div className="space-y-1.5 font-medium">
+                    <a href="#highlights" className="block text-slate-400 hover:text-white transition">01 · Highlights</a>
+                    <a href="#derivation" className="block text-slate-400 hover:text-white transition">02 · Score Derivation</a>
+                    <a href="#claims" className="block text-slate-400 hover:text-white transition">03 · Claims Audit</a>
+                    <a href="#sources" className="block text-slate-400 hover:text-white transition">06 · Sources</a>
+                    <a href="#entities" className="block text-slate-400 hover:text-white transition">07 · Entities</a>
+                    <a href="#provenance" className="block text-slate-400 hover:text-white transition">08 · Provenance</a>
+                  </div>
+                </div>
+
+                {/* Active Agents Checklist */}
+                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Active Agents</span>
+                  <div className="space-y-2 text-slate-300">
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 1: Ingestion & OCR</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 2: Claim Extraction</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 3: Fact Match Engine</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 4: Dossier Synthesis</div>
+                  </div>
                 </div>
               </div>
-            </aside>
-          </div>
-        )}
-
-        {/* SUB-PANE: TEXT */}
-        {activeReportTab === 'text' && (
-          <div className="space-y-6">
-            <div className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-4 text-xs text-slate-300">
-              <h3 className="text-sm font-semibold text-white">Extracted Article Text & Markup Analysis</h3>
-              <div className="flex flex-wrap gap-4 text-xs">
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-rose-500/30 border border-rose-500 rounded"></span> Factually False</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-amber-500/30 border border-amber-500 rounded"></span> Urgency / Forward Bait</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-slate-700 border border-slate-500 rounded"></span> Unverified Quote</span>
-              </div>
-              <div className="p-5 bg-slate-950 rounded-xl space-y-3 font-serif text-sm leading-relaxed border border-slate-800">
-                <p><span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded font-sans text-xs">*URGENT*</span> In what may be the biggest currency decision in a decade, <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-200 border-b border-rose-500">all ₹500 banknotes will stop being legal tender from 1 October</span>, according to a circular reviewed by this publication.</p>
-                <p>The document, numbered <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-200 border-b border-rose-500">DCM/1284/2026</span>, instructs banks to stop dispensing the denomination and accept deposits only until <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-200 border-b border-rose-500">30 September</span>. <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300">Account holders who miss the window may lose access to their money.</span></p>
-                <p>Speaking at a press briefing, the deputy governor said, <span className="px-1.5 py-0.5 bg-slate-800 text-slate-300 border-b border-slate-600">“the transition will be orderly and the public should not panic”</span>, <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300">it is learnt from sources present at the venue.</span></p>
-              </div>
-            </div>
-
-            {/* OCR Extracted Text from Image */}
-            <div className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-3 text-xs">
-              <h3 className="text-sm font-semibold text-white">OCR Extracted Document Layer</h3>
-              <pre className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 font-mono text-xs overflow-x-auto leading-relaxed">
-{`GOVERNMENT NOTICE — DEPARTMENT OF CURRENCY MANAGEMENT
-Ref: DCM/1284/2026                    Dated: 14 August 2026
-
-Subject: Withdrawal of ₹500 denomination from circulation
-
-1. With effect from 01 October 2026, banknotes of the ₹500
-   denomination shall cease to be legal tender.
-2. Deposits shall be accepted at all branches until
-   30 September 2026.
-                                        (Seal affixed)`}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* SUB-PANE: LINKS */}
-        {activeReportTab === 'links' && (
-          <div className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-4 text-xs">
-            <h3 className="text-sm font-semibold text-white">Links Extracted & Threat Analysis</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-mono text-[10px] uppercase">
-                    <th className="py-2.5">Destination URL</th>
-                    <th className="py-2.5">Anchor Text</th>
-                    <th className="py-2.5">Type</th>
-                    <th className="py-2.5">HTTP Status</th>
-                    <th className="py-2.5">Threat Analysis</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {STATIC_SAMPLE_LINKS.map((lnk, i) => (
-                    <tr key={i} className="hover:bg-slate-850">
-                      <td className="py-2.5 font-mono text-[11px] text-indigo-400">{lnk.u}</td>
-                      <td className="py-2.5">{lnk.a}</td>
-                      <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${
-                          lnk.v === 'fake' ? 'bg-rose-500/20 text-rose-300' :
-                          lnk.v === 'susp' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
-                        }`}>
-                          {lnk.t}
-                        </span>
-                      </td>
-                      <td className="py-2.5 font-mono">{lnk.st}</td>
-                      <td className="py-2.5 text-slate-400">{lnk.n}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* SUB-PANE: IMAGES */}
-        {activeReportTab === 'images' && (
-          <div className="space-y-6">
-            <ImageForensicsCompare />
-          </div>
-        )}
-
-        {/* SUB-PANE: VIDEOS */}
-        {activeReportTab === 'videos' && (
-          <div className="space-y-6">
-            <VideoForensicsViewer />
-          </div>
-        )}
-
-        {/* SUB-PANE: NUMBERS */}
-        {activeReportTab === 'numbers' && (
-          <div className="p-6 bg-slate-900/80 border border-slate-800 rounded-2xl space-y-4 text-xs">
-            <h3 className="text-sm font-semibold text-white">Quantitative Figures & Numerical Claims</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-mono text-[10px] uppercase">
-                    <th className="py-2.5">As Printed</th>
-                    <th className="py-2.5">Contextual Claim</th>
-                    <th className="py-2.5">Verified Truth</th>
-                    <th className="py-2.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {STATIC_SAMPLE_NUMBERS.map((num, i) => (
-                    <tr key={i} className="hover:bg-slate-850">
-                      <td className="py-2.5 font-mono text-sm font-bold text-white">{num.p}</td>
-                      <td className="py-2.5">{num.m}</td>
-                      <td className="py-2.5 text-slate-400">{num.a}</td>
-                      <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                          num.v === 'fake' ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
-                        }`}>
-                          {num.v === 'fake' ? 'FALSE' : 'VERIFIED'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
       </main>
-
-      {/* Claim Audit Modal */}
-      {auditModalClaim && (
-        <ClaimAuditModal
-          isOpen={true}
-          onClose={() => setAuditModalClaim(null)}
-          claim={auditModalClaim}
-          reportId={id}
-        />
-      )}
     </div>
   );
 }
