@@ -71,10 +71,42 @@ const optionalAuth = async (req, res, next) => {
   next();
 };
 
+const requireRole = (allowedRoles = []) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: 'Authentication required.' });
+      }
+      const { prisma } = require('../utils/prisma');
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!user) return res.status(401).json({ error: 'User record not found.' });
+
+      const member = await prisma.teamMember.findFirst({
+        where: { userId: req.user.id, status: 'ACTIVE' }
+      });
+
+      const effectiveRole = member?.role || user.role || 'OWNER';
+
+      if (allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole) && effectiveRole !== 'OWNER') {
+        return res.status(403).json({
+          error: `Permission denied. Role '${effectiveRole}' is not authorized to perform this operation.`
+        });
+      }
+
+      req.user.effectiveRole = effectiveRole;
+      next();
+    } catch (err) {
+      return res.status(500).json({ error: 'RBAC role validation error.' });
+    }
+  };
+};
+
 module.exports = {
   requireAuth,
   protect: requireAuth,
   authenticateToken: requireAuth,
   optionalAuth,
+  requireRole,
   JWT_SECRET
 };
+
