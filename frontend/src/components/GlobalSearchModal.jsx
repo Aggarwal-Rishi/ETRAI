@@ -7,316 +7,188 @@ import {
   CheckCircle2,
   AlertTriangle,
   Globe,
-  Database,
-  Building2,
-  Newspaper,
-  X,
-  CornerDownLeft,
-  ArrowUpDown
+  Radio,
+  ShieldAlert,
+  Shield,
+  Clock,
+  Sparkles,
+  ArrowRight,
+  Sliders,
+  CreditCard,
+  Users,
+  X
 } from 'lucide-react';
+
+const QUICK_PAGES = [
+  { t: 'Dashboard', m: 'Today’s volume, verdict mix and narrative clusters', path: '/dashboard', ic: FileText },
+  { t: 'Latest News Desk', m: 'Live intake from your ranked sources', path: '/news', ic: Radio },
+  { t: 'Fake News Desk', m: 'Everything under 40, grouped by narrative', path: '/fake-news', ic: ShieldAlert },
+  { t: 'History & Sealed Ledger', m: 'Runs, tokens and cost per verification', path: '/history', ic: Clock },
+  { t: 'New DeepTrust Analysis', m: 'Verify a link, video, image, PDF or text', path: '/analysis', ic: Sparkles },
+  { t: 'Scoring Algorithm', m: 'Factor weights, thresholds and penalties', path: '/settings?tab=algo', ic: Sliders },
+  { t: 'Source Authority Rankings', m: 'Rank 1–4 tables and purpose in pipeline', path: '/settings?tab=sources', ic: Shield },
+  { t: 'Upgrade Plan & Billing', m: 'Compare Starter, Team, Newsroom and Enterprise', path: '/billing', ic: CreditCard },
+  { t: 'My Team & Workspace', m: 'Members, roles and invite links', path: '/workspace', ic: Users }
+];
+
+const STATIC_CLAIMS = [
+  { t: 'All ₹500 banknotes stop being legal tender from 1 October 2026', m: 'In run DT-041-018 · False', path: '/results/DT-041-018', sc: 23 },
+  { t: 'A leaked internal circular numbered DCM/1284/2026 authorises the withdrawal', m: 'In run DT-041-018 · False', path: '/results/DT-041-018', sc: 23 },
+  { t: 'Minister subsidy rollback in Parliament', m: 'In run DT-041-017 · Questionable', path: '/results/DT-041-017', sc: 41 },
+  { t: 'Monsoon deficit revised to 8% below normal', m: 'In run DT-041-016 · Verified Real', path: '/results/DT-041-016', sc: 91 }
+];
+
+const STATIC_SOURCES = [
+  { t: 'The Standard Ledger', m: 'Rank 1 · National authority · 96/100', path: '/settings?tab=sources', sc: 96 },
+  { t: 'Meridian Post', m: 'Rank 1 · National news desk · 93/100', path: '/settings?tab=sources', sc: 93 },
+  { t: 'National Gazette index', m: 'Rank 1 · Gazette authority · 99/100', path: '/settings?tab=sources', sc: 99 },
+  { t: 'bharatwire-live.co', m: 'Rank 4 · Repeat fabrications · 11/100', path: '/settings?tab=sources', sc: 11 }
+];
 
 export default function GlobalSearchModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
-  const [activeType, setActiveType] = useState('ALL');
-  const [results, setResults] = useState([]);
-  const [resultsByType, setResultsByType] = useState({});
-  const [totalMatches, setTotalMatches] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  // Global Ctrl+K / Cmd+K listener
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        if (isOpen) {
-          onClose();
-        }
-      }
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Focus input on open
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setQuery('');
-      setResults([]);
       setSelectedIndex(0);
     }
   }, [isOpen]);
 
-  // Debounced search query
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      setTotalMatches(0);
-      setResultsByType({});
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('etrai_token');
-        const params = new URLSearchParams({ q: query, type: activeType, limit: '30' });
-        const res = await fetch(apiUrl(`/api/v1/search?${params.toString()}`), {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        const data = await res.json();
-        if (data && data.items) {
-          setResults(data.items);
-          setTotalMatches(data.totalMatches || data.items.length);
-          setResultsByType(data.resultsByType || {});
-          setSelectedIndex(0);
-        }
-      } catch (err) {
-        console.error('Global search error:', err);
-      } finally {
-        setLoading(false);
-      }
-    }, 180);
-
-    return () => clearTimeout(timer);
-  }, [query, activeType]);
-
-  // Keyboard navigation
-  const handleInputKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1 < results.length ? prev + 1 : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : results.length - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (results[selectedIndex]) {
-        handleSelectItem(results[selectedIndex]);
-      }
-    }
-  };
-
-  const handleSelectItem = (item) => {
-    onClose();
-    if (item.type === 'REPORT' && item.metadata?.reportId) {
-      navigate(`/reports/${item.metadata.reportId}`);
-    } else if (item.type === 'CLAIM' && item.metadata?.reportId) {
-      navigate(`/reports/${item.metadata.reportId}`);
-    } else if (item.type === 'EVIDENCE' && item.metadata?.reportId) {
-      navigate(`/reports/${item.metadata.reportId}`);
-    } else if (item.type === 'NEWS') {
-      navigate('/dashboard');
-    } else if (item.type === 'SOURCE') {
-      navigate('/history');
-    }
-  };
-
   if (!isOpen) return null;
 
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'REPORT':
-        return <FileText className="w-4 h-4 text-brand-400" />;
-      case 'CLAIM':
-        return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
-      case 'EVIDENCE':
-        return <Globe className="w-4 h-4 text-cyan-400" />;
-      case 'ENTITY':
-        return <Building2 className="w-4 h-4 text-amber-400" />;
-      case 'SOURCE':
-        return <Database className="w-4 h-4 text-purple-400" />;
-      case 'NEWS':
-        return <Newspaper className="w-4 h-4 text-blue-400" />;
-      default:
-        return <Search className="w-4 h-4 text-slate-400" />;
+  const q = query.trim().toLowerCase();
+
+  const matchedPages = QUICK_PAGES.filter(p => !q || p.t.toLowerCase().includes(q) || p.m.toLowerCase().includes(q));
+  const matchedClaims = STATIC_CLAIMS.filter(c => q && (c.t.toLowerCase().includes(q) || c.m.toLowerCase().includes(q)));
+  const matchedSources = STATIC_SOURCES.filter(s => q && (s.t.toLowerCase().includes(q) || s.m.toLowerCase().includes(q)));
+
+  const allResults = q
+    ? [
+        ...matchedClaims.map(c => ({ ...c, group: 'Claims', icon: AlertTriangle })),
+        ...matchedSources.map(s => ({ ...s, group: 'Sources', icon: Shield })),
+        ...matchedPages.map(p => ({ ...p, group: 'Jump to', icon: p.ic }))
+      ]
+    : matchedPages.slice(0, 6).map(p => ({ ...p, group: 'Quick Jump', icon: p.ic }));
+
+  const handleSelect = (item) => {
+    onClose();
+    if (item.path) {
+      navigate(item.path);
     }
   };
 
-  const typesList = [
-    { key: 'ALL', label: 'All' },
-    { key: 'REPORTS', label: `Reports (${resultsByType.REPORT || 0})` },
-    { key: 'CLAIMS', label: `Claims (${resultsByType.CLAIM || 0})` },
-    { key: 'EVIDENCE', label: `Evidence (${resultsByType.EVIDENCE || 0})` },
-    { key: 'ENTITIES', label: `Entities (${resultsByType.ENTITY || 0})` },
-    { key: 'SOURCES', label: `Sources (${resultsByType.SOURCE || 0})` },
-    { key: 'NEWS', label: `News (${resultsByType.NEWS || 0})` }
-  ];
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1 < allResults.length ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 >= 0 ? prev - 1 : allResults.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allResults[selectedIndex]) {
+        handleSelect(allResults[selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div
-        className="w-full max-w-3xl glass-panel rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-scaleUp"
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 bg-black/80 backdrop-blur-md animate-fadeIn"
+    >
+      <div 
         onClick={(e) => e.stopPropagation()}
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-scaleUp text-xs text-slate-200"
       >
-        {/* Search Header */}
-        <div className="p-4 border-b border-slate-800/80 flex items-center gap-3 bg-slate-900/60">
-          <Search className="w-5 h-5 text-slate-400 shrink-0" />
+        {/* Search Input Bar */}
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800 bg-slate-950/80">
+          <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
+            placeholder="Search reports, claims, sources, or jump to page..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleInputKeyDown}
-            placeholder="Search reports, claims, evidence, sources, entities, news..."
-            className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-base focus:outline-none"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-transparent border-0 text-sm text-white focus:outline-none focus:ring-0 placeholder-slate-500"
           />
-          {query && (
-            <button
-              onClick={() => setQuery('')}
-              className="p-1 text-slate-400 hover:text-slate-200 rounded-md transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          <kbd className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono font-medium text-slate-400 bg-slate-800 border border-slate-700 rounded shadow-sm">
-            ESC
-          </kbd>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="px-4 py-2 border-b border-slate-800/60 bg-slate-900/30 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
-          {typesList.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setActiveType(t.key)}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-colors shrink-0 ${
-                activeType === t.key
-                  ? 'bg-brand-600/30 text-brand-300 border border-brand-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+          <button 
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1 divide-y divide-slate-800/30">
-          {loading && (
-            <div className="p-8 text-center text-sm text-slate-400 animate-pulse">
-              Searching global verification index...
-            </div>
-          )}
+        <div className="max-h-80 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+          {allResults.length > 0 ? (
+            allResults.map((item, idx) => {
+              const Icon = item.icon;
+              const isSelected = selectedIndex === idx;
+              return (
+                <div
+                  key={idx}
+                  onClick={() => handleSelect(item)}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                  className={`px-3 py-2.5 rounded-xl cursor-pointer transition flex items-center justify-between gap-3 ${
+                    isSelected ? 'bg-indigo-600/20 text-white border border-indigo-500/30' : 'hover:bg-slate-800/60 text-slate-300 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                      isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-medium text-slate-100 block truncate">{item.t}</span>
+                      <span className="text-[11px] text-slate-400 block truncate">{item.m}</span>
+                    </div>
+                  </div>
 
-          {!loading && query && results.length === 0 && (
-            <div className="p-8 text-center text-sm text-slate-400">
-              No matching records discovered for "{query}".
-            </div>
-          )}
-
-          {!loading && !query && (
-            <div className="p-8 text-center text-xs text-slate-500 space-y-2">
-              <p>Type keywords to omni-search across all verification models.</p>
-              <div className="flex justify-center gap-4 text-[11px] text-slate-400">
-                <span className="flex items-center gap-1"><ArrowUpDown className="w-3 h-3" /> Navigate</span>
-                <span className="flex items-center gap-1"><CornerDownLeft className="w-3 h-3" /> Select</span>
-                <span className="flex items-center gap-1"><kbd className="px-1 bg-slate-800 rounded">ESC</kbd> Close</span>
-              </div>
-            </div>
-          )}
-
-          {!loading && results.map((item, index) => {
-            const isSelected = index === selectedIndex;
-            return (
-              <div
-                key={item.id}
-                onClick={() => handleSelectItem(item)}
-                onMouseEnter={() => setSelectedIndex(index)}
-                className={`p-3 rounded-xl cursor-pointer transition-all flex items-start gap-3 ${
-                  isSelected
-                    ? 'bg-brand-600/20 border border-brand-500/30 text-white'
-                    : 'text-slate-300 hover:bg-slate-800/40'
-                }`}
-              >
-                <div className="mt-0.5 p-2 rounded-lg bg-slate-800/80 shrink-0 border border-slate-700/50">
-                  {getTypeIcon(item.type)}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4
-                      className="text-sm font-semibold text-slate-100 truncate"
-                      dangerouslySetInnerHTML={{ __html: item.highlightedTitle || item.title }}
-                    />
-                    <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-md bg-slate-800 border border-slate-700 text-slate-300 shrink-0">
-                      {item.type}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {item.sc !== undefined && (
+                      <span className={`font-mono font-bold text-[11px] ${
+                        item.sc >= 75 ? 'text-emerald-400' : item.sc >= 40 ? 'text-amber-400' : 'text-rose-400'
+                      }`}>
+                        {item.sc}
+                      </span>
+                    )}
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-slate-800 text-slate-400">
+                      {item.group}
                     </span>
                   </div>
-
-                  <p
-                    className="text-xs text-slate-400 line-clamp-2 mt-1"
-                    dangerouslySetInnerHTML={{ __html: item.highlightedSnippet || item.snippet }}
-                  />
-
-                  {/* Metadata Chips */}
-                  <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-400">
-                    {item.metadata?.verdict && (
-                      <span
-                        className={`px-1.5 py-0.5 rounded font-semibold text-[10px] ${
-                          item.metadata.verdict === 'VERIFIED'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : item.metadata.verdict === 'FALSE'
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}
-                      >
-                        {item.metadata.verdict}
-                      </span>
-                    )}
-
-                    {item.metadata?.trustScore !== undefined && (
-                      <span className="text-brand-300 font-medium">
-                        Score: {item.metadata.trustScore}/100
-                      </span>
-                    )}
-
-                    {item.metadata?.domain && (
-                      <span className="text-slate-400">
-                        {item.metadata.domain}
-                      </span>
-                    )}
-
-                    {item.metadata?.authorityScore !== undefined && (
-                      <span className="text-purple-300">
-                        Authority: {item.metadata.authorityScore}
-                      </span>
-                    )}
-                  </div>
                 </div>
-
-                {isSelected && (
-                  <CornerDownLeft className="w-4 h-4 text-brand-400 shrink-0 mt-2" />
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="p-6 text-center text-slate-500">
+              No matching claims, sources, or reports found for "{query}".
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-between text-xs text-slate-500">
-          <div>
-            Showing {results.length} of {totalMatches} result(s)
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 text-[10px] rounded border border-slate-700 text-slate-400">↑</kbd>
-              <kbd className="px-1.5 py-0.5 bg-slate-800 text-[10px] rounded border border-slate-700 text-slate-400">↓</kbd>
-              Navigate
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 text-[10px] rounded border border-slate-700 text-slate-400">Enter</kbd>
-              Select
-            </span>
-          </div>
+        {/* Footer Hints */}
+        <div className="px-4 py-2 bg-slate-950 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+          <span>
+            <kbd className="px-1 py-0.2 bg-slate-800 rounded">↑</kbd> <kbd className="px-1 py-0.2 bg-slate-800 rounded">↓</kbd> navigate · <kbd className="px-1 py-0.2 bg-slate-800 rounded">↵</kbd> select
+          </span>
+          <span>
+            <kbd className="px-1 py-0.2 bg-slate-800 rounded">ESC</kbd> to close
+          </span>
         </div>
       </div>
     </div>

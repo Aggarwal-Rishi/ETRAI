@@ -12,6 +12,9 @@ import HistoryPage from './pages/HistoryPage';
 import WorkspacePage from './pages/WorkspacePage';
 import AccountSecurityPage from './pages/AccountSecurityPage';
 import BillingPage from './pages/BillingPage';
+import LatestNewsPage from './pages/LatestNewsPage';
+import FakeNewsPage from './pages/FakeNewsPage';
+import SettingsPage from './pages/SettingsPage';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -20,8 +23,8 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slateDark-950 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-400" />
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
         <span className="text-sm font-medium">Verifying Session...</span>
       </div>
     );
@@ -48,6 +51,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/news"
+          element={
+            <ProtectedRoute>
+              <LatestNewsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fake-news"
+          element={
+            <ProtectedRoute>
+              <FakeNewsPage />
             </ProtectedRoute>
           }
         />
@@ -92,6 +111,14 @@ export default function App() {
           }
         />
         <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/security"
           element={
             <ProtectedRoute>
@@ -108,6 +135,7 @@ export default function App() {
           }
         />
 
+        {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
