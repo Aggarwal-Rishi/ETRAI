@@ -272,27 +272,39 @@ model Analysis {
 }
 
 model Claim {
-  id               String         @id @default(uuid())
-  analysisId       String
-  analysis         Analysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
-  claimText        String
-  claimScope       String         @default("National") // International | National | Regional | Local
-  category         String         @default("Factual Statement")
-  verdict          String         @default("UNVERIFIED") // VERIFIED | PARTIALLY_VERIFIED | SUSPICIOUS | FALSE | UNVERIFIED
-  status           String         @default("SUSPICIOUS") // TRUSTED | PARTIALLY_VERIFIED | SUSPICIOUS | FABRICATED
-  confidence       Float          @default(50.0)
-  importanceScore  Float          @default(70.0)
-  reasoning        String?
-  hasCorrection    Boolean        @default(false)
-  correctedClaim   String?
-  correctionBasis  String?
-  partiallyAccurate Boolean       @default(false)
-  rawJson          String?        // Full claim JSON
-  createdAt        DateTime       @default(now())
+  id                   String         @id @default(uuid())
+  analysisId           String
+  analysis             Analysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  claimText            String
+  normalizedClaim      String?
+  claimType            String         @default("FACTUAL_STATEMENT") // QUANTITATIVE | TEMPORAL | EVENT | ATTRIBUTION | INSTITUTIONAL | LEGAL | FINANCIAL | DOCUMENTARY | GEOGRAPHIC | SCIENTIFIC | HISTORICAL | FACTUAL_STATEMENT
+  claimScope           String         @default("National") // International | National | Regional | Local
+  category             String         @default("Factual Statement")
+  verdict              String         @default("INSUFFICIENT_EVIDENCE") // SUPPORTED | FALSE | MISLEADING | PARTIALLY_TRUE | OUTDATED | UNSUPPORTED | INSUFFICIENT_EVIDENCE | DISPUTED
+  status               String         @default("SUSPICIOUS") // TRUSTED | PARTIALLY_VERIFIED | SUSPICIOUS | FABRICATED
+  confidence           Float          @default(50.0)
+  importanceScore      Float          @default(70.0)
+  extractionConfidence Float          @default(90.0)
+  verifiability        String         @default("DIRECTLY_VERIFIABLE") // DIRECTLY_VERIFIABLE | CONTEXT_DEPENDENT | SPECULATIVE | UNVERIFIABLE
+  attribution          String?
+  temporalContext      String?
+  entitiesJson         String?        // JSON array of strings
+  datesJson            String?        // JSON array of strings
+  numbersJson          String?        // JSON array of strings
+  locationsJson        String?        // JSON array of strings
+  reasoning            String?
+  hasCorrection        Boolean        @default(false)
+  correctedClaim       String?
+  correctionBasis      String?
+  partiallyAccurate    Boolean        @default(false)
+  rawJson              String?        // Full claim JSON
+  createdAt            DateTime       @default(now())
 
-  evidenceItems    EvidenceItem[]
+  evidenceItems        EvidenceItem[]
 
   @@index([analysisId])
+  @@index([verdict])
+  @@index([claimType])
   @@map("claims")
 }
 
@@ -300,23 +312,35 @@ model EvidenceItem {
   id                    String   @id @default(uuid())
   claimId               String
   claim                 Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sourceId              String?
   sourceIndex           Int      @default(0)
   url                   String
   domain                String
   title                 String
   snippet               String?
   content               String?
+  excerpt               String?
+  surroundingContext    String?
   stance                String   @default("NEUTRAL") // SUPPORTS | REFUTES | NEUTRAL | IRRELEVANT
+  relationship          String   @default("NEUTRAL") // SUPPORTS | CONTRADICTS | QUALIFIES | IRRELEVANT | INSUFFICIENT
+  evidenceType          String   @default("PRIMARY_REPORTING") // PRIMARY_DOCUMENT | OFFICIAL_STATEMENT | FACT_CHECK_DEBUNK | PEER_REVIEWED_STUDY | EYEWITNESS_REPORT | SECONDARY_ANALYSIS | SOCIAL_POST
   relevanceScore        Float    @default(50.0)
+  reliabilityContribution Float  @default(80.0)
+  independenceGroup     String?
   isIndependent         Boolean  @default(true)
   isSyndicatedDuplicate Boolean  @default(false)
   authorityRank         Int      @default(2)
   authorityScore        Float    @default(80.0)
+  freshness             String   @default("CURRENT_WEEK") // BREAKING_NOW | RECENT_24H | CURRENT_WEEK | ARCHIVE | OUTDATED
+  retrievalStatus       String   @default("SUCCESS") // SUCCESS | PARTIAL | FAILED | BLOCKED
+  retrievedAt           DateTime @default(now())
+  publishedAt           DateTime?
   reason                String?
   createdAt             DateTime @default(now())
 
   @@index([claimId])
   @@index([domain])
+  @@index([relationship])
   @@map("evidence_items")
 }
 

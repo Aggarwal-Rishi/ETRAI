@@ -363,6 +363,59 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
                 }))
               }
             } : {}),
+            ...(verifiedClaims && verifiedClaims.length > 0 ? {
+              claims: {
+                create: verifiedClaims.slice(0, 20).map((c, cIdx) => ({
+                  claimText: c.claimText || c.text || `Claim ${cIdx + 1}`,
+                  normalizedClaim: c.normalizedClaim || c.searchReadyText || c.claimText || c.text,
+                  claimType: (c.claimType || c.category || 'FACTUAL_STATEMENT').toUpperCase().replace(/ /g, '_'),
+                  claimScope: c.claimScope || 'National',
+                  category: c.category || 'Factual Statement',
+                  verdict: c.claimVerificationResult?.verdict || c.verdict || 'INSUFFICIENT_EVIDENCE',
+                  status: c.status || 'SUSPICIOUS',
+                  confidence: c.confidence || c.claimVerificationResult?.confidence || 50.0,
+                  importanceScore: c.importanceScore || 70.0,
+                  extractionConfidence: c.extractionConfidence || 90.0,
+                  verifiability: c.verifiability || 'DIRECTLY_VERIFIABLE',
+                  attribution: c.attribution || null,
+                  temporalContext: c.temporalContext || null,
+                  entitiesJson: JSON.stringify(c.entities || []),
+                  datesJson: JSON.stringify(c.dates || []),
+                  numbersJson: JSON.stringify(c.numbers || []),
+                  locationsJson: JSON.stringify(c.locations || []),
+                  reasoning: c.explanation || c.reasoning || null,
+                  hasCorrection: Boolean(c.hasCorrection),
+                  correctedClaim: c.correctedClaim || null,
+                  correctionBasis: c.correctionBasis || null,
+                  rawJson: JSON.stringify(c),
+                  evidenceItems: {
+                    create: (c.evidenceEvaluations || c.sources || []).slice(0, 10).map((ev, sIdx) => ({
+                      sourceIndex: ev.index !== undefined ? ev.index : sIdx,
+                      url: ev.url || ev.link || 'https://google.com',
+                      domain: ev.domain || 'unknown',
+                      title: ev.title || `Evidence ${sIdx + 1}`,
+                      snippet: ev.snippet || '',
+                      content: ev.fetchedPassage || ev.content || null,
+                      excerpt: ev.snippet || ev.reason || '',
+                      surroundingContext: ev.surroundingContext || null,
+                      stance: ev.stance || 'NEUTRAL',
+                      relationship: ev.relationship || (ev.stance === 'SUPPORTS' ? 'SUPPORTS' : ev.stance === 'REFUTES' ? 'CONTRADICTS' : 'NEUTRAL'),
+                      evidenceType: ev.evidenceType || 'PRIMARY_REPORTING',
+                      relevanceScore: ev.relevanceScore || ev.retrievalRelevance || 50.0,
+                      reliabilityContribution: ev.reliabilityContribution || 80.0,
+                      independenceGroup: ev.syndicationGroup || ev.domain || 'default',
+                      isIndependent: ev.isIndependent !== false && !ev.isSyndicatedDuplicate,
+                      isSyndicatedDuplicate: Boolean(ev.isSyndicatedDuplicate),
+                      authorityRank: ev.rank || 2,
+                      authorityScore: ev.authorityScore || 80.0,
+                      freshness: ev.recency || 'CURRENT_WEEK',
+                      retrievalStatus: ev.retrievalStatus || 'SUCCESS',
+                      reason: ev.reason || ev.reasoning || null
+                    }))
+                  }
+                }))
+              }
+            } : {}),
             ...(numericalRes.facts && numericalRes.facts.length > 0 ? {
               numericalFacts: {
                 create: numericalRes.facts.slice(0, 15).map(f => ({
