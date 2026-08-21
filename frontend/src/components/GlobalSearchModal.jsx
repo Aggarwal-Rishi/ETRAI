@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl } from '../utils/api';
 import {
   Search,
   FileText,
@@ -68,7 +69,7 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
       try {
         const token = localStorage.getItem('etrai_token');
         const params = new URLSearchParams({ q: query, type: activeType, limit: '30' });
-        const res = await fetch(`/api/v1/search?${params.toString()}`, {
+        const res = await fetch(apiUrl(`/api/v1/search?${params.toString()}`), {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         const data = await res.json();

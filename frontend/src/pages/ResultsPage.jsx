@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import ObservabilityPanel from '../components/ObservabilityPanel';
 import ClaimAuditModal from '../components/ClaimAuditModal';
+import { apiUrl } from '../utils/api';
 import { 
   ShieldCheck, 
   AlertTriangle, 
@@ -44,7 +45,7 @@ export default function ResultsPage() {
 
     const fetchReportDetail = async () => {
       try {
-        const res = await fetch(`/api/v1/reports/${id}`, { credentials: 'include' });
+        const res = await fetch(apiUrl(`/api/v1/reports/${id}`), { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           const reportPayload = data.report?.reportData || data.report;
@@ -65,7 +66,7 @@ export default function ResultsPage() {
       if (exists) return;
 
       // Connect to SSE stream (Cookie-based authentication)
-      eventSource = new EventSource(`/api/v1/verify/stream/${id}`, { withCredentials: true });
+      eventSource = new EventSource(apiUrl(`/api/v1/verify/stream/${id}`), { withCredentials: true });
 
       eventSource.onmessage = (event) => {
         try {

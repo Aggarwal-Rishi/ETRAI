@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import {
   Shield,
   Key,
@@ -58,7 +59,7 @@ export default function AccountSecurityPage() {
 
   const fetchProfileAndSecurity = async () => {
     try {
-      const res = await fetch('/api/v1/account/profile', {
+      const res = await fetch(apiUrl('/api/v1/account/profile'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -74,8 +75,8 @@ export default function AccountSecurityPage() {
     try {
       setLoadingSessions(true);
       const [resSessions, resHistory] = await Promise.all([
-        fetch('/api/v1/account/sessions', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/v1/account/login-history', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(apiUrl('/api/v1/account/sessions'), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(apiUrl('/api/v1/account/login-history'), { headers: { Authorization: `Bearer ${token}` } })
       ]);
       const dataSessions = await resSessions.json();
       const dataHistory = await resHistory.json();
@@ -106,7 +107,7 @@ export default function AccountSecurityPage() {
     setSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/v1/account/password', {
+      const res = await fetch(apiUrl('/api/v1/account/password'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +136,7 @@ export default function AccountSecurityPage() {
     setSuccessMsg(null);
     setSettingUp2fa(true);
     try {
-      const res = await fetch('/api/v1/account/2fa/setup', {
+      const res = await fetch(apiUrl('/api/v1/account/2fa/setup'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -154,7 +155,7 @@ export default function AccountSecurityPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch('/api/v1/account/2fa/verify', {
+      const res = await fetch(apiUrl('/api/v1/account/2fa/verify'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +180,7 @@ export default function AccountSecurityPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch('/api/v1/account/2fa/disable', {
+      const res = await fetch(apiUrl('/api/v1/account/2fa/disable'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +201,7 @@ export default function AccountSecurityPage() {
 
   const handleRevokeSession = async (sessionId) => {
     try {
-      const res = await fetch(`/api/v1/account/sessions/${sessionId}`, {
+      const res = await fetch(apiUrl(`/api/v1/account/sessions/${sessionId}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -214,7 +215,7 @@ export default function AccountSecurityPage() {
 
   const handleRevokeAllOtherSessions = async () => {
     try {
-      const res = await fetch('/api/v1/account/sessions/revoke-others', {
+      const res = await fetch(apiUrl('/api/v1/account/sessions/revoke-others'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -228,7 +229,7 @@ export default function AccountSecurityPage() {
   };
 
   const handleDownloadExport = () => {
-    window.open(`/api/v1/account/export?token=${token}`, '_blank');
+    window.open(apiUrl(`/api/v1/account/export?token=${token}`), '_blank');
   };
 
   const handleDeleteAccount = async (e) => {
@@ -241,7 +242,7 @@ export default function AccountSecurityPage() {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/v1/account/delete', {
+      const res = await fetch(apiUrl('/api/v1/account/delete'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

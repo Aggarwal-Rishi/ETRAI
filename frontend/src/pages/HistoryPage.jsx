@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { History, Trash2, ExternalLink, Calendar, Filter, FileText } from 'lucide-react';
+import { apiUrl } from '../utils/api';
 
 export default function HistoryPage() {
   const [reports, setReports] = useState([]);
@@ -9,7 +10,7 @@ export default function HistoryPage() {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch('/api/v1/reports', { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/v1/reports'), { credentials: 'include' });
       const data = await res.json();
       if (data.success) {
         setReports(data.reports || []);
@@ -31,7 +32,7 @@ export default function HistoryPage() {
     }
 
     try {
-      const res = await fetch(`/api/v1/reports/${id}`, {
+      const res = await fetch(apiUrl(`/api/v1/reports/${id}`), {
         method: 'DELETE',
         credentials: 'include'
       });

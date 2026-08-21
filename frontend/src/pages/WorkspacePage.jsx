@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import {
   Users,
   UserPlus,
@@ -44,7 +45,7 @@ export default function WorkspacePage() {
   const fetchWorkspaces = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/v1/workspaces', {
+      const res = await fetch(apiUrl('/api/v1/workspaces'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -65,7 +66,7 @@ export default function WorkspacePage() {
 
   const fetchWorkspaceDetails = async (id) => {
     try {
-      const res = await fetch(`/api/v1/workspaces/${id}`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${id}`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -95,7 +96,7 @@ export default function WorkspacePage() {
     setSuccessMsg(null);
 
     try {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspace.id}/invitations`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${activeWorkspace.id}/invitations`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export default function WorkspacePage() {
   const handleUpdateRole = async (memberId, newRole) => {
     try {
       setError(null);
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}/role`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}/role`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -140,7 +141,7 @@ export default function WorkspacePage() {
     const nextStatus = currentStatus === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
     try {
       setError(null);
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}/status`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}/status`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -160,7 +161,7 @@ export default function WorkspacePage() {
     if (!window.confirm('Are you sure you want to remove this member from the workspace?')) return;
     try {
       setError(null);
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${activeWorkspace.id}/members/${memberId}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -175,7 +176,7 @@ export default function WorkspacePage() {
   const handleRevokeInvite = async (inviteId) => {
     try {
       setError(null);
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspace.id}/invitations/${inviteId}`, {
+      const res = await fetch(apiUrl(`/api/v1/workspaces/${activeWorkspace.id}/invitations/${inviteId}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -193,7 +194,7 @@ export default function WorkspacePage() {
     setError(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch('/api/v1/workspaces/profile', {
+      const res = await fetch(apiUrl('/api/v1/workspaces/profile'), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

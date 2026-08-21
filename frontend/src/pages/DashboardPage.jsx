@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { PlusCircle, FileText, CheckCircle2, AlertTriangle, XCircle, ArrowRight, Activity, Shield } from 'lucide-react';
+import { apiUrl } from '../utils/api';
 
 export default function DashboardPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/v1/reports', { credentials: 'include' })
+    fetch(apiUrl('/api/v1/reports'), { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data.success) {

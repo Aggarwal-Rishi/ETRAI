@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiUrl } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -14,7 +15,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const res = await fetch('/api/v1/auth/me', {
+      const res = await fetch(apiUrl('/api/v1/auth/me'), {
         headers: { 'Accept': 'application/json' },
         credentials: 'include'
       });
@@ -34,7 +35,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setError(null);
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await fetch(apiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -55,7 +56,7 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password) => {
     setError(null);
     try {
-      const res = await fetch('/api/v1/auth/signup', {
+      const res = await fetch(apiUrl('/api/v1/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -75,7 +76,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await fetch('/api/v1/auth/logout', {
+      await fetch(apiUrl('/api/v1/auth/logout'), {
         method: 'POST',
         credentials: 'include'
       });

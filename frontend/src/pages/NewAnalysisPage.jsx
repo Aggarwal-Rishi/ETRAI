@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { Link2, Upload, AlignLeft, CheckSquare, ShieldCheck, ArrowRight, Info, AlertTriangle, Image as ImageIcon, Video, Camera, Film, Sparkles, Eye } from 'lucide-react';
+import { apiUrl } from '../utils/api';
 
 export default function NewAnalysisPage() {
   const [activeTab, setActiveTab] = useState('URL'); // 'URL' | 'FILE' | 'TEXT' | 'PHOTO' | 'VIDEO'
@@ -23,7 +24,7 @@ export default function NewAnalysisPage() {
   const [providerStatus, setProviderStatus] = useState({ openai: 'AVAILABLE', webSearch: 'AVAILABLE', reverseSearch: 'UNAVAILABLE' });
 
   React.useEffect(() => {
-    fetch('/api/v1/verify/providers', { credentials: 'include' })
+    fetch(apiUrl('/api/v1/verify/providers'), { credentials: 'include' })
       .then(res => res.json())
       .then(data => { if (data.status) setProviderStatus(data.status); })
       .catch(() => {});
@@ -113,7 +114,7 @@ export default function NewAnalysisPage() {
         });
       }
 
-      const res = await fetch('/api/v1/verify/analyze', {
+      const res = await fetch(apiUrl('/api/v1/verify/analyze'), {
         method: 'POST',
         headers,
         body,

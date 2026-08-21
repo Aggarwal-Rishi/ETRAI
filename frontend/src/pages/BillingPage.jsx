@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import {
   CreditCard,
   CheckCircle2,
@@ -38,13 +39,13 @@ export default function BillingPage() {
     try {
       setLoading(true);
       // Fetch user's workspaces first
-      const resWs = await fetch('/api/v1/workspaces', {
+      const resWs = await fetch(apiUrl('/api/v1/workspaces'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const dataWs = await resWs.json();
       if (dataWs && dataWs.workspaces && dataWs.workspaces.length > 0) {
         const wsId = dataWs.workspaces[0].id;
-        const res = await fetch(`/api/v1/billing/${wsId}`, {
+        const res = await fetch(apiUrl(`/api/v1/billing/${wsId}`), {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -72,7 +73,7 @@ export default function BillingPage() {
     if (!promoCode.trim()) return;
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/v1/billing/validate-coupon', {
+      const res = await fetch(apiUrl('/api/v1/billing/validate-coupon'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ export default function BillingPage() {
     setSuccessMsg(null);
 
     try {
-      const res = await fetch(`/api/v1/billing/${billingData.workspaceId}/change-plan`, {
+      const res = await fetch(apiUrl(`/api/v1/billing/${billingData.workspaceId}/change-plan`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +129,7 @@ export default function BillingPage() {
   const handleCancelSubscription = async () => {
     if (!window.confirm('Are you sure you want to cancel your subscription at the end of the billing period?')) return;
     try {
-      const res = await fetch(`/api/v1/billing/${billingData.workspaceId}/cancel`, {
+      const res = await fetch(apiUrl(`/api/v1/billing/${billingData.workspaceId}/cancel`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -143,7 +144,7 @@ export default function BillingPage() {
 
   const handleReactivateSubscription = async () => {
     try {
-      const res = await fetch(`/api/v1/billing/${billingData.workspaceId}/reactivate`, {
+      const res = await fetch(apiUrl(`/api/v1/billing/${billingData.workspaceId}/reactivate`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
