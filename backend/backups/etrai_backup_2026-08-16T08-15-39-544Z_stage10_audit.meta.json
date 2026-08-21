@@ -1,0 +1,8 @@
+{
+  "backupFileName": "etrai_backup_2026-08-16T08-15-39-544Z_stage10_audit.db",
+  "backupFilePath": "C:\\Users\\acer\\.gemini\\antigravity-ide\\scratch\\etrai\\backend\\backups\\etrai_backup_2026-08-16T08-15-39-544Z_stage10_audit.db",
+  "timestamp": "2026-08-16T08:15:39.792Z",
+  "sizeBytes": 27787264,
+  "sha256": "dcd81efefd8c928ee7b9040d78619c1a8868a487bdb2aa8edaf0c633fa634e7a",
+  "sourceDatabase": "C:\\Users\\acer\\.gemini\\antigravity-ide\\scratch\\etrai\\backend\\prisma\\dev.db"
+}

@@ -1,0 +1,275 @@
+{
+  "id": "true_1",
+  "text": "Global cloud computing and AI infrastructure expenditure grew by over 20 percent according to major tech industry evaluations.",
+  "importanceScore": 85,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Statistical Metric"
+},
+{
+  "id": "true_2",
+  "text": "The Eiffel Tower is located in Paris, France and attracts millions of international visitors annually.",
+  "importanceScore": 70,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Factual Statement"
+},
+{
+  "id": "true_3",
+  "text": "Technology companies across Europe and North America increased investments in data security and automated compliance tools.",
+  "importanceScore": 80,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Market Assertion"
+},
+{
+  "id": "true_4",
+  "text": "World Health Organization provides global guidance on public health policies and infectious disease monitoring.",
+  "importanceScore": 90,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Institutional Fact"
+},
+{
+  "id": "true_5",
+  "text": "Enterprise software adoption continued to expand throughout recent fiscal quarters across international markets.",
+  "importanceScore": 75,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Financial Metric"
+},
+{
+  "id": "true_6",
+  "text": "BBC News and Reuters are major global media organizations broadcasting news worldwide.",
+  "importanceScore": 70,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Media Assertion"
+},
+{
+  "id": "true_7",
+  "text": "Artificial intelligence model parameters and compute infrastructure require substantial GPU cluster resources.",
+  "importanceScore": 82,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Technical Fact"
+},
+{
+  "id": "true_8",
+  "text": "NASA operates space exploration missions and satellite observation networks for planetary science.",
+  "importanceScore": 88,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Scientific Fact"
+},
+{
+  "id": "true_9",
+  "text": "Financial reporting standards require publicly traded corporations to release quarterly earnings disclosures.",
+  "importanceScore": 85,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Regulatory Fact"
+},
+{
+  "id": "true_10",
+  "text": "Renewable energy installations including solar and wind capacity expanded globally over the past decade.",
+  "importanceScore": 80,
+  "claimScope": "International",
+  "groundTruth": "Verified",
+  "category": "Industry Metric"
+},
+{
+  "id": "true_regional_11",
+  "text": "A tea garden worker was abducted by unidentified miscreants near the India-Bangladesh border in West Bengal today.",
+  "importanceScore": 75,
+  "claimScope": "Regional",
+  "isRecentBreaking": true,
+  "groundTruth": "Verified",
+  "category": "Regional Incident"
+},
+{
+  "id": "true_regional_12",
+  "text": "Local police and border security forces in North Bengal initiated search operations following a tea farmer abduction.",
+  "importanceScore": 70,
+  "claimScope": "Regional",
+  "isRecentBreaking": true,
+  "groundTruth": "Verified",
+  "category": "Regional Incident"
+},
+{
+  "id": "true_regional_13",
+  "text": "Heavy rainfall in the northern district caused temporary waterlogging across low-lying agricultural fields.",
+  "importanceScore": 60,
+  "claimScope": "Regional",
+  "groundTruth": "Verified",
+  "category": "Regional Weather"
+},
+{
+  "id": "true_regional_14",
+  "text": "District administration sanctioned repair funds for the regional highway bridge connecting neighboring tea estates.",
+  "importanceScore": 65,
+  "claimScope": "Regional",
+  "groundTruth": "Verified",
+  "category": "Regional Civic Project"
+},
+{
+  "id": "false_1",
+  "text": "In a dramatic press conference held in New Delhi, Indian Prime Minister Narendra Modi declared an immediate military operation against Russia.",
+  "importanceScore": 95,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Major Event Assertion"
+},
+{
+  "id": "false_2",
+  "text": "Billionaire tycoon Rishi Aggarwal purchased Microsoft and Google simultaneously in a $5 trillion cash buyout.",
+  "importanceScore": 98,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Financial Fabrication"
+},
+{
+  "id": "false_3",
+  "text": "US President Joe Biden announced the abolition of all federal income taxes nationwide effective yesterday.",
+  "importanceScore": 92,
+  "claimScope": "National",
+  "groundTruth": "False",
+  "category": "Policy Fabrication"
+},
+{
+  "id": "false_4",
+  "text": "French President Emmanuel Macron signed a secret decree annexing the Moon as sovereign French territory.",
+  "importanceScore": 90,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Geopolitical Fabrication"
+},
+{
+  "id": "false_5",
+  "text": "Scientists confirmed that drinking ocean saltwater cures all viral infections within 10 seconds.",
+  "importanceScore": 88,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Medical Fabrication"
+},
+{
+  "id": "false_6",
+  "text": "The United Nations voted unanimously to ban internet usage globally starting next month.",
+  "importanceScore": 94,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Global Policy Fabrication"
+},
+{
+  "id": "false_7",
+  "text": "Japanese Prime Minister declared that Tokyo will relocate to Mars by the end of 2026.",
+  "importanceScore": 96,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Major Event Fabrication"
+},
+{
+  "id": "false_8",
+  "text": "The Bank of England replaced all physical currency with wooden wooden tokens overnight.",
+  "importanceScore": 89,
+  "claimScope": "National",
+  "groundTruth": "False",
+  "category": "Financial Fabrication"
+},
+{
+  "id": "false_9",
+  "text": "A secret subterranean continent was discovered beneath Central Park in New York City.",
+  "importanceScore": 85,
+  "claimScope": "National",
+  "groundTruth": "False",
+  "category": "Geographical Fabrication"
+},
+{
+  "id": "false_10",
+  "text": "Diplomatic ties between Canada and Australia were completely severed after a disagreement over koalas.",
+  "importanceScore": 91,
+  "claimScope": "International",
+  "groundTruth": "False",
+  "category": "Diplomatic Fabrication"
+},
+{
+  "id": "ambiguous_1",
+  "text": "A local neighborhood bakery in Springfield reported a 12% increase in artisan sourdough sales last Tuesday.",
+  "importanceScore": 25,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Local Assertion"
+},
+{
+  "id": "ambiguous_2",
+  "text": "Internal developer testing for a niche open-source utility recorded 99.9% uptime during benchmark runs.",
+  "importanceScore": 30,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Unverified Niche Claim"
+},
+{
+  "id": "ambiguous_3",
+  "text": "Private collector John Smith acquired an unlabeled 19th-century oil painting at a rural yard sale.",
+  "importanceScore": 20,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Uncorroborated Assertion"
+},
+{
+  "id": "ambiguous_4",
+  "text": "A regional badminton club in Leeds elected a new committee treasurer following an informal vote.",
+  "importanceScore": 15,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Niche Claim"
+},
+{
+  "id": "ambiguous_5",
+  "text": "An independent freelance programmer completed refactoring a custom legacy database script in 4 hours.",
+  "importanceScore": 22,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Unverified Assertion"
+},
+{
+  "id": "ambiguous_6",
+  "text": "A local coffee shop owner claimed that dark roast coffee improves customer focus during morning meetings.",
+  "importanceScore": 35,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Subjective Minor Claim"
+},
+{
+  "id": "ambiguous_7",
+  "text": "Small boutique marketing agency in Austin hired two junior graphic design interns last summer.",
+  "importanceScore": 18,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Corporate Assertion"
+},
+{
+  "id": "ambiguous_8",
+  "text": "Amateur astronomer observed a faint meteor trail near Orion constellation using a backyard telescope.",
+  "importanceScore": 28,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Unconfirmed Observation"
+},
+{
+  "id": "ambiguous_9",
+  "text": "Community garden project in Bristol harvested 45 kilograms of tomatoes during early autumn.",
+  "importanceScore": 20,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Local Metric"
+},
+{
+  "id": "ambiguous_10",
+  "text": "Regional pottery workshop hosted seven participants during its weekend introductory course.",
+  "importanceScore": 15,
+  "claimScope": "Local",
+  "groundTruth": "Suspicious",
+  "category": "Minor Local Event"
+}
+]

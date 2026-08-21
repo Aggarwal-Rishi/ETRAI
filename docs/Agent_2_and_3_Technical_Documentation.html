@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ETRAI - Agent 2 and Agent 3 Technical Architecture Documentation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    
+    @page {
+      size: A4;
+      margin: 18mm 18mm 22mm 18mm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1e293b;
+      line-height: 1.6;
+      font-size: 13px;
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header-container {
+      border-bottom: 3px solid #3b82f6;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border-radius: 4px;
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .meta-table {
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+    }
+
+    .meta-table td {
+      padding: 6px 10px;
+      font-size: 11px;
+      border: 1px solid #e2e8f0;
+      background-color: #f8fafc;
+    }
+
+    .meta-table td strong {
+      color: #334155;
+    }
+
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1e293b;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 6px;
+      margin-top: 26px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2563eb;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-top: 0;
+      margin-bottom: 10px;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin-top: 0;
+      margin-bottom: 12px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 11.5px;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 3px;
+      border: 1px solid #e2e8f0;
+    }
+
+    pre {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 11px;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-top: 8px;
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+
+    .callout {
+      padding: 12px 14px;
+      border-left: 4px solid #3b82f6;
+      background-color: #f0f9ff;
+      border-radius: 0 6px 6px 0;
+      margin: 14px 0;
+      font-size: 12px;
+    }
+
+    .callout.warning {
+      border-left-color: #f59e0b;
+      background-color: #fffbeb;
+    }
+
+    .callout.danger {
+      border-left-color: #ef4444;
+      background-color: #fef2f2;
+    }
+
+    .callout.success {
+      border-left-color: #10b981;
+      background-color: #ecfdf5;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #0f172a;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 11.5px;
+    }
+
+    table.data-table th, table.data-table td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background-color: #1e293b;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    table.data-table tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .tag-verified { background: #dcfce7; color: #15803d; }
+    .tag-suspicious { background: #fef9c3; color: #a16207; }
+    .tag-false { background: #fee2e2; color: #b91c1c; }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .footer {
+      margin-top: 30px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+      font-size: 10px;
+      color: #94a3b8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-container">
+    <span class="badge">ETRAI Core Verification Engine</span>
+    <h1>Agent 2 & Agent 3 Architecture & Operational Workflow</h1>
+    <p class="subtitle">Complete Technical Specification of Claim Extraction, Web Search Verification, and Deception Detection</p>
+    
+    <table class="meta-table">
+      <tr>
+        <td><strong>Project:</strong> ETRAI Fact-Checking Platform</td>
+        <td><strong>Pipeline Stage:</strong> Agent 2 (Claim Extractor) & Agent 3 (Fact Verifier)</td>
+      </tr>
+      <tr>
+        <td><strong>AI Model:</strong> OpenAI GPT-4o (Structured JSON Mode)</td>
+        <td><strong>Search Provider:</strong> Serper Google Search API</td>
+      </tr>
+      <tr>
+        <td><strong>Source Modules:</strong> <code>claimExtractor.js</code> & <code>factVerifier.js</code></td>
+        <td><strong>Status:</strong> Active Production Architecture</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>1. Executive Overview & Pipeline Context</h2>
+  <p>
+    <strong>ETRAI</strong> processes input documents through a sequential 4-agent verification pipeline.
+    While Agent 1 extracts and truncates raw text, <strong>Agent 2 (Claim Extractor)</strong> and <strong>Agent 3 (Fact Verification Agent)</strong> form the core intelligence of the platform:
+  </p>
+  <ul>
+    <li><strong>Agent 2 (Claim Extractor):</strong> Converts unstructured document text into structured, atomic, and testable factual assertions (max 25 claims).</li>
+    <li><strong>Agent 3 (Fact Verification Agent):</strong> Queries live web search indexes, cross-references claims against live search snippets using GPT-4o, validates live HTTP URLs to eliminate 404 links, and detects fabricated news events.</li>
+  </ul>
+
+  <h2>2. Agent 2: Claim Extractor Service</h2>
+  <p><strong>Source File:</strong> <code>backend/src/services/claimExtractor.js</code></p>
+  
+  <h3>2.1 Primary Function & Input Guardrails</h3>
+  <p>
+    Agent 2 receives raw extracted text from Agent 1. To prevent context window overflow and reduce latency, the text is truncated to the first <strong>15,000 characters</strong> (~3,750 tokens) before being sent to GPT-4o.
+  </p>
+
+  <h3>2.2 GPT-4o Execution Strategy & JSON Schema</h3>
+  <p>
+    Agent 2 uses <code>gpt-4o</code> with a low temperature of <code>0.2</code> and enforces JSON output using <code>response_format: { type: "json_object" }</code>.
+  </p>
+
+  <div class="callout">
+    <div class="callout-title">Agent 2 System & User Prompt Structure</div>
+    "You are Agent 2 (Claim Extractor) in an AI Fact-Checking system.<br>
+    Your task is to analyze the text below and extract up to 25 of the most important, specific, and verifiable factual claims.<br>
+    Focus on:<br>
+    1. Specific quantitative metrics, numbers, percentages, dates, and financial figures.<br>
+    2. Direct factual assertions regarding events, companies, people, or scientific claims.<br>
+    3. Statements that can be proven True or False by independent web search.<br><br>
+    STRICT RULE: Maximum 25 claims. Do not include opinions or subjective commentary."
+  </div>
+
+  <h3>2.3 Output Data Contract</h3>
+  <pre>{
+  "claims": [
+    {
+      "id": "claim_1",
+      "text": "Global cloud computing expenditure grew by 24% in Q3 2024.",
+      "category": "Statistical Metric",
+      "importanceScore": 95
+    },
+    {
+      "id": "claim_2",
+      "text": "Company X acquired Startup Y for $1.2 billion in cash.",
+      "category": "Financial Claim",
+      "importanceScore": 88
+    }
+  ]
+}</pre>
+
+  <h3>2.4 Heuristic Fallback Engine (<code>extractMockClaims</code>)</h3>
+  <p>
+    If <code>OPENAI_API_KEY</code> is unconfigured, missing, or throws an API exception, Agent 2 fails gracefully over to an internal heuristic extraction engine:
+  </p>
+  <ul>
+    <li>Splits text into clean sentences using regex lookbehind <code>/(?&lt;=[.?!])\s+/</code>.</li>
+    <li>Filters for sentences between 20 and 250 characters.</li>
+    <li>Matches regex patterns for quantitative terms: <code>/\d+|percent|dollar|company|market|report|announced|according|growth|year|million|billion|increase|decrease|found|proved|stated/i</code>.</li>
+    <li>Extracts up to 25 factual sentences and calculates dynamic importance scores (60–100 range).</li>
+  </ul>
+
+  <div class="page-break"></div>
+
+  <h2>3. Agent 3: Fact Verification Agent Service</h2>
+  <p><strong>Source File:</strong> <code>backend/src/services/factVerifier.js</code></p>
+
+  <h3>3.1 Primary Workflow & Architecture</h3>
+  <p>
+    Agent 3 iterates through every claim extracted by Agent 2 and executes a multi-layered verification strategy combining live web search, AI cross-examination, major event fabrication detection, and HTTP link validation.
+  </p>
+
+  <h3>3.2 Live Web Search Integration (Serper API)</h3>
+  <p>
+    Agent 3 sends a POST request to the Serper Google Search API (<code>https://google.serper.dev/search</code>) with the claim text as the query payload:
+  </p>
+  <ul>
+    <li>Retrieves top <strong>5 organic search results</strong> per claim.</li>
+    <li>Extracts title, target URL, text snippet, and cleans domain hostnames (e.g., stripping <code>www.</code>).</li>
+    <li>Maintains a list of trusted domain filters including <code>reuters.com</code>, <code>apnews.com</code>, <code>bbc.com</code>, <code>factcheck.org</code>, <code>snopes.com</code>, <code>bloomberg.com</code>, <code>wsj.com</code>, <code>.gov</code>, and <code>.edu</code>.</li>
+  </ul>
+
+  <h3>3.3 Dual-Engine Verification & Classification Rubric</h3>
+  <p>
+    Retrieved search snippets are passed to <code>gpt-4o</code> (with <code>temperature: 0.0</code>) along with strict classification instructions:
+  </p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Verdict Status</th>
+        <th>Classification Criteria</th>
+        <th>Default Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tag tag-verified">Verified</span></td>
+        <td>Search result snippets directly and explicitly corroborate the claim text. Must cite source titles and pass HTTP link validation.</td>
+        <td>85% - 98%</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-false">False</span></td>
+        <td>Search snippets directly contradict/refute the claim OR the claim asserts a major public event but zero search coverage exists.</td>
+        <td>90% - 98%</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-suspicious">Suspicious</span></td>
+        <td>Claim is ambiguous, minor, uncorroborated by search hits, or candidate source links fail live HTTP validation.</td>
+        <td>50% - 70%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.4 Major Event Fabrication Detection (<code>isMajorEventAssertion</code>)</h3>
+  <div class="callout danger">
+    <div class="callout-title">Deception Detection Guardrail</div>
+    If a claim describes a major public news event (such as actions by national leaders, military operations, wars, treaties, or state emergencies) but <strong>Serper API returns 0 search results</strong>, Agent 3 classifies the claim as <strong>FALSE</strong> rather than ambiguous.
+  </div>
+  <p>Regex matching patterns detect high-impact entities and actions:</p>
+  <pre>/\bprime minister\b|\bpresident\b|\bmodi\b|\bbiden\b|\bputin\b|\bxi jinping\b|\bmilitary campaign\b|\bdeclared war\b|\binvaded\b|\bnuclear test\b|\bstate of emergency\b/i</pre>
+
+  <p>When triggered with 0 search hits, Agent 3 attaches the standardized reasoning:</p>
+  <blockquote style="font-style: italic; color: #475569; border-left: 3px solid #cbd5e1; padding-left: 10px; margin: 8px 0;">
+    "This claim describes an event of major significance with no corroborating coverage found across searched sources, which is strong evidence of fabrication."
+  </blockquote>
+
+  <h3>3.5 Live Source HTTP URL Validator (<code>validateSourceUrl</code>)</h3>
+  <p>
+    To eliminate dead or broken links from final reports, candidate URLs selected by GPT-4o are dynamically checked:
+  </p>
+  <ul>
+    <li>Executes a live HTTP <code>GET</code> request with an <code>AbortController</code> timeout of <strong>4,000 ms</strong>.</li>
+    <li>Includes standard browser <code>User-Agent</code> headers to avoid false bot rejections.</li>
+    <li>Rejects any URL returning status <code>404 Not Found</code> or connection timeouts.</li>
+    <li><strong>Safety Fallback:</strong> If a claim was labeled <code>Verified</code> but all supporting URLs fail validation, its status is downgraded to <code>Suspicious</code> (or <code>False</code> if major event).</li>
+  </ul>
+
+  <h3>3.6 Agent 3 Output Schema</h3>
+  <pre>{
+  "claimId": "claim_1",
+  "claimText": "Global cloud computing expenditure grew by 24% in Q3 2024.",
+  "category": "Statistical Metric",
+  "status": "Verified",
+  "confidence": 92,
+  "explanation": "Confirmed by BBC News – Global Technology Report, which states that 'Official industry data confirms global cloud computing expenditure grew...'.",
+  "sources": [
+    {
+      "title": "BBC News – Global Technology Report",
+      "url": "https://www.bbc.com/news",
+      "snippet": "Official industry data confirms global cloud computing expenditure grew...",
+      "domain": "bbc.com"
+    }
+  ]
+}</pre>
+
+  <h2>4. Summary Comparison Table</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Metric / Feature</th>
+        <th>Agent 2: Claim Extractor</th>
+        <th>Agent 3: Fact Verification Agent</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Primary Goal</strong></td>
+        <td>Isolate verifiable factual statements</td>
+        <td>Verify factual accuracy via web search</td>
+      </tr>
+      <tr>
+        <td><strong>Input</strong></td>
+        <td>Raw extracted text (~15k chars)</td>
+        <td>Array of extracted claim objects</td>
+      </tr>
+      <tr>
+        <td><strong>AI Model & Temp</strong></td>
+        <td><code>gpt-4o</code> (Temperature: 0.2)</td>
+        <td><code>gpt-4o</code> (Temperature: 0.0)</td>
+      </tr>
+      <tr>
+        <td><strong>External APIs</strong></td>
+        <td>OpenAI API</td>
+        <td>OpenAI API + Serper Google Search API</td>
+      </tr>
+      <tr>
+        <td><strong>Max Limit</strong></td>
+        <td>25 Claims max</td>
+        <td>Processes all claims passed by Agent 2</td>
+      </tr>
+      <tr>
+        <td><strong>Validation Checks</strong></td>
+        <td>Factual phrasing & sentence filtering</td>
+        <td>Live HTTP GET link check (404/Timeout)</td>
+      </tr>
+      <tr>
+        <td><strong>Deception Safeguard</strong></td>
+        <td>Filters subjective commentary & opinion</td>
+        <td><code>isMajorEventAssertion</code> fabrication detection</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    ETRAI Multi-Agent AI Fact Checking System • Architecture Documentation • Generated Automatically
+  </div>
+
+</body>
+</html>

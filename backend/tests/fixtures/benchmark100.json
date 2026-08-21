@@ -1,0 +1,703 @@
+[
+  {
+    "id": "real_1",
+    "type": "URL",
+    "input": "https://www.indiatoday.in/india/story/jalpaiguri-tea-farmer-abducted-near-bangladesh-border-bsf-seeks-release-2967286-2026-08-09",
+    "groundTruth": "TRUSTED",
+    "category": "Regional Breaking News"
+  },
+  {
+    "id": "real_2",
+    "type": "URL",
+    "input": "https://www.indiatoday.in/india/story/jharkhand-student-assembly-protest-live-updates-jharkhand-jpsc-jssc-exam-hemant-soren-devendra-nath-mahto-2967405-2026-08-10",
+    "groundTruth": "TRUSTED",
+    "category": "Regional Student Protest"
+  },
+  {
+    "id": "real_3",
+    "type": "TEXT",
+    "input": "Global cloud computing and AI infrastructure expenditure grew by over 20 percent according to major tech industry evaluations.",
+    "groundTruth": "TRUSTED",
+    "category": "Statistical Metric"
+  },
+  {
+    "id": "real_4",
+    "type": "TEXT",
+    "input": "The Eiffel Tower is located in Paris, France and attracts millions of international visitors annually.",
+    "groundTruth": "TRUSTED",
+    "category": "Factual Statement"
+  },
+  {
+    "id": "real_5",
+    "type": "TEXT",
+    "input": "Technology companies across Europe and North America increased investments in data security and automated compliance tools.",
+    "groundTruth": "TRUSTED",
+    "category": "Market Assertion"
+  },
+  {
+    "id": "real_6",
+    "type": "TEXT",
+    "input": "World Health Organization provides global guidance on public health policies and infectious disease monitoring.",
+    "groundTruth": "TRUSTED",
+    "category": "Factual Statement"
+  },
+  {
+    "id": "real_7",
+    "type": "TEXT",
+    "input": "India successfully landed its Chandrayaan-3 spacecraft near the lunar south pole in August 2023.",
+    "groundTruth": "TRUSTED",
+    "category": "Event Assertion"
+  },
+  {
+    "id": "real_8",
+    "type": "TEXT",
+    "input": "Neeraj Chopra won the gold medal in men's javelin throw at the Tokyo 2020 Olympics.",
+    "groundTruth": "TRUSTED",
+    "category": "Sports Assertion"
+  },
+  {
+    "id": "real_9",
+    "type": "TEXT",
+    "input": "The Reserve Bank of India regulates monetary policy and financial institutions in India.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_10",
+    "type": "TEXT",
+    "input": "Microsoft acquired LinkedIn in 2016 for approximately $26.2 billion.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_11",
+    "type": "TEXT",
+    "input": "The Supreme Court of India is the highest judicial authority under the Constitution of India.",
+    "groundTruth": "TRUSTED",
+    "category": "Legal Assertion"
+  },
+  {
+    "id": "real_12",
+    "type": "TEXT",
+    "input": "ISRO launched the Aditya-L1 solar observatory mission to study the Sun from Lagrange point 1.",
+    "groundTruth": "TRUSTED",
+    "category": "Scientific Assertion"
+  },
+  {
+    "id": "real_13",
+    "type": "TEXT",
+    "input": "Apple Inc was founded by Steve Jobs, Steve Wozniak, and Ronald Wayne in April 1976.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_14",
+    "type": "TEXT",
+    "input": "The Goods and Services Tax (GST) was launched in India on July 1, 2017.",
+    "groundTruth": "TRUSTED",
+    "category": "National Policy"
+  },
+  {
+    "id": "real_15",
+    "type": "TEXT",
+    "input": "NASA's James Webb Space Telescope was launched into space in December 2021.",
+    "groundTruth": "TRUSTED",
+    "category": "Scientific Assertion"
+  },
+  {
+    "id": "real_16",
+    "type": "TEXT",
+    "input": "The Panama Canal connects the Atlantic Ocean to the Pacific Ocean through Central America.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_17",
+    "type": "TEXT",
+    "input": "Standard Chartered and HSBC operate international commercial banking operations globally.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_18",
+    "type": "TEXT",
+    "input": "Draupadi Murmu took office as the 15th President of India in July 2022.",
+    "groundTruth": "TRUSTED",
+    "category": "Political Assertion"
+  },
+  {
+    "id": "real_19",
+    "type": "TEXT",
+    "input": "The United Nations General Assembly is headquartered in New York City.",
+    "groundTruth": "TRUSTED",
+    "category": "International Assertion"
+  },
+  {
+    "id": "real_20",
+    "type": "TEXT",
+    "input": "Google acquired YouTube in 2006 for $1.65 billion in stock.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_21",
+    "type": "TEXT",
+    "input": "The Great Barrier Reef is located off the northeastern coast of Queensland, Australia.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_22",
+    "type": "TEXT",
+    "input": "The Indian Space Research Organisation (ISRO) is headquartered in Bengaluru, Karnataka.",
+    "groundTruth": "TRUSTED",
+    "category": "Factual Assertion"
+  },
+  {
+    "id": "real_23",
+    "type": "TEXT",
+    "input": "The WHO declared COVID-19 a global pandemic in March 2020.",
+    "groundTruth": "TRUSTED",
+    "category": "Health Assertion"
+  },
+  {
+    "id": "real_24",
+    "type": "TEXT",
+    "input": "The Golden Gate Bridge spans the opening of San Francisco Bay into the Pacific Ocean.",
+    "groundTruth": "TRUSTED",
+    "category": "Factual Assertion"
+  },
+  {
+    "id": "real_25",
+    "type": "TEXT",
+    "input": "The Reserve Bank of India keeps policy repo rates subject to periodic Monetary Policy Committee reviews.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_26",
+    "type": "TEXT",
+    "input": "Jalpaiguri district is an administrative district in the Indian state of West Bengal.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_27",
+    "type": "TEXT",
+    "input": "Ranchi serves as the capital city of the state of Jharkhand in eastern India.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_28",
+    "type": "TEXT",
+    "input": "The Border Security Force (BSF) guards India's land borders with Pakistan and Bangladesh.",
+    "groundTruth": "TRUSTED",
+    "category": "National Defense"
+  },
+  {
+    "id": "real_29",
+    "type": "TEXT",
+    "input": "The International Monetary Fund (IMF) promotes global financial stability and international trade.",
+    "groundTruth": "TRUSTED",
+    "category": "International Assertion"
+  },
+  {
+    "id": "real_30",
+    "type": "TEXT",
+    "input": "Tesla Inc produces electric vehicles, battery energy storage systems, and solar panels.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_31",
+    "type": "TEXT",
+    "input": "State Bank of India is the largest public sector bank in India.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_32",
+    "type": "TEXT",
+    "input": "The Nile River is widely recognized as one of the longest rivers in the world.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_33",
+    "type": "TEXT",
+    "input": "The European Central Bank sets monetary policy for countries in the eurozone.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_34",
+    "type": "TEXT",
+    "input": "Narendra Modi assumed office as Prime Minister of India in May 2014.",
+    "groundTruth": "TRUSTED",
+    "category": "Political Assertion"
+  },
+  {
+    "id": "real_35",
+    "type": "TEXT",
+    "input": "The Amazon rainforest spans across nine countries in South America.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_36",
+    "type": "TEXT",
+    "input": "The Nobel Peace Prize is awarded annually in Oslo, Norway.",
+    "groundTruth": "TRUSTED",
+    "category": "Factual Assertion"
+  },
+  {
+    "id": "real_37",
+    "type": "TEXT",
+    "input": "The Large Hadron Collider is operated by CERN near Geneva, Switzerland.",
+    "groundTruth": "TRUSTED",
+    "category": "Scientific Assertion"
+  },
+  {
+    "id": "real_38",
+    "type": "TEXT",
+    "input": "The Paris Agreement is a legally binding international treaty on climate change adopted in 2015.",
+    "groundTruth": "TRUSTED",
+    "category": "International Treaty"
+  },
+  {
+    "id": "real_39",
+    "type": "TEXT",
+    "input": "Reliance Industries Limited operates oil refineries, retail, and telecommunication networks in India.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_40",
+    "type": "TEXT",
+    "input": "The G20 is an intergovernmental forum comprising 19 sovereign countries, the European Union, and the African Union.",
+    "groundTruth": "TRUSTED",
+    "category": "International Assertion"
+  },
+  {
+    "id": "real_41",
+    "type": "TEXT",
+    "input": "The Suez Canal provides a direct maritime trade route between the Mediterranean Sea and the Red Sea.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_42",
+    "type": "TEXT",
+    "input": "The Federal Reserve is the central banking system of the United States.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_43",
+    "type": "TEXT",
+    "input": "Mount Everest is the highest mountain peak above sea level on Earth.",
+    "groundTruth": "TRUSTED",
+    "category": "Geographic Assertion"
+  },
+  {
+    "id": "real_44",
+    "type": "TEXT",
+    "input": "Tata Consultancy Services (TCS) is an Indian multinational information technology services provider.",
+    "groundTruth": "TRUSTED",
+    "category": "Corporate Assertion"
+  },
+  {
+    "id": "real_45",
+    "type": "TEXT",
+    "input": "The WHO monitors international public health emergencies under International Health Regulations.",
+    "groundTruth": "TRUSTED",
+    "category": "Health Assertion"
+  },
+  {
+    "id": "real_46",
+    "type": "TEXT",
+    "input": "The Indian Railways is operated by the Ministry of Railways of the Government of India.",
+    "groundTruth": "TRUSTED",
+    "category": "Infrastructure Assertion"
+  },
+  {
+    "id": "real_47",
+    "type": "TEXT",
+    "input": "The Bank of England was established in 1694 and serves as the central bank of the United Kingdom.",
+    "groundTruth": "TRUSTED",
+    "category": "Financial Assertion"
+  },
+  {
+    "id": "real_48",
+    "type": "TEXT",
+    "input": "The WHO headquarters is located in Geneva, Switzerland.",
+    "groundTruth": "TRUSTED",
+    "category": "International Assertion"
+  },
+  {
+    "id": "real_49",
+    "type": "TEXT",
+    "input": "The Constitution of India was adopted by the Constituent Assembly on November 26, 1949.",
+    "groundTruth": "TRUSTED",
+    "category": "Historical Legal Assertion"
+  },
+  {
+    "id": "real_50",
+    "type": "TEXT",
+    "input": "The Tokyo 2020 Olympic Games were held in July and August 2021 due to COVID-19 delays.",
+    "groundTruth": "TRUSTED",
+    "category": "Sports Assertion"
+  },
+
+  {
+    "id": "fake_1",
+    "type": "TEXT",
+    "input": "India's newly appointed Prime Minister, Rishi Aggarwal, has reportedly announced sweeping national policy reforms while declaring a military campaign against Russia over alleged border security concerns.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Political Claim"
+  },
+  {
+    "id": "fake_2",
+    "type": "TEXT",
+    "input": "India's newly appointed Prime Minister Rishi Aggarwal's government supposedly imposed emergency measures and increased defense spending by 800% overnight.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake National Security Claim"
+  },
+  {
+    "id": "fake_3",
+    "type": "TEXT",
+    "input": "The Reserve Bank of India announced that all paper currency will be outlawed and replaced with gold coins starting tomorrow morning.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Currency Policy"
+  },
+  {
+    "id": "fake_4",
+    "type": "TEXT",
+    "input": "Infosys declared quarterly revenue growth of 950% and announced it is acquiring Microsoft for $4 trillion.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate Claim"
+  },
+  {
+    "id": "fake_5",
+    "type": "TEXT",
+    "input": "NASA confirmed that the Moon was discovered to be entirely hollow and made of solid 24-karat gold.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Scientific Discovery"
+  },
+  {
+    "id": "fake_6",
+    "type": "TEXT",
+    "input": "The Eiffel Tower was completely dismantled in 2025 and moved to central London.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Historical Event"
+  },
+  {
+    "id": "fake_7",
+    "type": "TEXT",
+    "input": "World Health Organization announced a global order mandating that nobody is allowed to sleep for more than 2 hours per day.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Health Directive"
+  },
+  {
+    "id": "fake_8",
+    "type": "TEXT",
+    "input": "Apple Inc declared full national bankruptcy and transferred all its assets to a local bakery in Chicago.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Financial Claim"
+  },
+  {
+    "id": "fake_9",
+    "type": "TEXT",
+    "input": "Scientists confirmed that drinking 10 liters of seawater daily reverses human aging completely in 24 hours.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Medical Discovery"
+  },
+  {
+    "id": "fake_10",
+    "type": "TEXT",
+    "input": "The Supreme Court of India ruled that all income tax is immediately abolished retroactively for the past 100 years.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Judicial Ruling"
+  },
+  {
+    "id": "fake_11",
+    "type": "TEXT",
+    "input": "United Nations General Assembly voted unanimously to move its headquarters to a submarine in the Pacific Ocean.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Diplomatic Claim"
+  },
+  {
+    "id": "fake_12",
+    "type": "TEXT",
+    "input": "Google shut down its search engine permanently and replaced it with a printed paper encyclopedia sent by mail.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Tech Announcement"
+  },
+  {
+    "id": "fake_13",
+    "type": "TEXT",
+    "input": "The Great Wall of China was reported to have been built entirely out of compressed plastic bottles in 2018.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Historical Claim"
+  },
+  {
+    "id": "fake_14",
+    "type": "TEXT",
+    "input": "ISRO launched a manned space rocket powered entirely by vegetable cooking oil that reached Mars in 10 minutes.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Space Mission"
+  },
+  {
+    "id": "fake_15",
+    "type": "TEXT",
+    "input": "State Bank of India announced it will give every citizen 1 million US dollars upon showing a library card.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Banking Policy"
+  },
+  {
+    "id": "fake_16",
+    "type": "TEXT",
+    "input": "The Amazon river completely dried up overnight due to a giant sponge placed at its source.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Environmental Event"
+  },
+  {
+    "id": "fake_17",
+    "type": "TEXT",
+    "input": "Tesla Inc announced that all future electric cars will run on human thoughts instead of lithium batteries.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate Tech"
+  },
+  {
+    "id": "fake_18",
+    "type": "TEXT",
+    "input": "The Taj Mahal was bought by a private billionaire and converted into a water park in 2026.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Cultural News"
+  },
+  {
+    "id": "fake_19",
+    "type": "TEXT",
+    "input": "The United States government declared that gravity has been suspended in California until further notice.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Government Announcement"
+  },
+  {
+    "id": "fake_20",
+    "type": "TEXT",
+    "input": "Microsoft bought the sun for $500 trillion and announced plans to charge subscription fees for daylight.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate Acquisition"
+  },
+  {
+    "id": "fake_21",
+    "type": "TEXT",
+    "input": "The Panama Canal was replaced by a giant catapult system that flings cargo ships over the mountains.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Infrastructure News"
+  },
+  {
+    "id": "fake_22",
+    "type": "TEXT",
+    "input": "The World Bank announced that all international debts have been paid using chocolate bars.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Economic Claim"
+  },
+  {
+    "id": "fake_23",
+    "type": "TEXT",
+    "input": "Astronomers detected an alien satellite broadcasting rock music directly to radios in Tokyo.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Space Discovery"
+  },
+  {
+    "id": "fake_24",
+    "type": "TEXT",
+    "input": "The Reserve Bank of India raised interest rates to 500% per hour to eliminate inflation.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Monetary Policy"
+  },
+  {
+    "id": "fake_25",
+    "type": "TEXT",
+    "input": "The International Space Station made an emergency landing in a backyard swimming pool in Florida.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Space News"
+  },
+  {
+    "id": "fake_26",
+    "type": "TEXT",
+    "input": "Cricket star Virat Kohli retired from sports to become Chief Astronaut at NASA next week.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Celebrity News"
+  },
+  {
+    "id": "fake_27",
+    "type": "TEXT",
+    "input": "The city of Paris announced it is banning all spoken languages except ancient Latin starting Monday.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Municipal Policy"
+  },
+  {
+    "id": "fake_28",
+    "type": "TEXT",
+    "input": "Scientists built a time machine out of microwave ovens that successfully sent a hamster to the year 3000.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Scientific Invention"
+  },
+  {
+    "id": "fake_29",
+    "type": "TEXT",
+    "input": "The United Nations declared that oxygen will now be taxed at $100 per breath globally.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Global Policy"
+  },
+  {
+    "id": "fake_30",
+    "type": "TEXT",
+    "input": "The Pacific Ocean was reported to have turned completely into strawberry juice due to algae.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Environmental News"
+  },
+  {
+    "id": "fake_31",
+    "type": "TEXT",
+    "input": "Google announced it acquired the country of New Zealand to turn it into a giant data center.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate Acquisition"
+  },
+  {
+    "id": "fake_32",
+    "type": "TEXT",
+    "input": "The Bank of England announced it will print banknotes on slices of cheese instead of paper.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Central Bank Policy"
+  },
+  {
+    "id": "fake_33",
+    "type": "TEXT",
+    "input": "A local high school student in Ohio built a working nuclear fusion reactor out of soda cans.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Technology Discovery"
+  },
+  {
+    "id": "fake_34",
+    "type": "TEXT",
+    "input": "The Supreme Court of the United States ruled that Mondays are unconstitutional and prohibited statewide.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Legal Ruling"
+  },
+  {
+    "id": "fake_35",
+    "type": "TEXT",
+    "input": "McDonald's announced it will stop selling burgers and only sell computer hardware starting tomorrow.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate Shift"
+  },
+  {
+    "id": "fake_36",
+    "type": "TEXT",
+    "input": "The Sahara Desert experienced 10 feet of heavy snowfall overnight, freezing all sand dunes solid.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Weather Event"
+  },
+  {
+    "id": "fake_37",
+    "type": "TEXT",
+    "input": "NASA confirmed that Mars has been inhabited by a secret civilization of giant penguins.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Space Discovery"
+  },
+  {
+    "id": "fake_38",
+    "type": "TEXT",
+    "input": "The European Union declared electricity illegal across all member states to save energy.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Policy Directive"
+  },
+  {
+    "id": "fake_39",
+    "type": "TEXT",
+    "input": "Reliance Industries bought all internet cables worldwide and shut off internet access for 48 hours.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Telecom Event"
+  },
+  {
+    "id": "fake_40",
+    "type": "TEXT",
+    "input": "The International Olympic Committee announced that sleeping will be an official medal sport in 2028.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Sports Announcement"
+  },
+  {
+    "id": "fake_41",
+    "type": "TEXT",
+    "input": "The Suez Canal was blocked again by a giant rubber duck placed by pranksters.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Maritime Event"
+  },
+  {
+    "id": "fake_42",
+    "type": "TEXT",
+    "input": "The Federal Reserve declared that all US paper money is now legally worthless and must be burned.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Monetary Policy"
+  },
+  {
+    "id": "fake_43",
+    "type": "TEXT",
+    "input": "Mount Everest sank by 5000 meters overnight into an underground cave system.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Geological Event"
+  },
+  {
+    "id": "fake_44",
+    "type": "TEXT",
+    "input": "Tata Group bought the Moon from international space agencies for 1 trillion rupees.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Corporate News"
+  },
+  {
+    "id": "fake_45",
+    "type": "TEXT",
+    "input": "WHO announced that chocolate has been proven to make humans immortal if eaten for breakfast.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Medical Study"
+  },
+  {
+    "id": "fake_46",
+    "type": "TEXT",
+    "input": "Indian Railways announced flying bullet trains operating at 5000 kilometers per hour using anti-gravity.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Infrastructure Tech"
+  },
+  {
+    "id": "fake_47",
+    "type": "TEXT",
+    "input": "The Bank of England declared that all London houses are now free for anyone who claims them.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Housing Policy"
+  },
+  {
+    "id": "fake_48",
+    "type": "TEXT",
+    "input": "WHO headquarters was moved to a giant floating cloud over the Atlantic Ocean.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake International News"
+  },
+  {
+    "id": "fake_49",
+    "type": "TEXT",
+    "input": "The Constitution of India was rewritten overnight by an automated chatbot without parliamentary approval.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Political Claim"
+  },
+  {
+    "id": "fake_50",
+    "type": "TEXT",
+    "input": "The 2028 Olympic Games were canceled because all athletes decided to play video games instead.",
+    "groundTruth": "FABRICATED",
+    "category": "Fake Sports Claim"
+  }
+]

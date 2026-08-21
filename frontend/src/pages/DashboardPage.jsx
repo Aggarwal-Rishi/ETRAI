@@ -50,7 +50,7 @@ export default function DashboardPage() {
               Fact-Checking & Content Verification
             </h1>
             <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-              Verify claims, detect manipulation tactics, and audit business reports using custom Serper search and OpenAI GPT-4o verification agents.
+              Verify claims, detect manipulation tactics, and audit business reports using custom Serper search and Google Gemini verification agents.
             </p>
             <div className="pt-2">
               <Link

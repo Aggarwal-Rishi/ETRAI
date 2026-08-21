@@ -49,8 +49,32 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
+const optionalAuth = async (req, res, next) => {
+  try {
+    let token = null;
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (token) {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await dbService.findUserById(decoded.id);
+      if (user) {
+        req.user = { id: user.id, email: user.email, createdAt: user.createdAt };
+      }
+    }
+  } catch (e) {
+    // Ignore invalid token in optionalAuth
+  }
+  next();
+};
+
 module.exports = {
   requireAuth,
   protect: requireAuth,
+  authenticateToken: requireAuth,
+  optionalAuth,
   JWT_SECRET
 };

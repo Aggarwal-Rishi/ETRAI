@@ -5,57 +5,442 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
+// -------------------------------------------------------------
+// 1. AUTHENTICATION, WORKSPACES & TEAM MODELS
+// -------------------------------------------------------------
+
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String        @id @default(uuid())
+  email        String        @unique
   passwordHash String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  fullName     String?
+  phone        String?
+  company      String?
+  role         String        @default("OWNER") // OWNER | CREATOR | REVIEWER | READER
+  photoUrl     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
   analyses     Analysis[]
+  workspaces   Workspace[]   @relation("WorkspaceOwner")
+  memberships  TeamMember[]
+  sessions     Session[]
+  usageRecords UsageRecord[]
 
   @@map("users")
 }
 
-model Analysis {
-  id             String         @id @default(uuid())
-  userId         String
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title          String
-  inputType      InputType
-  inputSource    String         @db.Text
-  selectedTypes  AnalysisType[]
-  status         AnalysisStatus @default(PENDING)
-  summary        String?        @db.Text
-  overallMetrics Json?          // Scores per category (e.g. { factCheckingScore: 82, fakeNewsScore: 45, businessReportScore: 90 })
-  reportData     Json?          // Full report storage: claims array, source evidence links, category breakdowns, AI recommendation
-  errorMessage   String?        @db.Text
-  truncated      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+model Workspace {
+  id                 String              @id @default(uuid())
+  name               String
+  slug               String              @unique
+  ownerId            String
+  owner              User                @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  plan               String              @default("Team") // Starter | Team | Newsroom | Enterprise
+  maxSeats           Int                 @default(5)
+  verificationLimit  Int                 @default(500)
+  verificationsUsed  Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  members            TeamMember[]
+  invitations        Invitation[]
+  analyses           Analysis[]
+  settings           WorkspaceSettings?
+  customSources      Source[]
+  subscriptions      Subscription[]
+  invoices           Invoice[]
+  usageRecords       UsageRecord[]
+  newsItems          NewsItem[]
+  narrativeClusters  NarrativeCluster[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model TeamMember {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email        String
+  name         String?
+  phone        String?
+  company      String?
+  role         String     @default("REVIEWER") // OWNER | CREATOR | REVIEWER | READER
+  status       String     @default("ACTIVE")   // ACTIVE | INVITED | DISABLED
+  photoUrl     String?
+  color        String     @default("#0B5CD5")
+  lastActive   String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([email])
+  @@map("team_members")
+}
+
+model Invitation {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email        String
+  role         String     @default("REVIEWER")
+  token        String     @unique
+  status       String     @default("PENDING") // PENDING | ACCEPTED | EXPIRED | CANCELLED
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
+
+  @@index([workspaceId])
+  @@index([token])
+  @@map("invitations")
+}
+
+model Session {
+  id           String     @id @default(uuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String     @unique
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean    @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
 
   @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+// -------------------------------------------------------------
+// 2. SUBSCRIPTIONS & BILLING RECORDS
+// -------------------------------------------------------------
+
+model Subscription {
+  id                   String     @id @default(uuid())
+  workspaceId          String
+  workspace            Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan                 String     @default("Team") // Starter | Team | Newsroom | Enterprise
+  cycle                String     @default("MONTHLY") // MONTHLY | ANNUAL
+  seats                Int        @default(5)
+  status               String     @default("ACTIVE") // ACTIVE | PAST_DUE | CANCELLED
+  currentPeriodStart   DateTime   @default(now())
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean    @default(false)
+  paymentMethodType    String?    // UPI | CARD | NET_BANKING | INVOICE
+  paymentMethodDetails String?    // Stored as JSON string
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([workspaceId])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id            String     @id @default(uuid())
+  workspaceId   String
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoiceNumber String     @unique
+  amount        Float
+  currency      String     @default("INR")
+  taxAmount     Float      @default(0)
+  status        String     @default("PAID") // PAID | PENDING | FAILED
+  periodStart   DateTime
+  periodEnd     DateTime
+  pdfUrl        String?
+  paymentMethod String?
+  paidAt        DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@index([workspaceId])
+  @@index([invoiceNumber])
+  @@map("invoices")
+}
+
+model UsageRecord {
+  id             String     @id @default(uuid())
+  workspaceId    String
+  workspace      Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysisId     String?
+  tokensConsumed Int        @default(0)
+  costUsd        Float      @default(0.0)
+  runType        String     @default("VERIFICATION") // VERIFICATION | RE_VERIFY | FETCH
+  createdAt      DateTime   @default(now())
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("usage_records")
+}
+
+// -------------------------------------------------------------
+// 3. WORKSPACE SETTINGS & RANKED SOURCES
+// -------------------------------------------------------------
+
+model WorkspaceSettings {
+  id                 String     @id @default(uuid())
+  workspaceId        String     @unique
+  workspace          Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scoringWeightsJson String?    // Stored as JSON string
+  thresholdsJson     String?    // Stored as JSON string
+  alertsJson         String?    // Stored as JSON string
+  regionFocus        String     @default("India")
+  primaryBeat        String     @default("Policy & governance")
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@map("workspace_settings")
+}
+
+model Source {
+  id             String     @id @default(uuid())
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  domain         String
+  rank           Int        @default(2) // 1 to 4
+  authorityScore Float      @default(80.0)
+  purpose        String?
+  status         String     @default("ACTIVE") // ACTIVE | FLAGGED | WATCHLIST
+  isCustom       Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([workspaceId])
+  @@index([domain])
+  @@map("sources")
+}
+
+// -------------------------------------------------------------
+// 4. VERIFICATION RUNS, CLAIMS & EVIDENCE MODELS
+// -------------------------------------------------------------
+
+model Analysis {
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId    String?
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  title          String
+  inputType      String
+  inputSource    String
+  selectedTypes  String
+  status         String          @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  summary        String?
+  overallMetrics String?         // Stored as JSON stringified string
+  reportData     String?         // Stored as JSON stringified string
+  errorMessage   String?
+  truncated      Boolean         @default(false)
+  runVersion     Int             @default(1)
+  tokensConsumed Int             @default(0)
+  costUsd        Float           @default(0.0)
+  trustScore     Float?
+  verdict        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  mediaAnalysis  MediaAnalysis?
+  claims         Claim[]
+  entities       NamedEntity[]
+  numericalFacts NumericalFact[]
+  provenance     ProvenanceEvent[]
+  reportSections ReportSection[]
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([createdAt])
   @@map("analyses")
 }
 
-enum InputType {
-  URL
-  FILE
-  TEXT
+model Claim {
+  id               String         @id @default(uuid())
+  analysisId       String
+  analysis         Analysis       @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  claimText        String
+  claimScope       String         @default("National") // International | National | Regional | Local
+  category         String         @default("Factual Statement")
+  verdict          String         @default("UNVERIFIED") // VERIFIED | PARTIALLY_VERIFIED | SUSPICIOUS | FALSE | UNVERIFIED
+  status           String         @default("SUSPICIOUS") // TRUSTED | PARTIALLY_VERIFIED | SUSPICIOUS | FABRICATED
+  confidence       Float          @default(50.0)
+  importanceScore  Float          @default(70.0)
+  reasoning        String?
+  hasCorrection    Boolean        @default(false)
+  correctedClaim   String?
+  correctionBasis  String?
+  partiallyAccurate Boolean       @default(false)
+  rawJson          String?        // Full claim JSON
+  createdAt        DateTime       @default(now())
+
+  evidenceItems    EvidenceItem[]
+
+  @@index([analysisId])
+  @@map("claims")
 }
 
-enum AnalysisType {
-  FACT_CHECKING
-  FAKE_NEWS_DETECTION
-  BUSINESS_REPORT
+model EvidenceItem {
+  id                    String   @id @default(uuid())
+  claimId               String
+  claim                 Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sourceIndex           Int      @default(0)
+  url                   String
+  domain                String
+  title                 String
+  snippet               String?
+  content               String?
+  stance                String   @default("NEUTRAL") // SUPPORTS | REFUTES | NEUTRAL | IRRELEVANT
+  relevanceScore        Float    @default(50.0)
+  isIndependent         Boolean  @default(true)
+  isSyndicatedDuplicate Boolean  @default(false)
+  authorityRank         Int      @default(2)
+  authorityScore        Float    @default(80.0)
+  reason                String?
+  createdAt             DateTime @default(now())
+
+  @@index([claimId])
+  @@index([domain])
+  @@map("evidence_items")
 }
 
-enum AnalysisStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+model NamedEntity {
+  id          String   @id @default(uuid())
+  analysisId  String
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  name        String
+  role        String?
+  type        String   @default("PERSON") // PERSON | ORGANIZATION | PHONE | DOCUMENT
+  status      String   @default("UNVERIFIED") // VERIFIED | SUSPICIOUS | FABRICATED | UNVERIFIED
+  finding     String?
+  createdAt   DateTime @default(now())
+
+  @@index([analysisId])
+  @@map("named_entities")
+}
+
+model NumericalFact {
+  id            String   @id @default(uuid())
+  analysisId    String
+  analysis      Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  asPrinted     String
+  refersTo      String
+  actualFinding String
+  status        String   @default("UNVERIFIED") // VERIFIED | SUSPICIOUS | FABRICATED
+  createdAt     DateTime @default(now())
+
+  @@index([analysisId])
+  @@map("numerical_facts")
+}
+
+model ProvenanceEvent {
+  id            String   @id @default(uuid())
+  analysisId    String
+  analysis      Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  timeLabel     String
+  platform      String
+  description   String
+  status        String   @default("UNVERIFIED") // VERIFIED | SUSPICIOUS | FABRICATED | UNVERIFIED
+  sequenceIndex Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([analysisId])
+  @@map("provenance_events")
+}
+
+model ReportSection {
+  id           String   @id @default(uuid())
+  analysisId   String
+  analysis     Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  sectionKey   String   // HIGHLIGHTS | SCORE_DERIVATION | MEDIA_FORENSICS | SOURCES | INTENT | PROVENANCE | RELATED
+  sectionTitle String
+  contentJson  String   // JSON stringified section data
+  createdAt    DateTime @default(now())
+
+  @@index([analysisId])
+  @@index([sectionKey])
+  @@map("report_sections")
+}
+
+model MediaAnalysis {
+  id                      String   @id @default(uuid())
+  analysisId              String   @unique
+  analysis                Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  mediaType               String
+  filename                String
+  mimeType                String
+  sizeBytes               Int
+  sha256                  String
+  width                   Int?
+  height                  Int?
+  duration                Float?
+  fps                     Float?
+  codec                   String?
+  metadataJson            String?  // Stored as JSON stringified string
+  ocrText                 String?
+  transcriptJson          String?  // Stored as JSON stringified string
+  visualFindingsJson      String?  // Stored as JSON stringified string
+  manipulationSignalsJson String?  // Stored as JSON stringified string
+  reverseSearchJson       String?  // Stored as JSON stringified string
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("media_analyses")
+}
+
+// -------------------------------------------------------------
+// 5. NEWS FEED & NARRATIVE CLUSTERS
+// -------------------------------------------------------------
+
+model NewsItem {
+  id              String            @id @default(uuid())
+  workspaceId     String?
+  workspace       Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title           String
+  url             String?
+  sourceName      String
+  domain          String
+  category        String
+  mediaType       String            @default("Text") // Image | Video | PDF | Text
+  publishedAt     DateTime          @default(now())
+  timeAgoLabel    String?
+  status          String            @default("UNVERIFIED") // VERIFIED | SUSPICIOUS | FABRICATED | UNVERIFIED
+  trustScore      Float?
+  isHero          Boolean           @default(false)
+  isLead          Boolean           @default(false)
+  isClusterActive Boolean           @default(false)
+  clusterId       String?
+  cluster         NarrativeCluster? @relation(fields: [clusterId], references: [id], onDelete: SetNull)
+  rawJson         String?
+  createdAt       DateTime          @default(now())
+
+  @@index([workspaceId])
+  @@index([clusterId])
+  @@index([publishedAt])
+  @@map("news_items")
+}
+
+model NarrativeCluster {
+  id             String     @id @default(uuid())
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  velocityLabel  String?    // e.g. +412% · 38 posts
+  postCount      Int        @default(1)
+  domainsCount   Int        @default(1)
+  status         String     @default("ACTIVE") // ACTIVE | RESOLVED
+  firstSeenAt    DateTime   @default(now())
+  leadAnalysisId String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  newsItems      NewsItem[]
+
+  @@index([workspaceId])
+  @@map("narrative_clusters")
 }

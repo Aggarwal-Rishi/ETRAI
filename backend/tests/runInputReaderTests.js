@@ -21,23 +21,23 @@ async function testInputReader() {
     }
   };
 
-  // Test 1: Short text (<35 words) throws error
-  await runTest('Short text (<35 words) returns error', async () => {
-    const shortText = 'This is a short sample text with only ten words in it.';
+  // Test 1: Short text (<15 words) throws error
+  await runTest('Short text (<15 words) returns error', async () => {
+    const shortText = 'This is short sample text.';
     try {
       await processInputContent({ inputType: 'TEXT', text: shortText });
       assert.fail('Should have thrown error');
     } catch (err) {
       assert.strictEqual(err.status, 400);
-      assert.ok(err.message.includes('minimum of 35 words'));
+      assert.ok(err.message.includes('minimum of 15 words'));
     }
   });
 
-  // Test 2: Valid text (>35 words) succeeds
-  await runTest('Valid text (>35 words) processes successfully', async () => {
-    const validText = Array(40).fill('verified').join(' ');
+  // Test 2: Valid text (>15 words) succeeds
+  await runTest('Valid text (>15 words) processes successfully', async () => {
+    const validText = Array(20).fill('verified').join(' ');
     const res = await processInputContent({ inputType: 'TEXT', text: validText });
-    assert.strictEqual(res.wordCount, 40);
+    assert.strictEqual(res.wordCount, 20);
     assert.strictEqual(res.truncated, false);
     assert.ok(res.extractedText.startsWith('verified'));
   });

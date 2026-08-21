@@ -60,9 +60,13 @@ async function runRound2Tests() {
     }
 
     // Mathematical Consistency Checks
-    const expectedFactScore = Math.round((report.breakdown.verified / report.breakdown.totalClaims) * 100);
-    assert.strictEqual(report.scores.factCheckingScore, expectedFactScore, 'Fact Checking score must match mathematical ratio');
-    assert.strictEqual(report.scores.factCheckingScore, 0, 'Fact checking score must be 0% when 0 claims are verified');
+    const expectedFactScore = Math.round(
+      ((report.breakdown.verified * 100) +
+       ((report.breakdown.partiallyVerified || 0) * 50) +
+       ((report.breakdown.suspicious || 0) * 45) +
+       (report.breakdown.false * 0)) / report.breakdown.totalClaims
+    );
+    assert.strictEqual(report.scores.factCheckingScore, expectedFactScore, 'Fact Checking score must match canonical weighted scoring formula');
     assert.ok(report.scores.fakeNewsScore <= 20, 'Fake news credibility score must be very low for fabricated story');
 
     // Decisive False Verdict Check: At least one claim MUST be marked False due to absence of major event coverage
@@ -102,7 +106,12 @@ async function runRound2Tests() {
       console.log(`     Agent Reasoning: "${c.explanation}"`);
     }
 
-    const expectedFactScore = Math.round((report.breakdown.verified / report.breakdown.totalClaims) * 100);
+    const expectedFactScore = Math.round(
+      ((report.breakdown.verified * 100) +
+       ((report.breakdown.partiallyVerified || 0) * 50) +
+       ((report.breakdown.suspicious || 0) * 45) +
+       (report.breakdown.false * 0)) / report.breakdown.totalClaims
+    );
     assert.strictEqual(report.scores.factCheckingScore, expectedFactScore, 'Fact Checking score must match mathematical formula');
   });
 
@@ -138,14 +147,20 @@ async function runRound2Tests() {
       console.log(`\n   [Claim]: "${c.claimText}"`);
       console.log(`     Verdict: ${c.status}`);
       console.log(`     Reasoning: "${c.explanation}"`);
-      if (c.status === 'False') foundFalse = true;
+      if (c.status === 'False' || c.status === 'FABRICATED' || c.verdict === 'FABRICATED' || c.verdict === 'FALSE') foundFalse = true;
     }
 
     assert.ok(foundFalse, 'The fabricated claim in the mixed story MUST be flagged as False');
+    const expectedFactScore = Math.round(
+      ((report.breakdown.verified * 100) +
+       ((report.breakdown.partiallyVerified || 0) * 50) +
+       ((report.breakdown.suspicious || 0) * 45) +
+       (report.breakdown.false * 0)) / report.breakdown.totalClaims
+    );
     assert.strictEqual(
       report.scores.factCheckingScore,
-      Math.round((report.breakdown.verified / report.breakdown.totalClaims) * 100),
-      'Score must match exact mathematical percentage'
+      expectedFactScore,
+      'Score must match canonical weighted percentage'
     );
   });
 

@@ -1,0 +1,394 @@
+[
+  {
+    "id": "eval_001_true_earnings",
+    "category": "TRUE_NEWS",
+    "difficulty": "EASY",
+    "title": "Microsoft Reports Q4 Revenue Growth of 15% Reaching $64.7 Billion",
+    "articleText": "Microsoft Corporation announced its fourth-quarter financial results today, reporting a 15% increase in revenue to $64.7 billion. The growth was primarily driven by strong demand in its Intelligent Cloud segment, with Microsoft Azure and other cloud services revenue growing by 29% year-over-year. Net income rose 10% to $22.0 billion for the quarter ended June 30.",
+    "sourceUrl": "https://www.reuters.com/technology/microsoft-revenue-q4-2024",
+    "expectedOverallVerdict": "VERIFIED",
+    "expectedTrustScoreRange": [75, 100],
+    "expectedClaims": [
+      {
+        "claimText": "Microsoft reported Q4 revenue increased by 15% to $64.7 billion.",
+        "claimType": "Numerical",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "Official SEC filings and global financial press corroborated Microsoft's Q4 revenue of $64.7B with 15% YoY growth."
+      },
+      {
+        "claimText": "Microsoft Azure cloud services revenue grew by 29% year-over-year.",
+        "claimType": "Numerical",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "Corroborated by earnings disclosures indicating Azure 29% growth."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Reuters Financial",
+      "domain": "reuters.com",
+      "publishedDate": "2024-07-30",
+      "groundTruthSources": ["reuters.com", "bloomberg.com", "cnbc.com"]
+    }
+  },
+  {
+    "id": "eval_002_false_acquisition",
+    "category": "FALSE_NEWS",
+    "difficulty": "EASY",
+    "title": "Billionaire Rishi Aggarwal Buys Google and Apple in Unprecedented $10 Trillion Cash Deal",
+    "articleText": "In a historic and shocking development, Indian billionaire tycoon Rishi Aggarwal has officially finalized the complete purchase of Alphabet Inc and Apple Inc for $10 trillion in cash. Regulators in the United States and European Union unanimously approved the mega-merger within 24 hours, giving Aggarwal sole control over global tech infrastructure.",
+    "sourceUrl": "https://fake-news-world-daily.test/rishi-buys-tech",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 30],
+    "expectedClaims": [
+      {
+        "claimText": "Rishi Aggarwal purchased Google and Apple in a $10 trillion cash deal.",
+        "claimType": "Factual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Total fabrication; no such transaction or billionaire purchase exists anywhere in global financial records."
+      },
+      {
+        "claimText": "US and EU regulators approved the $10 trillion mega-merger in 24 hours.",
+        "claimType": "Factual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Fabricated regulatory claim directly contradicted by antitrust law reality."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Fake News World Daily",
+      "domain": "fake-news-world-daily.test",
+      "publishedDate": "2024-08-01",
+      "groundTruthSources": ["sec.gov", "ftc.gov", "reuters.com"]
+    }
+  },
+  {
+    "id": "eval_003_numerical_misinfo",
+    "category": "NUMERICAL_MISINFO",
+    "difficulty": "MEDIUM",
+    "title": "Tesla Announces Record Vehicle Deliveries Surging 85% to 4.5 Million in Single Quarter",
+    "articleText": "Tesla Inc announced quarterly delivery figures asserting that vehicle deliveries surged by 85% year-over-year to 4.5 million cars in the second quarter. The electric automaker claimed unprecedented factory output across Fremont, Texas, and Shanghai gigafactories to achieve this monumental milestone.",
+    "sourceUrl": "https://ev-news-unverified.test/tesla-deliveries-record",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 35],
+    "expectedClaims": [
+      {
+        "claimText": "Tesla quarterly vehicle deliveries surged 85% to 4.5 million cars.",
+        "claimType": "Numerical",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Actual Tesla Q2 deliveries were approximately 443,956 vehicles, representing an inflated 10x error."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "EV News Unverified",
+      "domain": "ev-news-unverified.test",
+      "publishedDate": "2024-07-02",
+      "groundTruthSources": ["ir.tesla.com", "reuters.com", "wsj.com"]
+    }
+  },
+  {
+    "id": "eval_004_location_mismatch",
+    "category": "INCORRECT_ENTITIES",
+    "difficulty": "MEDIUM",
+    "title": "Apple Inaugurates Global Artificial Intelligence Innovation Headquarters in New York",
+    "articleText": "Apple chief executive Tim Cook announced the grand opening of Apple's primary global artificial intelligence innovation headquarters in New York City yesterday. The company stated that 5,000 new research engineers will be stationed at the Manhattan facility immediately.",
+    "sourceUrl": "https://tech-times-rumors.test/apple-ny-ai-hq",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [10, 40],
+    "expectedClaims": [
+      {
+        "claimText": "Apple opened its global AI innovation headquarters in New York City.",
+        "claimType": "Location",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Apple's global headquarters and AI leadership are located in Cupertino, California, not New York City."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Tech Times Rumors",
+      "domain": "tech-times-rumors.test",
+      "publishedDate": "2024-06-15",
+      "groundTruthSources": ["apple.com", "bloomberg.com"]
+    }
+  },
+  {
+    "id": "eval_005_event_state_mismatch",
+    "category": "MISLEADING_CLAIMS",
+    "difficulty": "HARD",
+    "title": "Nvidia Completes Definitive Acquisition and Merger with Arm Holdings",
+    "articleText": "Semiconductor powerhouse Nvidia has finalized the complete acquisition of British chip designer Arm Holdings for $40 billion. The deal officially closed this morning following the regulatory approval process across all jurisdictions.",
+    "sourceUrl": "https://chip-industry-insider.test/nvidia-arm-closed",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 35],
+    "expectedClaims": [
+      {
+        "claimText": "Nvidia completed and finalized the acquisition of Arm Holdings.",
+        "claimType": "Factual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Nvidia signed an acquisition agreement in 2020, but the deal was officially TERMINATED/ABANDONED in 2022 due to regulatory challenges."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Chip Industry Insider",
+      "domain": "chip-industry-insider.test",
+      "publishedDate": "2024-05-10",
+      "groundTruthSources": ["reuters.com", "ft.com", "nvidianews.nvidia.com"]
+    }
+  },
+  {
+    "id": "eval_006_partially_true",
+    "category": "PARTIALLY_TRUE",
+    "difficulty": "MEDIUM",
+    "title": "NASA Lands Artemis Crew on South Pole of Moon in Successful Historic Touchdown",
+    "articleText": "NASA successfully conducted the Artemis mission this month, testing its Space Launch System rocket and Orion spacecraft. The agency announced that astronauts landed on the lunar South Pole surface and established a permanent human research outpost during the mission.",
+    "sourceUrl": "https://space-frontier-dispatch.test/artemis-moon-landing",
+    "expectedOverallVerdict": "PARTIALLY_VERIFIED",
+    "expectedTrustScoreRange": [40, 65],
+    "expectedClaims": [
+      {
+        "claimText": "NASA conducted Artemis mission testing SLS rocket and Orion spacecraft.",
+        "claimType": "Factual",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "NASA did successfully launch and test the uncrewed Artemis I SLS/Orion mission."
+      },
+      {
+        "claimText": "Astronauts landed on the lunar South Pole surface during this Artemis mission.",
+        "claimType": "Factual",
+        "expectedStance": "NEUTRAL",
+        "expectedClaimVerdict": "UNVERIFIED",
+        "groundTruthReasoning": "Artemis I was uncrewed; crewed lunar landings are unverified for current timeline."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Space Frontier Dispatch",
+      "domain": "space-frontier-dispatch.test",
+      "publishedDate": "2024-03-20",
+      "groundTruthSources": ["nasa.gov", "space.com"]
+    }
+  },
+  {
+    "id": "eval_007_conflicting_sources",
+    "category": "CONFLICTING_SOURCES",
+    "difficulty": "ADVERSARIAL",
+    "title": "Conflicting Death Toll Figures Reported Following Coastal Cyclone Landfall",
+    "articleText": "Emergency management agencies and local relief organizations have issued sharply conflicting reports regarding casualties following the coastal cyclone. While the national disaster management authority confirmed 12 fatalities, independent municipal hospitals reported treating over 60 victims, with local monitors claiming fatalities exceeded 80.",
+    "sourceUrl": "https://coastal-times-breaking.test/cyclone-casualties",
+    "expectedOverallVerdict": "PARTIALLY_VERIFIED",
+    "expectedTrustScoreRange": [35, 60],
+    "expectedClaims": [
+      {
+        "claimText": "National disaster management confirmed 12 fatalities from the cyclone.",
+        "claimType": "Attribution",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "Official government statement cited 12 verified deaths."
+      },
+      {
+        "claimText": "Local municipal monitors reported fatalities exceeded 80.",
+        "claimType": "Attribution",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "UNVERIFIED",
+        "groundTruthReasoning": "Reputable on-the-ground monitors cite conflicting unofficial counts, creating legitimate dispute."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Coastal Times Breaking",
+      "domain": "coastal-times-breaking.test",
+      "publishedDate": "2024-08-05",
+      "groundTruthSources": ["reuters.com", "apnews.com", "bbc.com"]
+    }
+  },
+  {
+    "id": "eval_008_outdated_claim",
+    "category": "OUTDATED_CLAIMS",
+    "difficulty": "MEDIUM",
+    "title": "United Kingdom Remains Full Member of the European Union Single Market Today",
+    "articleText": "European trade policy continues with the United Kingdom participating as a full member state of the European Union single market and customs union, operating under unrestricted free movement of goods and labor across borders today.",
+    "sourceUrl": "https://euro-chronicle-today.test/uk-eu-status",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 30],
+    "expectedClaims": [
+      {
+        "claimText": "The United Kingdom remains a full member of the European Union single market today.",
+        "claimType": "Temporal",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "The UK officially left the European Union and the single market under Brexit in January 2020."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Euro Chronicle Today",
+      "domain": "euro-chronicle-today.test",
+      "publishedDate": "2024-07-11",
+      "groundTruthSources": ["bbc.co.uk", "gov.uk", "europa.eu"]
+    }
+  },
+  {
+    "id": "eval_009_unverified_rumor",
+    "category": "UNVERIFIED_CLAIMS",
+    "difficulty": "MEDIUM",
+    "title": "Secret Underground Lithium Deposit Discovered Under Antarctica Ice Shelf",
+    "articleText": "Anonymous explorers claim to have uncovered the largest unmined lithium deposit in planetary history beneath the Ross Ice Shelf in Antarctica. The anonymous expedition claimed the deposit holds 500 million tons of battery-grade lithium.",
+    "sourceUrl": "https://deep-geology-rumor.test/antarctica-lithium",
+    "expectedOverallVerdict": "UNVERIFIED",
+    "expectedTrustScoreRange": [30, 55],
+    "expectedClaims": [
+      {
+        "claimText": "A 500 million ton lithium deposit was discovered beneath the Antarctic ice shelf.",
+        "claimType": "Factual",
+        "expectedStance": "NEUTRAL",
+        "expectedClaimVerdict": "UNVERIFIED",
+        "groundTruthReasoning": "No peer-reviewed geological survey, government agency, or reputable mining database corroborates this claim."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Deep Geology Rumor",
+      "domain": "deep-geology-rumor.test",
+      "publishedDate": "2024-04-18",
+      "groundTruthSources": ["usgs.gov", "nature.com"]
+    }
+  },
+  {
+    "id": "eval_010_missing_context",
+    "category": "MISSING_CONTEXT",
+    "difficulty": "HARD",
+    "title": "WHO Declares Coffee Consumption Increases Cancer Risk Nationwide",
+    "articleText": "The World Health Organization has issued a health advisory declaring that drinking coffee causes direct cellular carcinogenesis and raises cancer risk in humans, advising global consumers to immediately cease morning caffeine consumption.",
+    "sourceUrl": "https://global-health-alarm.test/who-coffee-cancer",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [15, 45],
+    "expectedClaims": [
+      {
+        "claimText": "WHO declared that drinking coffee causes cancer and advises cessation.",
+        "claimType": "Contextual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "IARC/WHO classified very hot beverages (>65°C) as potentially risky due to thermal scalding, but expressly evaluated coffee itself as unclassifiable/protective against specific cancers."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Global Health Alarm",
+      "domain": "global-health-alarm.test",
+      "publishedDate": "2024-02-14",
+      "groundTruthSources": ["who.int", "iarc.who.fr", "mayoclinic.org"]
+    }
+  },
+  {
+    "id": "eval_011_opinion_vs_fact",
+    "category": "OPINION_VS_FACT",
+    "difficulty": "MEDIUM",
+    "title": "New Operating System UI is Objectively the Greatest Software Design in Human History",
+    "articleText": "Design critics announced that the newly released desktop operating system user interface is objectively the greatest aesthetic triumph in human history. The company also announced that the software installation file size is 4.2 gigabytes.",
+    "sourceUrl": "https://tech-op-ed-gazette.test/greatest-ui-review",
+    "expectedOverallVerdict": "PARTIALLY_VERIFIED",
+    "expectedTrustScoreRange": [50, 75],
+    "expectedClaims": [
+      {
+        "claimText": "The new operating system user interface is objectively the greatest aesthetic triumph in human history.",
+        "claimType": "Opinion",
+        "expectedStance": "NEUTRAL",
+        "expectedClaimVerdict": "UNVERIFIED",
+        "groundTruthReasoning": "Subjective aesthetic value judgement cannot be empirically fact-checked."
+      },
+      {
+        "claimText": "The software installation file size is 4.2 gigabytes.",
+        "claimType": "Factual",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "Empirically measurable software specification."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Tech Op-Ed Gazette",
+      "domain": "tech-op-ed-gazette.test",
+      "publishedDate": "2024-05-22",
+      "groundTruthSources": ["theverge.com", "arstechnica.com"]
+    }
+  },
+  {
+    "id": "eval_012_satire_parody",
+    "category": "SATIRE_PARODY",
+    "difficulty": "MEDIUM",
+    "title": "Study Finds 98% of Earth's Rotation Powered by People Pushing Revolving Doors",
+    "articleText": "A groundbreaking scientific report published by the Institute of Obvious Physics revealed that 98% of planetary rotational momentum is generated exclusively by office workers rushing through revolving doors during morning commute hours.",
+    "sourceUrl": "https://the-daily-satirist.test/revolving-doors-rotation",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 30],
+    "expectedClaims": [
+      {
+        "claimText": "98% of Earth rotational momentum is generated by people pushing revolving doors.",
+        "claimType": "Numerical",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Satirical parody claim contrary to fundamental laws of angular momentum and astrophysics."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "The Daily Satirist",
+      "domain": "the-daily-satirist.test",
+      "publishedDate": "2024-04-01",
+      "groundTruthSources": ["nasa.gov", "physics.org"]
+    }
+  },
+  {
+    "id": "eval_013_ai_manipulated",
+    "category": "AI_MANIPULATED",
+    "difficulty": "HARD",
+    "title": "Synthetic AI Release: Federal Reserve Cuts Interest Rates to Minus 5 Percent in Emergency Sunday Session",
+    "articleText": "Federal Reserve Chairman Jerome Powell convened an unannounced Sunday evening emergency meeting of the Federal Open Market Committee, voting unanimously to slash the benchmark federal funds rate to negative 5.00 percent to spur domestic retail spending.",
+    "sourceUrl": "https://synthetic-fin-wire.test/fed-negative-rates",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [0, 30],
+    "expectedClaims": [
+      {
+        "claimText": "The Federal Reserve cut interest rates to negative 5.00 percent in an emergency Sunday meeting.",
+        "claimType": "Factual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "AI-hallucinated financial narrative contradicting official FOMC statements and interest rate schedules."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Synthetic Fin Wire",
+      "domain": "synthetic-fin-wire.test",
+      "publishedDate": "2024-06-30",
+      "groundTruthSources": ["federalreserve.gov", "bloomberg.com", "reuters.com"]
+    }
+  },
+  {
+    "id": "eval_014_misleading_headline",
+    "category": "MISLEADING_HEADLINES",
+    "difficulty": "MEDIUM",
+    "title": "World Economy Collapses Into Total Ruin Following Morning Stock Market Dip",
+    "articleText": "The Dow Jones Industrial Average experienced a minor routine morning pullback of 0.3% following strong manufacturing data. Analysts noted that broader macroeconomic indicators, employment levels, and corporate profitability remain at near-record highs across all international sectors.",
+    "sourceUrl": "https://clickbait-financial-alert.test/world-economy-collapse",
+    "expectedOverallVerdict": "FALSE",
+    "expectedTrustScoreRange": [20, 50],
+    "expectedClaims": [
+      {
+        "claimText": "The global economy collapsed into total ruin.",
+        "claimType": "Contextual",
+        "expectedStance": "REFUTES",
+        "expectedClaimVerdict": "FALSE",
+        "groundTruthReasoning": "Sensationalist clickbait headline directly contradicted by the article's own body text describing healthy fundamentals."
+      },
+      {
+        "claimText": "The Dow Jones experienced a minor 0.3% morning pullback.",
+        "claimType": "Numerical",
+        "expectedStance": "SUPPORTS",
+        "expectedClaimVerdict": "VERIFIED",
+        "groundTruthReasoning": "Empirically supported routine market fluctuation."
+      }
+    ],
+    "sourceMetadata": {
+      "publisher": "Clickbait Financial Alert",
+      "domain": "clickbait-financial-alert.test",
+      "publishedDate": "2024-07-15",
+      "groundTruthSources": ["wsj.com", "bloomberg.com"]
+    }
+  }
+]

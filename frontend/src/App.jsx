@@ -9,6 +9,9 @@ import DashboardPage from './pages/DashboardPage';
 import NewAnalysisPage from './pages/NewAnalysisPage';
 import ResultsPage from './pages/ResultsPage';
 import HistoryPage from './pages/HistoryPage';
+import WorkspacePage from './pages/WorkspacePage';
+import AccountSecurityPage from './pages/AccountSecurityPage';
+import BillingPage from './pages/BillingPage';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -77,6 +80,30 @@ export default function App() {
           element={
             <ProtectedRoute>
               <HistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workspace"
+          element={
+            <ProtectedRoute>
+              <WorkspacePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/security"
+          element={
+            <ProtectedRoute>
+              <AccountSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute>
+              <BillingPage />
             </ProtectedRoute>
           }
         />

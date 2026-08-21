@@ -1,13 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const { analyze, streamProgress } = require('../controllers/verifyController');
+const { analyze, streamProgress, getJobStatus, deepResearchClaim } = require('../controllers/verifyController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
+const { analyzeLimiter } = require('../middleware/rateLimiter');
 
-// Initiate analysis job (supports single file upload)
-router.post('/analyze', protect, upload.single('file'), analyze);
+// Initiate analysis job (supports single file upload with rate limiting)
+router.post('/analyze', protect, analyzeLimiter, upload.single('file'), analyze);
 
-// SSE Stream for real-time progress updates
-router.get('/stream/:jobId', streamProgress);
+// Manual On-Demand Per-Claim Deep Research Endpoint
+router.post('/claim-deep-research', protect, deepResearchClaim);
+
+// SSE Stream for real-time progress updates (Protected & Authorized per user job)
+router.get('/stream/:jobId', protect, streamProgress);
+
+// Polling and state recovery endpoint (Protected & Authorized per user job)
+router.get('/job/:jobId', protect, getJobStatus);
 
 module.exports = router;
