@@ -200,21 +200,33 @@ model WorkspaceSettings {
 }
 
 model Source {
-  id             String     @id @default(uuid())
-  workspaceId    String?
-  workspace      Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name           String
-  domain         String
-  rank           Int        @default(2) // 1 to 4
-  authorityScore Float      @default(80.0)
-  purpose        String?
-  status         String     @default("ACTIVE") // ACTIVE | FLAGGED | WATCHLIST
-  isCustom       Boolean    @default(false)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                 String     @id @default(uuid())
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name               String
+  domain             String
+  rank               Int        @default(2) // 1 to 4
+  authorityScore     Float      @default(80.0)
+  reliabilityScore   Float      @default(85.0)
+  sourceType         String     @default("PRIMARY_NEWSROOM") // OFFICIAL_GAZETTE | GLOBAL_WIRE | PRIMARY_NEWSROOM | SPECIALIZED_DESK | FACT_CHECK_DESK | SOCIAL_MEDIA | GENERAL_WEB
+  sourceRole         String     @default("PRIMARY_REPORTING") // PRIMARY_AUTHORITY | PRIMARY_REPORTING | SECONDARY_REPORTING | FACT_CHECKER | SPECIALIST | PROVENANCE_SOURCE | SIGNAL_ONLY | SPREAD_TRACKING | WATCHLIST
+  purpose            String?
+  status             String     @default("ACTIVE") // ACTIVE | DISABLED | FLAGGED | WATCHLIST
+  isCustom           Boolean    @default(false)
+  verifiedCount      Int        @default(0)
+  refutedCount       Int        @default(0)
+  correctionCount    Int        @default(0)
+  parentCompany      String?
+  syndicationGroup   String?
+  lastEvaluatedAt    DateTime?  @default(now())
+  metadataJson       String?    // JSON stringified metadata
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   @@index([workspaceId])
   @@index([domain])
+  @@index([sourceRole])
+  @@index([status])
   @@map("sources")
 }
 
