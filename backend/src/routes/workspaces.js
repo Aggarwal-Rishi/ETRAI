@@ -9,10 +9,12 @@ const {
   updateRole,
   updateStatus,
   deleteMember,
-  updateProfile
+  updateProfile,
+  getNavTelemetry
 } = require('../controllers/workspaceController');
 const { protect } = require('../middleware/authMiddleware');
 
+router.get('/nav-stats', protect, getNavTelemetry);
 router.get('/', protect, getWorkspaces);
 router.patch('/profile', protect, updateProfile);
 router.post('/invitations/accept', protect, handleAcceptInvitation);

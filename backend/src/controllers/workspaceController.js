@@ -152,6 +152,20 @@ const updateProfile = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/workspaces/nav-stats
+ */
+const getNavTelemetry = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const stats = await getNavStats(userId);
+    return res.status(200).json({ success: true, ...stats });
+  } catch (err) {
+    console.error('[Get Nav Telemetry Error]:', err);
+    return res.status(500).json({ error: 'Failed to retrieve navigation telemetry.' });
+  }
+};
+
 module.exports = {
   getWorkspaces,
   getWorkspaceById,
@@ -161,5 +175,6 @@ module.exports = {
   updateRole,
   updateStatus,
   deleteMember,
-  updateProfile
+  updateProfile,
+  getNavTelemetry
 };

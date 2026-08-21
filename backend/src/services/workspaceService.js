@@ -297,6 +297,74 @@ async function removeMember(workspaceId, memberId, requesterUserId) {
   return await prisma.teamMember.delete({ where: { id: memberId } });
 }
 
+/**
+ * Aggregates real nav telemetry: fake news count, workspace quota, and recent notifications
+ */
+async function getNavStats(userId) {
+  const { PrismaClient } = require('@prisma/client');
+  const p = new PrismaClient();
+
+  const workspace = await p.workspace.findFirst({
+    where: {
+      OR: [
+        { ownerId: userId },
+        { members: { some: { userId, status: 'ACTIVE' } } }
+      ]
+    },
+    include: {
+      _count: { select: { analyses: true } }
+    }
+  });
+
+  // Count real completed low-trust items (< 40)
+  const fakeNewsCount = await p.analysis.count({
+    where: {
+      status: 'COMPLETED',
+      OR: [
+        { trustScore: { lt: 40 } },
+        { verdict: { in: ['fake', 'false', 'refuted', 'manipulated', 'fabricated', 'FAKE', 'FALSE'] } }
+      ]
+    }
+  });
+
+  const verificationsUsed = workspace ? (workspace.verificationsUsed || workspace._count?.analyses || 0) : 0;
+  const verificationLimit = workspace?.verificationLimit || 500;
+  const plan = workspace?.plan || 'Team';
+
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const resetDateStr = nextMonth.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+  // Real recent completed analyses for notifications
+  const recentAnalyses = await p.analysis.findMany({
+    where: { status: 'COMPLETED' },
+    select: { id: true, title: true, trustScore: true, verdict: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+    take: 5
+  });
+
+  const notifications = recentAnalyses.map(a => ({
+    id: a.id,
+    type: 'ANALYSIS_COMPLETE',
+    title: 'Verification dossier sealed',
+    message: `${a.title.slice(0, 50)}...`,
+    score: a.trustScore,
+    time: a.createdAt,
+    link: `/results/${a.id}`
+  }));
+
+  return {
+    fakeNewsCount,
+    usage: {
+      used: verificationsUsed,
+      limit: verificationLimit,
+      plan,
+      resetDate: resetDateStr
+    },
+    notifications
+  };
+}
+
 module.exports = {
   listUserWorkspaces,
   getWorkspaceDetails,
@@ -305,5 +373,6 @@ module.exports = {
   cancelInvitation,
   updateMemberRole,
   toggleMemberStatus,
-  removeMember
+  removeMember,
+  getNavStats
 };

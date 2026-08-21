@@ -1,56 +1,92 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   Search,
   Plus,
   LayoutDashboard,
+  Radio,
+  ShieldAlert,
   History,
   Users,
   CreditCard,
+  Settings,
   Lock,
   LogOut,
   Menu,
   X,
   ChevronDown,
-  Radio,
-  ShieldAlert,
+  Bell,
+  Gem,
+  Check,
   Sparkles,
   Sliders,
-  Gem,
-  Bell
+  ExternalLink,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import GlobalSearchModal from './GlobalSearchModal';
 
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [notificationToast, setNotificationToast] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  const isActive = (path) => location.pathname === path;
+  // Platform detection for Mac (⌘K) vs Windows/Linux (Ctrl+K)
+  const isMac = typeof window !== 'undefined' && /(Mac|iPhone|iPod|iPad)/i.test(navigator?.userAgent || '');
+  const shortcutKey = isMac ? '⌘K' : 'Ctrl+K';
 
-  const handleLogout = async () => {
-    setIsUserMenuOpen(false);
-    setIsMobileMenuOpen(false);
-    await logout();
-    navigate('/login');
-  };
+  // Real Nav Telemetry from Backend
+  const [navStats, setNavStats] = useState({
+    fakeNewsCount: 0,
+    usage: {
+      used: 0,
+      limit: 500,
+      plan: 'Team',
+      resetDate: '1 Sep'
+    },
+    notifications: []
+  });
 
-  const getInitials = (email) => {
-    if (!email) return 'GS';
-    const namePart = email.split('@')[0];
-    return namePart.slice(0, 2).toUpperCase();
-  };
+  const userMenuRef = useRef(null);
+  const notifMenuRef = useRef(null);
 
-  // Keyboard shortcut ⌘K / Ctrl+K
+  // Fetch real nav stats on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadNavStats() {
+      try {
+        const token = localStorage.getItem('etrai_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(apiUrl('/api/v1/workspaces/nav-stats'), { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setNavStats({
+              fakeNewsCount: data.fakeNewsCount ?? 0,
+              usage: data.usage || { used: 0, limit: 500, plan: 'Team', resetDate: '1 Sep' },
+              notifications: data.notifications || []
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully
+      }
+    }
+    loadNavStats();
+    return () => { isMounted = false; };
+  }, [location.pathname]);
+
+  // Global Shortcut listener (⌘K / Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
       }
@@ -59,52 +95,119 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const navItems = [
+  // Close menus on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setIsUserMenuOpen(false);
+      }
+      if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    setIsMobileMenuOpen(false);
+    await logout();
+    navigate('/login');
+  };
+
+  const getInitials = (fullName, email) => {
+    if (fullName) {
+      const parts = fullName.trim().split(' ');
+      if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      return fullName.slice(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.split('@')[0].slice(0, 2).toUpperCase();
+    }
+    return 'DT';
+  };
+
+  const isActive = (path) => location.pathname === path;
+
+  const navLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/news', label: 'Latest News', icon: Radio },
-    { to: '/fake-news', label: 'Fake News', icon: ShieldAlert, badge: '14' },
-    { to: '/history', label: 'History', icon: History },
-    { to: '/workspace', label: 'My Team', icon: Users }
+    {
+      to: '/fake-news',
+      label: 'Fake News',
+      icon: ShieldAlert,
+      badge: navStats.fakeNewsCount > 0 ? String(navStats.fakeNewsCount) : null
+    },
+    { to: '/history', label: 'History', icon: History }
   ];
+
+  const usagePercent = Math.min(100, Math.round(((navStats.usage.used || 0) / (navStats.usage.limit || 500)) * 100));
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
+      {/* Top Bar Header */}
+      <header className="sticky top-0 z-40 w-full bg-[#000D59] border-b border-[#F0EDE9]/15 shadow-xl select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             
-            {/* Left: Brand Logo + Nav Links */}
-            <div className="flex items-center gap-6">
+            {/* Left: Mobile Toggle + Logo + Main Nav Links */}
+            <div className="flex items-center gap-4 lg:gap-8">
+              
+              {/* Mobile Hamburger Trigger */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition"
+                aria-label="Toggle navigation drawer"
+              >
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+
+              {/* Glowing Terracotta Shield Logo */}
               <Link to="/dashboard" className="flex items-center gap-2.5 group">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md shadow-indigo-500/30 group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-4.5 h-4.5 text-white" />
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#D97757] via-indigo-600 to-[#B0512F] p-0.5 shadow-lg shadow-[#D97757]/20 group-hover:scale-105 transition-transform flex items-center justify-center">
+                  <div className="w-full h-full bg-[#000D59] rounded-[10px] flex items-center justify-center">
+                    <ShieldCheck className="w-4.5 h-4.5 text-[#E88F6B] group-hover:text-[#F2C46B] transition-colors" />
+                  </div>
                 </div>
-                <span className="text-base font-bold tracking-tight text-white font-sans">
-                  ETRAI
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-base font-bold tracking-tight text-white font-sans flex items-center gap-1.5">
+                    ETRAI
+                    <span className="text-[9px] px-1.5 py-0.2 bg-[#E88F6B]/20 text-[#E88F6B] border border-[#E88F6B]/30 rounded font-mono font-bold uppercase hidden sm:inline">
+                      DeepTrust
+                    </span>
+                  </span>
+                </div>
               </Link>
 
               {/* Desktop Nav Links */}
               <nav className="hidden md:flex items-center gap-1">
-                {navItems.map((item) => {
+                {navLinks.map((item) => {
                   const active = isActive(item.to);
                   const Icon = item.icon;
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5 relative ${
                         active
-                          ? 'bg-slate-800 text-white shadow-sm font-semibold'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                          ? 'bg-white/15 text-white font-semibold shadow-sm'
+                          : 'text-[#A7B0D4] hover:text-white hover:bg-white/10'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
-                      {item.label}
+                      <span>{item.label}</span>
+                      
+                      {/* Active Count Badge for Low-Trust Items */}
                       {item.badge && (
-                        <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-mono font-bold">
+                        <span className="px-1.5 py-0.2 bg-[#B23F35] text-white rounded-full text-[10px] font-mono font-bold shadow-sm animate-pulse">
                           {item.badge}
                         </span>
+                      )}
+
+                      {/* Active Accent Underline */}
+                      {active && (
+                        <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-[#E88F6B] rounded-full" />
                       )}
                     </Link>
                   );
@@ -112,76 +215,150 @@ export default function Navbar() {
               </nav>
             </div>
 
-            {/* Right: Search + Quick CTAs + Profile Actions */}
+            {/* Right: Search + Action Buttons + Notifications + Avatar */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Search Bar Button */}
+              
+              {/* Search Command Palette Trigger */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-300 transition-all text-xs"
-                title="Search (⌘K)"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-300 hover:text-white transition text-xs"
+                title={`Search (${shortcutKey})`}
               >
-                <Search className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline text-slate-400">Search reports, claims…</span>
-                <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] font-mono bg-slate-800 border border-slate-700 rounded text-slate-400">
-                  ⌘K
+                <Search className="w-3.5 h-3.5 text-[#A7B0D4]" />
+                <span className="hidden lg:inline text-slate-300 text-xs">Search...</span>
+                <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] font-mono bg-black/40 border border-white/20 rounded text-[#A7B0D4]">
+                  {shortcutKey}
                 </kbd>
               </button>
 
-              {/* Generate CTA */}
+              {/* Generate DeepTrust Primary CTA (Clay) */}
               <Link
                 to="/analysis"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-500/20 transition"
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#D97757] hover:bg-[#B0512F] text-white font-semibold text-xs shadow-md shadow-[#D97757]/20 transition"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>New Analysis</span>
+                <span>Generate DeepTrust</span>
               </Link>
 
-              {/* Upgrade Jewel Icon */}
+              {/* Upgrade Plan Jewel Button (Gold Accent Glow) */}
               <Link
                 to="/billing"
-                className="p-2 rounded-xl text-amber-400 hover:bg-amber-500/10 border border-amber-500/20 transition"
-                title="Upgrade Plan"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-[#F2C46B]/40 text-[#F2C46B] text-xs font-semibold shadow-sm hover:shadow-[#F2C46B]/20 transition group"
+                title="Upgrade Plan & Quota"
               >
-                <Gem className="w-4 h-4" />
+                <Gem className="w-3.5 h-3.5 text-[#F2C46B] group-hover:scale-110 transition-transform" />
+                <span>Upgrade</span>
               </Link>
 
-              {/* Notification Bell */}
-              <button
-                onClick={() => {
-                  setNotificationToast(true);
-                  setTimeout(() => setNotificationToast(false), 3000);
-                }}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition relative"
-                title="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full" />
-              </button>
-
-              {/* User Avatar Menu Dropdown */}
-              <div className="relative">
+              {/* Notification Bell Dropdown */}
+              <div className="relative" ref={notifMenuRef}>
                 <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-1.5 p-1 rounded-full hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+                  onClick={() => {
+                    setIsNotifOpen(!isNotifOpen);
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="p-2 rounded-xl text-[#A7B0D4] hover:text-white hover:bg-white/10 transition relative"
+                  title="Notifications & Activity"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-[11px] font-bold text-white shadow-sm">
-                    {getInitials(user?.email)}
+                  <Bell className="w-4 h-4" />
+                  {navStats.notifications.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E88F6B] rounded-full ring-2 ring-[#000D59]" />
+                  )}
+                </button>
+
+                {/* Notifications Flyout */}
+                {isNotifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-3 z-50 animate-scaleUp text-xs text-slate-200">
+                    <div className="flex items-center justify-between px-4 pb-2 border-b border-slate-800">
+                      <span className="font-bold text-white uppercase font-mono text-[11px]">Recent Activity</span>
+                      <span className="text-[10px] text-slate-400 font-mono">Live Database</span>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-800/60 custom-scrollbar">
+                      {navStats.notifications.length > 0 ? (
+                        navStats.notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              setIsNotifOpen(false);
+                              if (n.link) navigate(n.link);
+                            }}
+                            className="p-3 hover:bg-slate-850 cursor-pointer transition space-y-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-white text-xs">{n.title}</span>
+                              {n.score !== undefined && (
+                                <span className="font-mono text-[10px] font-bold text-indigo-400">
+                                  {n.score}/100
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 line-clamp-2">{n.message}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-slate-500 text-xs">
+                          No recent system alerts.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <ChevronDown className="w-3 h-3 text-slate-500" />
+                )}
+              </div>
+
+              {/* Account Avatar with Dropdown */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(!isUserMenuOpen);
+                    setIsNotifOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 p-1 rounded-full hover:bg-white/10 border border-transparent hover:border-white/20 transition"
+                  aria-label="User profile menu"
+                >
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#D97757] to-indigo-600 flex items-center justify-center text-[11px] font-bold text-white shadow-sm ring-1 ring-white/20">
+                    {getInitials(user?.fullName, user?.email)}
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-[#A7B0D4]" />
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
-                    {/* Quota Usage Meter */}
-                    <div className="px-4 py-2.5 border-b border-slate-800">
-                      <div className="flex justify-between items-center mb-1 text-[11px]">
-                        <span className="text-slate-400 uppercase font-mono">Verifications</span>
-                        <span className="font-mono text-indigo-400 font-bold">310 / 500</span>
+                  <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
+                    
+                    {/* User Profile Header */}
+                    <div className="px-4 py-2.5 border-b border-slate-800 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#D97757] to-indigo-600 flex items-center justify-center text-xs font-bold text-white">
+                        {getInitials(user?.fullName, user?.email)}
                       </div>
-                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-1">
-                        <div className="w-[62%] h-full bg-gradient-to-r from-indigo-500 to-cyan-400" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-white block truncate">{user?.fullName || 'Active Workspace'}</span>
+                        <span className="text-[11px] text-slate-400 block truncate">{user?.email}</span>
                       </div>
-                      <span className="text-[10px] text-slate-500">Team plan · resets 1 Sep</span>
+                    </div>
+
+                    {/* Real Usage Meter Card */}
+                    <div className="p-3 m-2 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400 uppercase font-mono font-semibold">
+                          {navStats.usage.plan} Quota
+                        </span>
+                        <span className="font-mono text-[#E88F6B] font-bold">
+                          {navStats.usage.used} / {navStats.usage.limit}
+                        </span>
+                      </div>
+                      
+                      {/* Proportional Usage Progress Bar */}
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-[#D97757] transition-all duration-500"
+                          style={{ width: `${usagePercent}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-[10px] text-slate-500">
+                        <span>{usagePercent}% utilized</span>
+                        <span>Resets {navStats.usage.resetDate}</span>
+                      </div>
                     </div>
 
                     {/* Menu Actions */}
@@ -193,8 +370,8 @@ export default function Navbar() {
                         }}
                         className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-850 flex items-center justify-between"
                       >
-                        <span className="flex items-center gap-2"><Search className="w-3.5 h-3.5" /> Search</span>
-                        <span className="font-mono text-[10px] text-slate-500">⌘K</span>
+                        <span className="flex items-center gap-2"><Search className="w-3.5 h-3.5 text-[#A7B0D4]" /> Search Command</span>
+                        <span className="font-mono text-[10px] text-slate-500">{shortcutKey}</span>
                       </button>
                       <Link
                         to="/billing"
@@ -204,11 +381,25 @@ export default function Navbar() {
                         <CreditCard className="w-3.5 h-3.5 text-indigo-400" /> My Subscription
                       </Link>
                       <Link
+                        to="/billing"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full text-left px-4 py-2 text-[#F2C46B] hover:bg-slate-850 flex items-center gap-2 block font-medium"
+                      >
+                        <Gem className="w-3.5 h-3.5" /> Upgrade Plan
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-850 flex items-center gap-2 block"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-indigo-400" /> My Account & Beats
+                      </Link>
+                      <Link
                         to="/workspace"
                         onClick={() => setIsUserMenuOpen(false)}
                         className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-850 flex items-center gap-2 block"
                       >
-                        <Users className="w-3.5 h-3.5 text-indigo-400" /> My Team
+                        <Users className="w-3.5 h-3.5 text-indigo-400" /> My Team & Seats
                       </Link>
                       <Link
                         to="/settings?tab=algo"
@@ -216,13 +407,6 @@ export default function Navbar() {
                         className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-850 flex items-center gap-2 block"
                       >
                         <Sliders className="w-3.5 h-3.5 text-indigo-400" /> Scoring Algorithm
-                      </Link>
-                      <Link
-                        to="/settings"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-850 flex items-center gap-2 block"
-                      >
-                        <Lock className="w-3.5 h-3.5 text-indigo-400" /> Account & Security
                       </Link>
                     </div>
 
@@ -237,22 +421,14 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
-
-              {/* Mobile menu trigger */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-              >
-                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation Dropdown */}
+        {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-b border-slate-800 bg-slate-950 px-4 py-3 space-y-1">
-            {navItems.map((item) => {
+          <div className="md:hidden border-t border-white/10 bg-[#000D59] px-4 py-4 space-y-2 animate-slideDown">
+            {navLinks.map((item) => {
               const active = isActive(item.to);
               const Icon = item.icon;
               return (
@@ -260,35 +436,46 @@ export default function Navbar() {
                   key={item.to}
                   to={item.to}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium ${
-                    active ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium ${
+                    active ? 'bg-white/15 text-white font-bold' : 'text-[#A7B0D4] hover:text-white'
                   }`}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2.5">
                     <Icon className="w-4 h-4" />
                     {item.label}
                   </span>
                   {item.badge && (
-                    <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-mono">
+                    <span className="px-1.5 py-0.2 bg-[#B23F35] text-white rounded-full text-[10px] font-mono font-bold">
                       {item.badge}
                     </span>
                   )}
                 </Link>
               );
             })}
+
+            <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+              <Link
+                to="/analysis"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full py-2.5 bg-[#D97757] hover:bg-[#B0512F] text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Generate DeepTrust</span>
+              </Link>
+              <Link
+                to="/billing"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full py-2 bg-white/10 border border-[#F2C46B]/40 text-[#F2C46B] rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
+              >
+                <Gem className="w-3.5 h-3.5" />
+                <span>Upgrade Plan</span>
+              </Link>
+            </div>
           </div>
         )}
       </header>
 
-      {/* Global Notification Toast */}
-      {notificationToast && (
-        <div className="fixed top-16 right-6 z-50 p-4 bg-slate-900 border border-slate-700 text-white text-xs rounded-2xl shadow-2xl flex items-center gap-3 animate-slideDown">
-          <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-          <span>3 new source-ranking updates active on your followed beats</span>
-        </div>
-      )}
-
-      {/* Global Search Modal (⌘K) */}
+      {/* Global Command Palette Search Modal */}
       <GlobalSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
