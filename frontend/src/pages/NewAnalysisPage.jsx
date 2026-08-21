@@ -160,7 +160,10 @@ export default function NewAnalysisPage() {
       setJobId(activeJobId);
 
       // Connect to SSE Stream
-      const eventSource = new EventSource(apiUrl(`/api/v1/verify/stream/${activeJobId}`), {
+      const sseUrl = token 
+        ? apiUrl(`/api/v1/verify/stream/${activeJobId}?token=${encodeURIComponent(token)}`)
+        : apiUrl(`/api/v1/verify/stream/${activeJobId}`);
+      const eventSource = new EventSource(sseUrl, {
         withCredentials: true
       });
 

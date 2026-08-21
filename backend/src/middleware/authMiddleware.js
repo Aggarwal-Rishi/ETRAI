@@ -15,6 +15,10 @@ const requireAuth = async (req, res, next) => {
     else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
     }
+    // 3. Check query param for EventSource / SSE connections
+    else if (req.query && req.query.token) {
+      token = req.query.token;
+    }
 
     if (!token) {
       return res.status(401).json({
@@ -56,6 +60,8 @@ const optionalAuth = async (req, res, next) => {
       token = req.cookies.token;
     } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
     }
 
     if (token) {

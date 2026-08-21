@@ -6,7 +6,8 @@ const {
   cancelInvitation,
   updateMemberRole,
   toggleMemberStatus,
-  removeMember
+  removeMember,
+  getNavStats
 } = require('../services/workspaceService');
 const { dbService } = require('../utils/prisma');
 

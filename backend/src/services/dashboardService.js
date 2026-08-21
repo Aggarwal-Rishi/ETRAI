@@ -46,7 +46,7 @@ async function getDashboardTelemetry(userId) {
       verdict: true,
       createdAt: true,
       entities: {
-        select: { name: true, category: true }
+        select: { name: true, type: true, role: true }
       }
     },
     orderBy: { createdAt: 'desc' }
