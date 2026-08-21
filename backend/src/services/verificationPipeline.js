@@ -113,15 +113,35 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
 
     let claims = [];
     if (isMediaJob && mediaAnalysis) {
-      const claimRes = await extractMediaClaims({
-        userNotes: text || '',
-        transcript: mediaAnalysis.transcript || '',
-        ocrText: mediaAnalysis.ocrText || '',
-        visualDescription: mediaAnalysis.visualDescription || '',
-        entities: mediaAnalysis.entities || [],
-        isVideo: mediaCategory === 'VIDEO'
-      });
-      claims = claimRes.claims || [];
+      if (Array.isArray(mediaAnalysis.claims) && mediaAnalysis.claims.length > 0) {
+        claims = mediaAnalysis.claims;
+      } else {
+        const claimRes = await extractMediaClaims({
+          userNotes: text || '',
+          transcript: mediaAnalysis.transcript || '',
+          ocrText: mediaAnalysis.ocrText || '',
+          visualDescription: mediaAnalysis.visualDescription || '',
+          entities: mediaAnalysis.entities || [],
+          isVideo: mediaCategory === 'VIDEO'
+        });
+        claims = claimRes.claims || [];
+      }
+
+      // Guarantee fallback verifiable claim if empty
+      if (claims.length === 0) {
+        const fallbackTopic = mediaAnalysis.visualDescription || `Visual content verification for ${contentRes.sourceTitle}`;
+        claims = [{
+          id: 'media_claim_visual_primary',
+          claimText: `The submitted ${mediaCategory === 'VIDEO' ? 'video' : 'image'} depicts: ${fallbackTopic}`,
+          text: `The submitted ${mediaCategory === 'VIDEO' ? 'video' : 'image'} depicts: ${fallbackTopic}`,
+          entities: mediaAnalysis.entities || [],
+          searchQuery: fallbackTopic.substring(0, 120),
+          scope: 'National',
+          importance: 'High',
+          verifiability: 'High',
+          origin: 'VISUAL_SCENE_DESCRIPTION'
+        }];
+      }
     } else {
       claims = await extractClaims(contentRes.extractedText);
     }

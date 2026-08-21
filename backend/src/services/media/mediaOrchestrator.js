@@ -163,13 +163,31 @@ async function processMediaAnalysis({ inputType, text, url, file }, options = {}
   }, options);
   allLimitations.push(...(claimRes.limitations || []));
 
-  // 7. Agent 3 External Web Evidence Verification
-  const verificationRes = await verifyMediaClaims(claimRes.claims, {
-    mainTopic: validation.fileInfo.filename,
-    location: (observed.visibleLocationClues || [])[0] || '',
-    date: (observed.visibleDates || [])[0] || ''
-  }, options);
-  allLimitations.push(...(verificationRes.limitations || []));
+  let finalClaims = claimRes.claims || [];
+  if (finalClaims.length === 0 && visualDescription) {
+    finalClaims = [{
+      id: 'media_claim_visual_1',
+      claimText: `The submitted ${validation.mediaType === 'VIDEO' ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`,
+      text: `The submitted ${validation.mediaType === 'VIDEO' ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`,
+      entities: combinedEntities,
+      searchQuery: visualDescription.substring(0, 120),
+      scope: 'National',
+      importance: 'High',
+      verifiability: 'High',
+      origin: 'VISUAL_SCENE_DESCRIPTION'
+    }];
+  }
+
+  // 7. Optional Immediate Verification (for standalone test harnesses)
+  if (options.verifyImmediately) {
+    const verificationRes = await verifyMediaClaims(finalClaims, {
+      mainTopic: validation.fileInfo.filename,
+      location: (observed.visibleLocationClues || [])[0] || '',
+      date: (observed.visibleDates || [])[0] || ''
+    }, options);
+    finalClaims = verificationRes.verifiedClaims || finalClaims;
+    allLimitations.push(...(verificationRes.limitations || []));
+  }
 
   const uniqueLimitations = Array.from(new Set(allLimitations));
 
@@ -193,8 +211,8 @@ async function processMediaAnalysis({ inputType, text, url, file }, options = {}
     observed,
     inferred,
     visualInconsistencies,
-    entities: claimRes.entities.length > 0 ? claimRes.entities : combinedEntities,
-    claims: verificationRes.verifiedClaims || claimRes.claims || [],
+    entities: claimRes.entities && claimRes.entities.length > 0 ? claimRes.entities : combinedEntities,
+    claims: finalClaims,
     manipulationSignals,
     reverseSearch,
     forensics: forensicRes,

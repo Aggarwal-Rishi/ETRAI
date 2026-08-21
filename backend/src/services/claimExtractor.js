@@ -578,90 +578,6 @@ TEXT TO ANALYZE:
 ${extractedText.substring(0, 8000)}
 """`;
 
-  let geminiRawText = null;
-
-  async function callGeminiApi() {
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-    
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Gemini API call timed out after 25000ms')), 25000);
-    });
-
-    const apiPromise = ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-        maxOutputTokens: 8192
-      }
-    });
-
-    const geminiResponse = await Promise.race([apiPromise, timeoutPromise]);
-
-    let rawText = null;
-    if (typeof geminiResponse.text === 'string') {
-      rawText = geminiResponse.text;
-    } else if (typeof geminiResponse.text === 'function') {
-      rawText = geminiResponse.text();
-    } else {
-      const parts = geminiResponse.candidates?.[0]?.content?.parts;
-      if (Array.isArray(parts) && parts.length > 0) {
-        rawText = parts.map(p => p.text || '').join('');
-      }
-    }
-    return rawText;
-  }
-
-  try {
-    const backoffDelays = [3000, 6000, 12000, 18000, 25000, 30000];
-    let attempt = 0;
-    while (attempt <= backoffDelays.length) {
-      try {
-        geminiRawText = await callGeminiApi();
-        // If parsed cleanly, break immediately
-        const testParse = safeParseGeminiJson(geminiRawText);
-        if (testParse && (Array.isArray(testParse) || (testParse.claims && testParse.claims.length > 0))) {
-          break;
-        }
-        if (attempt < backoffDelays.length) {
-          console.warn('[Agent 2 Gemini]: Response needed recovery. Retrying Gemini API call...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          attempt++;
-          continue;
-        }
-        break;
-      } catch (err) {
-        const errMsg = err.message || String(err);
-        if (/429|quota|rate.?limit|RESOURCE_EXHAUSTED|timed.?out|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|fetch failed|socket|hang up|abort|network/i.test(errMsg) && attempt < backoffDelays.length) {
-          const delay = backoffDelays[attempt];
-          console.log(`[Agent 2 Gemini]: Transient network/rate-limit error (${errMsg.substring(0, 120)}). Retrying in ${delay}ms... (attempt ${attempt + 1}/${backoffDelays.length})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          attempt++;
-        } else {
-          console.error(`[Agent 2 Gemini API Exception]: ${errMsg}`);
-          throw err;
-        }
-      }
-    }
-
-    if (!geminiRawText || geminiRawText.trim().length === 0) {
-      throw new Error('Gemini returned an empty response body (no text in candidates or .text())');
-    }
-
-  } catch (geminiErr) {
-    // Classify the error type for safe logging (never print the key)
-    const msg = geminiErr.message || String(geminiErr);
-    let safeReason = 'unknown error';
-    if (/401|403|api.?key|unauthorized|forbidden/i.test(msg)) safeReason = 'authentication failure';
-    else if (/429|quota|rate.?limit/i.test(msg)) safeReason = 'quota/rate-limit exceeded';
-    else if (/timeout|ETIMEDOUT|ECONNRESET|network/i.test(msg)) safeReason = 'network/timeout';
-    else if (/model|not.?found|invalid.?model/i.test(msg)) safeReason = 'invalid model name';
-    console.error(`[Agent 2 Gemini Error]: Gemini extraction failed (${safeReason}). Falling back to heuristic claim extraction.`);
-    return extractMockClaims(extractedText);
-  }
-
-  // ── JSON parsing ──────────────────────────────────────────────────────────
   function safeParseGeminiJson(raw) {
     if (!raw || typeof raw !== 'string') return null;
     let text = raw.trim();
@@ -721,43 +637,93 @@ ${extractedText.substring(0, 8000)}
       }
 
       try {
-        repaired = repaired.replace(/,\s*([\}\]])/g, '$1');
         return JSON.parse(repaired);
-      } catch (_) {}
-      return null;
-    }
-
-    const balancedDirect = balanceAndParse(text);
-    if (balancedDirect) return balancedDirect;
-
-    // 5. Try trimming to last comma before balancing
-    const lastComma = text.lastIndexOf(',');
-    if (lastComma > 0) {
-      const balancedTrimmed = balanceAndParse(text.substring(0, lastComma));
-      if (balancedTrimmed) return balancedTrimmed;
-    }
-
-    // 6. Individual claim object extraction fallback
-    const claimMatches = text.match(/\{\s*"[^"]+"\s*:\s*"[^"]+"[\s\S]*?\}/g);
-    if (claimMatches && claimMatches.length > 0) {
-      const extractedList = [];
-      for (const m of claimMatches) {
-        try {
-          const obj = JSON.parse(m);
-          if (obj.originalText || obj.resolvedText || obj.claimText || obj.text) {
-            extractedList.push(obj);
-          }
-        } catch (_) {}
-      }
-      if (extractedList.length > 0) {
-        return {
-          articleContext: { headline: 'Extracted Article', summary: 'Parsed from Gemini' },
-          claims: extractedList
-        };
+      } catch (_) {
+        return null;
       }
     }
 
-    return null;
+    return balanceAndParse(text);
+  }
+
+  async function callGeminiApi() {
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Gemini API call timed out after 25000ms')), 25000);
+    });
+
+    const apiPromise = ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.2,
+        maxOutputTokens: 8192
+      }
+    });
+
+    const geminiResponse = await Promise.race([apiPromise, timeoutPromise]);
+
+    let rawText = null;
+    if (typeof geminiResponse.text === 'string') {
+      rawText = geminiResponse.text;
+    } else if (typeof geminiResponse.text === 'function') {
+      rawText = geminiResponse.text();
+    } else {
+      const parts = geminiResponse.candidates?.[0]?.content?.parts;
+      if (Array.isArray(parts) && parts.length > 0) {
+        rawText = parts.map(p => p.text || '').join('');
+      }
+    }
+    return rawText;
+  }
+
+  try {
+    const backoffDelays = [3000, 6000, 12000, 18000, 25000, 30000];
+    let attempt = 0;
+    while (attempt <= backoffDelays.length) {
+      try {
+        geminiRawText = await callGeminiApi();
+        // If parsed cleanly, break immediately
+        const testParse = safeParseGeminiJson(geminiRawText);
+        if (testParse && (Array.isArray(testParse) || (typeof testParse === 'object' && testParse !== null))) {
+          break;
+        }
+        if (attempt < backoffDelays.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempt++;
+          continue;
+        }
+        break;
+      } catch (err) {
+        const errMsg = err.message || String(err);
+        if (/429|quota|rate.?limit|RESOURCE_EXHAUSTED|timed.?out|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|fetch failed|socket|hang up|abort|network/i.test(errMsg) && attempt < backoffDelays.length) {
+          const delay = backoffDelays[attempt];
+          console.log(`[Agent 2 Gemini]: Transient network/rate-limit error (${errMsg.substring(0, 120)}). Retrying in ${delay}ms... (attempt ${attempt + 1}/${backoffDelays.length})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          attempt++;
+        } else {
+          console.error(`[Agent 2 Gemini API Exception]: ${errMsg}`);
+          throw err;
+        }
+      }
+    }
+
+    if (!geminiRawText || geminiRawText.trim().length === 0) {
+      throw new Error('Gemini returned an empty response body (no text in candidates or .text())');
+    }
+
+  } catch (geminiErr) {
+    // Classify the error type for safe logging (never print the key)
+    const msg = geminiErr.message || String(geminiErr);
+    let safeReason = 'unknown error';
+    if (/401|403|api.?key|unauthorized|forbidden/i.test(msg)) safeReason = 'authentication failure';
+    else if (/429|quota|rate.?limit/i.test(msg)) safeReason = 'quota/rate-limit exceeded';
+    else if (/timeout|ETIMEDOUT|ECONNRESET|network/i.test(msg)) safeReason = 'network/timeout';
+    else if (/model|not.?found|invalid.?model/i.test(msg)) safeReason = 'invalid model name';
+    console.error(`[Agent 2 Gemini Error]: Gemini extraction failed (${safeReason}). Falling back to heuristic claim extraction.`);
+    return extractMockClaims(extractedText);
   }
 
   const parsed = safeParseGeminiJson(geminiRawText);

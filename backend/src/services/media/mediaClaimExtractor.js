@@ -68,23 +68,42 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
     });
   }
 
-  // 3. Fallback Standalone Visual Claim (if no user claim or transcript supplied)
-  if (!trimmedUserClaim && !trimmedTranscript && visualDescription) {
-    const standaloneClaimText = `The submitted ${isVideo ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`;
+  // 3. Extract OCR Text Claim (if visible text is detected on image)
+  if (ocrText && ocrText.trim().length >= 8) {
+    const cleanOcr = ocrText.trim().replace(/\s+/g, ' ');
+    const formattedOcrClaim = `The submitted media displays visible text stating: "${cleanOcr.substring(0, 240)}"`;
     claims.push({
-      id: 'media_claim_standalone_1',
-      claimText: standaloneClaimText,
-      text: standaloneClaimText,
-      entities: entities.length > 0 ? entities : (visualDescription.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []),
-      searchQuery: visualDescription.substring(0, 120),
+      id: 'media_claim_ocr_1',
+      claimText: formattedOcrClaim,
+      text: formattedOcrClaim,
+      entities: entities.length > 0 ? entities : (cleanOcr.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []),
+      searchQuery: cleanOcr.substring(0, 120),
       scope: 'National',
       importance: 'High',
       verifiability: 'High',
-      origin: 'VISUAL_SCENE_DESCRIPTION'
+      origin: 'IMAGE_OCR_TEXT'
     });
   }
 
-  // 4. Combine user claim + transcript + OCR text + visual findings for Agent 2 extraction
+  // 4. Standalone Visual Claim (if visual description supplied)
+  if (visualDescription && visualDescription.trim().length >= 10) {
+    const standaloneClaimText = `The submitted ${isVideo ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`;
+    if (!claims.some(c => c.origin === 'USER_SUBMITTED_CLAIM')) {
+      claims.push({
+        id: 'media_claim_standalone_1',
+        claimText: standaloneClaimText,
+        text: standaloneClaimText,
+        entities: entities.length > 0 ? entities : (visualDescription.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []),
+        searchQuery: visualDescription.substring(0, 120),
+        scope: 'National',
+        importance: 'High',
+        verifiability: 'High',
+        origin: 'VISUAL_SCENE_DESCRIPTION'
+      });
+    }
+  }
+
+  // 5. Combine user claim + transcript + OCR text + visual findings for Agent 2 extraction
   const combinedContext = [
     trimmedUserClaim ? `User Submitted Context: ${trimmedUserClaim}.` : '',
     trimmedTranscript ? `Video Audio Transcript: ${trimmedTranscript}.` : '',
