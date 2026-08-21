@@ -45,7 +45,11 @@ export default function ResultsPage() {
 
     const fetchReportDetail = async () => {
       try {
-        const res = await fetch(apiUrl(`/api/v1/reports/${id}`), { credentials: 'include' });
+        const token = localStorage.getItem('etrai_token');
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(apiUrl(`/api/v1/reports/${id}`), { headers, credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           const reportPayload = data.report?.reportData || data.report;

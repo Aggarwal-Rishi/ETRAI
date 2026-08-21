@@ -87,6 +87,8 @@ export default function NewAnalysisPage() {
     try {
       let body;
       let headers = {};
+      const token = localStorage.getItem('etrai_token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       if (activeTab === 'FILE' || (activeTab === 'PHOTO' && photoFile) || (activeTab === 'VIDEO' && videoFile)) {
         const formData = new FormData();

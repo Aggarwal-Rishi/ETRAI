@@ -9,7 +9,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(apiUrl('/api/v1/reports'), { credentials: 'include' })
+    const token = localStorage.getItem('etrai_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(apiUrl('/api/v1/reports'), { headers, credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data.success) {

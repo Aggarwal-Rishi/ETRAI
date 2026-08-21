@@ -10,7 +10,11 @@ export default function HistoryPage() {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch(apiUrl('/api/v1/reports'), { credentials: 'include' });
+      const token = localStorage.getItem('etrai_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(apiUrl('/api/v1/reports'), { headers, credentials: 'include' });
       const data = await res.json();
       if (data.success) {
         setReports(data.reports || []);
@@ -32,8 +36,13 @@ export default function HistoryPage() {
     }
 
     try {
+      const token = localStorage.getItem('etrai_token');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(apiUrl(`/api/v1/reports/${id}`), {
         method: 'DELETE',
+        headers,
         credentials: 'include'
       });
       if (res.ok) {
