@@ -41,9 +41,19 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow server-to-server / curl (no origin) and listed origins
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost, 127.0.0.1, any .vercel.app deployment, or explicit CLIENT_URL
+    const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const isVercel = origin.endsWith('.vercel.app') || origin.includes('vercel.app');
+    const isExplicitlyAllowed = allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed));
+
+    if (isLocalhost || isVercel || isExplicitlyAllowed) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
   },
   credentials: true
 }));
