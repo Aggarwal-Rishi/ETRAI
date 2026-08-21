@@ -16,13 +16,15 @@ import {
   Sliders,
   CreditCard,
   Users,
-  X
+  X,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 
 const QUICK_PAGES = [
   { t: 'Dashboard', m: 'Today’s volume, verdict mix and narrative clusters', path: '/dashboard', ic: FileText },
   { t: 'Latest News Desk', m: 'Live intake from your ranked sources', path: '/news', ic: Radio },
-  { t: 'Fake News Desk', m: 'Everything under 40, grouped by narrative', path: '/fake-news', ic: ShieldAlert },
+  { t: 'Fake News Desk', m: 'Debunked stories scored under 40', path: '/fake-news', ic: ShieldAlert },
   { t: 'History & Sealed Ledger', m: 'Runs, tokens and cost per verification', path: '/history', ic: Clock },
   { t: 'New DeepTrust Analysis', m: 'Verify a link, video, image, PDF or text', path: '/analysis', ic: Sparkles },
   { t: 'Scoring Algorithm', m: 'Factor weights, thresholds and penalties', path: '/settings?tab=algo', ic: Sliders },
@@ -31,50 +33,72 @@ const QUICK_PAGES = [
   { t: 'My Team & Workspace', m: 'Members, roles and invite links', path: '/workspace', ic: Users }
 ];
 
-const STATIC_CLAIMS = [
-  { t: 'All ₹500 banknotes stop being legal tender from 1 October 2026', m: 'In run DT-041-018 · False', path: '/results/DT-041-018', sc: 23 },
-  { t: 'A leaked internal circular numbered DCM/1284/2026 authorises the withdrawal', m: 'In run DT-041-018 · False', path: '/results/DT-041-018', sc: 23 },
-  { t: 'Minister subsidy rollback in Parliament', m: 'In run DT-041-017 · Questionable', path: '/results/DT-041-017', sc: 41 },
-  { t: 'Monsoon deficit revised to 8% below normal', m: 'In run DT-041-016 · Verified Real', path: '/results/DT-041-016', sc: 91 }
-];
-
-const STATIC_SOURCES = [
-  { t: 'The Standard Ledger', m: 'Rank 1 · National authority · 96/100', path: '/settings?tab=sources', sc: 96 },
-  { t: 'Meridian Post', m: 'Rank 1 · National news desk · 93/100', path: '/settings?tab=sources', sc: 93 },
-  { t: 'National Gazette index', m: 'Rank 1 · Gazette authority · 99/100', path: '/settings?tab=sources', sc: 99 },
-  { t: 'bharatwire-live.co', m: 'Rank 4 · Repeat fabrications · 11/100', path: '/settings?tab=sources', sc: 11 }
-];
-
 export default function GlobalSearchModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
+  // Focus input on open
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setQuery('');
+      setSearchResults([]);
       setSelectedIndex(0);
     }
   }, [isOpen]);
 
+  // Query real backend search endpoint
+  useEffect(() => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('etrai_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const res = await fetch(apiUrl(`/api/v1/search?q=${encodeURIComponent(query.trim())}`), { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.items || []);
+        }
+      } catch (err) {
+        // Fallback
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   if (!isOpen) return null;
 
   const q = query.trim().toLowerCase();
-
   const matchedPages = QUICK_PAGES.filter(p => !q || p.t.toLowerCase().includes(q) || p.m.toLowerCase().includes(q));
-  const matchedClaims = STATIC_CLAIMS.filter(c => q && (c.t.toLowerCase().includes(q) || c.m.toLowerCase().includes(q)));
-  const matchedSources = STATIC_SOURCES.filter(s => q && (s.t.toLowerCase().includes(q) || s.m.toLowerCase().includes(q)));
 
-  const allResults = q
+  const allItems = q
     ? [
-        ...matchedClaims.map(c => ({ ...c, group: 'Claims', icon: AlertTriangle })),
-        ...matchedSources.map(s => ({ ...s, group: 'Sources', icon: Shield })),
-        ...matchedPages.map(p => ({ ...p, group: 'Jump to', icon: p.ic }))
+        ...searchResults.map(item => ({
+          t: item.title,
+          m: `${item.type.toUpperCase()} · ${item.snippet || 'Dossier record'}`,
+          path: item.link || (item.analysisId ? `/results/${item.analysisId}` : '/history'),
+          group: item.type === 'claim' ? 'Extracted Claims' : item.type === 'report' ? 'Verification Dossiers' : 'Source Intelligence',
+          score: item.trustScore,
+          ic: item.type === 'claim' ? AlertTriangle : item.type === 'report' ? FileText : Shield
+        })),
+        ...matchedPages.map(p => ({ ...p, group: 'Quick Navigation', ic: p.ic }))
       ]
-    : matchedPages.slice(0, 6).map(p => ({ ...p, group: 'Quick Jump', icon: p.ic }));
+    : matchedPages.slice(0, 6).map(p => ({ ...p, group: 'Suggested Navigation', ic: p.ic }));
 
   const handleSelect = (item) => {
     onClose();
@@ -86,109 +110,136 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev + 1 < allResults.length ? prev + 1 : 0));
+      setSelectedIndex(prev => (prev + 1 < allItems.length ? prev + 1 : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex(prev => (prev - 1 >= 0 ? prev - 1 : allResults.length - 1));
+      setSelectedIndex(prev => (prev - 1 >= 0 ? prev - 1 : allItems.length - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (allResults[selectedIndex]) {
-        handleSelect(allResults[selectedIndex]);
+      if (allItems[selectedIndex]) {
+        handleSelect(allItems[selectedIndex]);
       }
     } else if (e.key === 'Escape') {
       onClose();
     }
   };
 
+  const highlightMatch = (text) => {
+    if (!q || !text) return text;
+    const parts = text.split(new RegExp(`(${q})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === q ? (
+        <mark key={i} className="bg-[#E88F6B]/30 text-white font-bold rounded-sm px-0.5">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
   return (
-    <div 
+    <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 bg-black/80 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center pt-20 p-4 animate-fadeIn"
     >
-      <div 
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-scaleUp text-xs text-slate-200"
+        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-scaleUp"
       >
-        {/* Search Input Bar */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800 bg-slate-950/80">
-          <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        {/* Search Input */}
+        <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950">
+          <Search className="w-5 h-5 text-indigo-400 flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search reports, claims, sources, or jump to page..."
+            placeholder="Search claims, reports, sources, or jump to navigation..."
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent border-0 text-sm text-white focus:outline-none focus:ring-0 placeholder-slate-500"
+            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-medium"
           />
-          <button 
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+          <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 rounded text-[10px] font-mono">
+            ESC
+          </kbd>
         </div>
 
         {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-          {allResults.length > 0 ? (
-            allResults.map((item, idx) => {
-              const Icon = item.icon;
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar text-xs">
+          {loading ? (
+            <div className="p-8 text-center text-slate-400 font-mono flex items-center justify-center gap-2">
+              <Search className="w-4 h-4 animate-spin text-[#E88F6B]" />
+              <span>Searching real database indices...</span>
+            </div>
+          ) : allItems.length > 0 ? (
+            allItems.map((item, idx) => {
               const isSelected = selectedIndex === idx;
+              const Icon = item.ic;
               return (
                 <div
                   key={idx}
                   onClick={() => handleSelect(item)}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`px-3 py-2.5 rounded-xl cursor-pointer transition flex items-center justify-between gap-3 ${
-                    isSelected ? 'bg-indigo-600/20 text-white border border-indigo-500/30' : 'hover:bg-slate-800/60 text-slate-300 border border-transparent'
+                  className={`p-3 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'hover:bg-slate-850 text-slate-300'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                      isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
-                    }`}>
-                      <Icon className="w-3.5 h-3.5" />
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${isSelected ? 'bg-white/20' : 'bg-slate-800 text-slate-400'}`}>
+                      <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <span className="font-medium text-slate-100 block truncate">{item.t}</span>
-                      <span className="text-[11px] text-slate-400 block truncate">{item.m}</span>
+                      <span className="font-bold block truncate text-xs">{highlightMatch(item.t)}</span>
+                      <span className={`text-[11px] block truncate ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                        {item.m}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {item.sc !== undefined && (
-                      <span className={`font-mono font-bold text-[11px] ${
-                        item.sc >= 75 ? 'text-emerald-400' : item.sc >= 40 ? 'text-amber-400' : 'text-rose-400'
+                    {item.score !== undefined && (
+                      <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[10px] ${
+                        item.score >= 75 ? 'bg-emerald-500/20 text-emerald-300' :
+                        item.score >= 40 ? 'bg-amber-500/20 text-amber-300' :
+                        'bg-rose-500/20 text-rose-300'
                       }`}>
-                        {item.sc}
+                        {item.score}/100
                       </span>
                     )}
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-slate-800 text-slate-400">
+                    <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-950 text-slate-400'
+                    }`}>
                       {item.group}
                     </span>
+                    <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="p-6 text-center text-slate-500">
-              No matching claims, sources, or reports found for "{query}".
+            <div className="p-8 text-center text-slate-500 text-xs">
+              No matching records found across your active database.
             </div>
           )}
         </div>
 
-        {/* Footer Hints */}
-        <div className="px-4 py-2 bg-slate-950 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-          <span>
-            <kbd className="px-1 py-0.2 bg-slate-800 rounded">↑</kbd> <kbd className="px-1 py-0.2 bg-slate-800 rounded">↓</kbd> navigate · <kbd className="px-1 py-0.2 bg-slate-800 rounded">↵</kbd> select
-          </span>
-          <span>
-            <kbd className="px-1 py-0.2 bg-slate-800 rounded">ESC</kbd> to close
-          </span>
+        {/* Footer */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+          <span>Navigate with ↑ ↓ · Select with ↵</span>
+          <span>Global Search Engine</span>
         </div>
       </div>
     </div>
