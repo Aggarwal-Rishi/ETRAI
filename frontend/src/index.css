@@ -2,30 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============ DEEPTRUST DESIGN FOUNDATION TOKENS ============ */
+:root {
+  /* Paper backgrounds */
+  --paper: #FFF6E3;
+  --paper-2: #EFEEE9;
+
+  /* Cards */
+  --card: #FFFFFF;
+  --card-2: #F8F8F6;
+
+  /* Inks (text colors) */
+  --ink: #0B5CD5;
+  --ink-2: #2C4E86;
+  --ink-3: #7386A8;
+  --slab: #0E2E63;
+
+  /* Accent / Action */
+  --clay: #D97757;
+  --clay-deep: #B0512F;
+  --clay-wash: #F6E7DF;
+
+  /* Status Washes (Backgrounds & Indicators) */
+  --moss-wash: #E4EFE7;
+  --ochre-wash: #F7EEDA;
+  --brick-wash: #F7E3E0;
+  --slate-wash: #E9ECF0;
+
+  /* Topbar Chrome */
+  --bar: #000D59;
+  --bar-accent: #E88F6B;
+  --bar-gold: #F2C46B;
+
+  /* Radius & Shadows */
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 16px;
+  --r-xl: 24px;
+}
+
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 font-sans;
+    @apply antialiased font-sans;
   }
 }
 
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Monospace Data Utilities */
+.data-mono {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  letter-spacing: 0.04em;
 }
 
-.glass-card {
-  background: rgba(30, 41, 59, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease-in-out;
+/* Status Chips & Badges */
+.badge-moss {
+  background-color: var(--moss-wash, #E4EFE7);
+  color: #2C5B3E;
+  border: 1px solid #C6DFCF;
 }
 
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.15);
+.badge-ochre {
+  background-color: var(--ochre-wash, #F7EEDA);
+  color: #8A6212;
+  border: 1px solid #EBD9AE;
+}
+
+.badge-brick {
+  background-color: var(--brick-wash, #F7E3E0);
+  color: #8E2F27;
+  border: 1px solid #EBC7C2;
+}
+
+.badge-slate {
+  background-color: var(--slate-wash, #E9ECF0);
+  color: #4C596A;
+  border: 1px solid #D3D9E1;
+}
+
+.badge-clay {
+  background-color: var(--clay-wash, #F6E7DF);
+  color: var(--clay-deep, #B0512F);
+  border: 1px solid #EFD3C6;
 }
 
 /* Custom Scrollbars */
@@ -44,5 +100,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.8);
+  background: rgba(217, 119, 87, 0.8);
 }
