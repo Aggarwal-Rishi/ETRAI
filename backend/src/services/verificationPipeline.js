@@ -309,6 +309,11 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     if (prisma && userId) {
       try {
         const userExists = await prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
+        const finalTokens = reportData.observability?.totalTokens || 0;
+        const finalCost = reportData.observability?.estimatedCostUsd || 0.0;
+        const finalScore = reportData.scores?.overallTrustScore !== undefined ? reportData.scores.overallTrustScore : 50;
+        const finalVerdict = reportData.verdict || (finalScore >= 75 ? 'Real' : finalScore >= 40 ? 'Suspicious' : 'Fake');
+
         savedRecord = await prisma.analysis.create({
           data: {
             id: jobId,
@@ -321,6 +326,11 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
             overallMetrics: overallMetricsStr,
             reportData: reportDataStr,
             truncated: Boolean(contentRes.truncated),
+            tokensConsumed: finalTokens,
+            costUsd: finalCost,
+            trustScore: finalScore,
+            verdict: finalVerdict,
+            runVersion: 1,
             ...(userExists ? { user: { connect: { id: userId } } } : {}),
             ...(entityIntentRes.entities && entityIntentRes.entities.length > 0 ? {
               entities: {
