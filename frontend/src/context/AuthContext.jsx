@@ -56,14 +56,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, keepSignedIn = false) => {
     setError(null);
     try {
       const res = await fetch(apiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, keepSignedIn })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -85,14 +85,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signup = async (email, password) => {
+  const signup = async (payload) => {
     setError(null);
     try {
+      const body = typeof payload === 'string' ? { email: payload, password: arguments[1] } : payload;
       const res = await fetch(apiUrl('/api/v1/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (!res.ok) {

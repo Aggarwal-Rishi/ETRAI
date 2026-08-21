@@ -262,6 +262,51 @@ const getReportExport = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/reports/public/recent-ticker
+ * Retrieves real recent analyses from the database for the live trust ticker
+ */
+const getRecentTickerReports = async (req, res) => {
+  try {
+    const prisma = require('@prisma/client');
+    const { dbService } = require('../utils/prisma');
+    // Using prisma from dbService
+    const { PrismaClient } = require('@prisma/client');
+    const p = new PrismaClient();
+
+    const reports = await p.analysis.findMany({
+      where: {
+        status: 'COMPLETED'
+      },
+      select: {
+        id: true,
+        title: true,
+        trustScore: true,
+        verdict: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 8
+    });
+
+    return res.status(200).json({
+      success: true,
+      items: reports.map(r => ({
+        id: r.id,
+        title: r.title,
+        trustScore: r.trustScore !== null ? Math.round(r.trustScore) : 50,
+        verdict: r.verdict || (r.trustScore >= 75 ? 'Real' : r.trustScore >= 40 ? 'Suspicious' : 'Fake'),
+        createdAt: r.createdAt
+      }))
+    });
+  } catch (err) {
+    console.error('[Ticker Reports Error]:', err.message);
+    return res.status(200).json({ success: true, items: [] });
+  }
+};
+
 module.exports = {
   getReports,
   getReportById,
@@ -271,5 +316,6 @@ module.exports = {
   exportHistoryCsv,
   getUsageSummary,
   reverifyReport,
-  deleteReport
+  deleteReport,
+  getRecentTickerReports
 };

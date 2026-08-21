@@ -8,19 +8,21 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 /**
  * Helper to generate JWT token and set httpOnly cookie
  */
-const sendAuthTokenResponse = (user, statusCode, res) => {
+const sendAuthTokenResponse = (user, statusCode, res, keepSignedIn = false) => {
+  const expiresIn = keepSignedIn ? '30d' : JWT_EXPIRES_IN;
   const token = jwt.sign(
     { id: user.id, email: user.email },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn }
   );
 
   const isProd = process.env.NODE_ENV === 'production';
+  const maxAge = keepSignedIn ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
   const cookieOptions = {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    maxAge
   };
 
   res.cookie('token', token, cookieOptions);
@@ -30,6 +32,10 @@ const sendAuthTokenResponse = (user, statusCode, res) => {
     user: {
       id: user.id,
       email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      company: user.company,
+      role: user.role,
       createdAt: user.createdAt
     },
     token // Included for convenience in non-browser API clients/testing
@@ -41,7 +47,7 @@ const sendAuthTokenResponse = (user, statusCode, res) => {
  */
 const signup = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, fullName, phone, company } = req.body;
 
     // Validation
     if (!email || !password) {
@@ -64,10 +70,13 @@ const signup = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Save user
+    // Save user with profile metadata
     const newUser = await dbService.createUser({
       email: normalizedEmail,
-      passwordHash
+      passwordHash,
+      fullName: fullName ? fullName.trim() : null,
+      phone: phone ? phone.trim() : null,
+      company: company ? company.trim() : null
     });
 
     return sendAuthTokenResponse(newUser, 201, res);
@@ -82,7 +91,7 @@ const signup = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, keepSignedIn } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
@@ -101,10 +110,10 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    return sendAuthTokenResponse(user, 200, res);
+    return sendAuthTokenResponse(user, 200, res, keepSignedIn);
   } catch (err) {
     console.error('[Login Error]:', err);
-    return res.status(500).json({ error: 'Failed to authenticate user.' });
+    return res.status(500).json({ error: 'An unexpected error occurred during authentication.' });
   }
 };
 

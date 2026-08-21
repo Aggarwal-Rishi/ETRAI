@@ -9,10 +9,12 @@ const {
   exportHistoryCsv,
   getUsageSummary,
   reverifyReport,
-  deleteReport
+  deleteReport,
+  getRecentTickerReports
 } = require('../controllers/reportsController');
 const { protect } = require('../middleware/authMiddleware');
 
+router.get('/public/recent-ticker', getRecentTickerReports);
 router.get('/', protect, getReports);
 router.get('/export-csv', protect, exportHistoryCsv);
 router.get('/usage-summary', protect, getUsageSummary);
