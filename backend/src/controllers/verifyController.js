@@ -10,6 +10,12 @@ function generateJobId() {
   return `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
+function parseOptionalBoolean(value, defaultValue = true) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  return String(value).trim().toLowerCase() !== 'false';
+}
+
 /**
  * POST /api/v1/verify/analyze
  */
@@ -35,6 +41,11 @@ const analyze = async (req, res) => {
     }
 
     const { inputType, text, url } = req.body;
+    const analysisOptions = {
+      enableReverseSearch: parseOptionalBoolean(req.body.enableReverseSearch),
+      traceProvenance: parseOptionalBoolean(req.body.traceProvenance),
+      detectEntities: parseOptionalBoolean(req.body.detectEntities)
+    };
     const file = req.file;
 
     // Operational Safeguards: Duplicate job & concurrency check
@@ -82,7 +93,8 @@ const analyze = async (req, res) => {
       text,
       url,
       file,
-      selectedTypes
+      selectedTypes,
+      ...analysisOptions
     }).catch(err => {
       console.error(`[Background Job Execution Error ${jobId}]:`, err.message);
     });
@@ -185,9 +197,37 @@ const getJobStatus = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/verify/proxy-image?url=...
+ * CORS-safe, SSRF-guarded image proxy for reverse-search wire archive images
+ */
+const proxyImage = async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Image URL parameter is required.' });
+    }
+
+    const { fetchRemoteMediaBuffer } = require('../services/media/remoteMediaFetcher');
+    const remote = await fetchRemoteMediaBuffer(url, {
+      expectedKind: 'image',
+      maxBytes: 10 * 1024 * 1024,
+      timeoutMs: 8000,
+      maxRedirects: 3
+    });
+    res.setHeader('Content-Type', remote.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(remote.buffer);
+  } catch (err) {
+    console.error('[Image Proxy Error]:', err.message);
+    return res.status(502).json({ error: `Image proxy failed: ${err.message}` });
+  }
+};
+
 module.exports = {
   analyze,
   streamProgress,
   getJobStatus,
-  deepResearchClaim
+  deepResearchClaim,
+  proxyImage
 };

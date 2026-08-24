@@ -401,10 +401,13 @@ const dbService = {
       where: { id, userId },
       include: {
         mediaAnalysis: true,
-        claims: { include: { evidenceItems: true } },
-        entities: true,
+        claims: { include: { evidenceItems: true, entityConnections: true, quoteAttributions: true } },
+        entities: { include: { claimConnections: true } },
         numericalFacts: true,
         provenance: { orderBy: { sequenceIndex: 'asc' } },
+        provenanceNodes: { orderBy: { sequenceOrder: 'asc' } },
+        spreadClusters: true,
+        quoteAttributions: true,
         reportSections: true
       }
     });

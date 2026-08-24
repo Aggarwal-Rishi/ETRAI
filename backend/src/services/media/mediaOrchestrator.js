@@ -3,12 +3,14 @@ const { extractMediaMetadata } = require('./mediaMetadata');
 const { analyzeImage } = require('./imageAnalyzer');
 const { analyzeVideo } = require('./videoAnalyzer');
 const { extractOcrText } = require('./ocrService');
-const { performReverseImageSearch } = require('./reverseImageSearch');
+const { performImageForensicAnalysis } = require('./imageForensics');
+const { performDocumentForensicAnalysis } = require('./documentForensics');
+const { performVideoAndAudioForensics } = require('./videoAudioForensics');
 const { extractMediaClaims } = require('./mediaClaimExtractor');
-const { verifyMediaClaims } = require('./mediaEvidenceService');
+const { verifyMediaClaims, mapForensicFindingsToClaims } = require('./mediaEvidenceService');
 
 /**
- * Checks if a URL is a social video URL (YouTube, TikTok, X/Twitter) requiring dedicated provider adapters
+ * Checks if a URL is a social video URL requiring dedicated provider adapters
  */
 function isSocialVideoUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -19,19 +21,25 @@ function isSocialVideoUrl(url) {
 }
 
 /**
- * Real Photo & Video Verification Orchestrator
+ * Real Media & Document Intelligence Orchestrator
  * Coordinates ingestion, magic-byte validation, EXIF/container metadata, keyframe sampling,
- * Whisper speech-to-text, multimodal vision, separate OCR, provider-isolated reverse search,
- * Agent 2 claim extraction, and Agent 3 evidence verification.
+ * separate OCR with uncertainty, real forensic engines, and claim-evidence mapping.
  */
-async function processMediaAnalysis({ inputType, text, url, file }, options = {}) {
+async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuffer }, options = {}) {
   const allLimitations = [];
+  const buffer = file?.buffer || rawBuffer || null;
 
-  let mediaType = (inputType || '').toUpperCase();
-  if (mediaType === 'IMAGE' || mediaType === 'PHOTO') mediaType = 'PHOTO';
-  if (mediaType === 'VIDEO') mediaType = 'VIDEO';
+  let rawType = (inputType || '').toUpperCase();
+  let mediaType = 'IMAGE';
 
-  // PART 12 — SOCIAL VIDEO URLS: Return VIDEO_URL_PROVIDER_UNAVAILABLE if social URL without adapter
+  if (rawType.includes('PDF')) mediaType = 'PDF';
+  else if (rawType.includes('DOC') || rawType.includes('WORD')) mediaType = 'DOCX';
+  else if (rawType.includes('TXT') || rawType.includes('TEXT')) mediaType = 'TXT';
+  else if (rawType.includes('VIDEO') || rawType.includes('CLIP')) mediaType = 'VIDEO';
+  else if (rawType.includes('AUDIO') || rawType.includes('VOICE')) mediaType = 'AUDIO';
+  else if (rawType.includes('PHOTO') || rawType.includes('IMAGE')) mediaType = 'IMAGE';
+
+  // Social Video URLs
   if (url && isSocialVideoUrl(url)) {
     if (!options.socialVideoProvider || typeof options.socialVideoProvider.fetchVideo !== 'function') {
       return {
@@ -51,18 +59,19 @@ async function processMediaAnalysis({ inputType, text, url, file }, options = {}
         claims: [],
         manipulationSignals: [],
         reverseSearch: { status: 'UNAVAILABLE', matches: [] },
-        limitations: ['Social video URLs (YouTube/TikTok/X) require a specialized video provider adapter (VIDEO_URL_PROVIDER_UNAVAILABLE)']
+        forensicEvidence: [],
+        limitations: ['Social video URLs require a specialized video provider adapter (VIDEO_URL_PROVIDER_UNAVAILABLE)']
       };
     }
   }
 
   // 1. Ingestion & Magic-Byte Validation
-  const validation = validateMediaInput({ file, url, inputType: mediaType });
+  const validation = validateMediaInput({ file, url, inputType: mediaType, buffer });
   if (!validation.valid) {
     return {
       valid: false,
       error: validation.error,
-      mediaType: validation.mediaType || mediaType || 'PHOTO',
+      mediaType: validation.mediaType || mediaType,
       file: validation.fileInfo || {},
       metadata: {},
       ocrText: '',
@@ -76,32 +85,42 @@ async function processMediaAnalysis({ inputType, text, url, file }, options = {}
       claims: [],
       manipulationSignals: [],
       reverseSearch: { status: 'UNAVAILABLE', matches: [] },
+      forensicEvidence: [],
       limitations: validation.limitations || [validation.error]
     };
   }
 
   allLimitations.push(...(validation.limitations || []));
 
-  // 2. EXIF & Container Metadata Extraction
-  const metaRes = extractMediaMetadata(validation.fileInfo, file?.buffer, options.mockMetadata || options.mockExif);
+  // 2. Metadata Extraction
+  const metaRes = extractMediaMetadata(validation.fileInfo, buffer, options.mockMetadata || options.mockExif);
   allLimitations.push(...(metaRes.limitations || []));
 
   let visualDescription = '';
   let transcript = '';
+  let translatedTranscript = '';
+  let transcriptLanguage = null;
   let transcriptSegments = [];
-  let observed = { visibleText: '', entities: [], logos: [], signs: [], landmarks: [], flags: [], objects: [], visibleDates: [], visibleLocationClues: [] };
+  let videoKeyframes = [];
+  let observed = { visibleText: '', entities: [], publicFigures: [], logos: [], signs: [], landmarks: [], flags: [], objects: [], vehicleMarkings: [], badges: [], uniforms: [], attire: [], securityDetails: [], visibleDates: [], visibleLocationClues: [] };
   let inferred = { possibleContext: '', possibleEvent: '', uncertainties: [] };
   let visualInconsistencies = [];
   let manipulationSignals = [];
-  let ocrText = '';
-  let rawOcrText = '';
+  let ocrRes = { status: 'NO_TEXT_DETECTED', ocrText: '', rawOcrText: '', blocks: [] };
   let reverseSearch = { status: 'UNAVAILABLE', matches: [] };
-  let extractedFrames = [];
-  let forensicRes = null;
+  let imageSourceContextComparison = null;
+  let imageForensics = null;
+  let docForensics = null;
+  let videoAudioForensics = null;
+  let videoContextReport = null;
+  let forensicEvidence = [];
+  let forensicVerdict = 'NO_MANIPULATION_SIGNAL_FOUND';
+  let forensicConfidence = 85;
 
-  // 3. Multimodal Analysis (PHOTO vs VIDEO Pipeline)
-  if (validation.mediaType === 'PHOTO') {
-    const imgRes = await analyzeImage(validation.fileInfo, file?.buffer, url, options);
+  // 3. Category-Specific Processing
+  if (validation.mediaType === 'IMAGE') {
+    // A. Image Multimodal Scene Understanding
+    const imgRes = await analyzeImage(validation.fileInfo, buffer, url, options);
     visualDescription = imgRes.visualDescription || '';
     observed = imgRes.observed || observed;
     inferred = imgRes.inferred || inferred;
@@ -109,117 +128,171 @@ async function processMediaAnalysis({ inputType, text, url, file }, options = {}
     manipulationSignals = imgRes.manipulationSignals || [];
     allLimitations.push(...(imgRes.limitations || []));
 
-    // 4. Separate OCR Extraction (Labeled model-extracted text)
-    const ocrRes = await extractOcrText(validation.fileInfo, file?.buffer, {
+    // B. Structured OCR
+    ocrRes = await extractOcrText(validation.fileInfo, buffer, {
       ...options,
       visionExtractedText: observed.visibleText || options.visionExtractedText
     });
-    ocrText = ocrRes.ocrText || '';
-    rawOcrText = ocrRes.rawOcrText || ocrText;
     allLimitations.push(...(ocrRes.limitations || []));
 
-    // 5. Provider-Isolated Reverse Image Search & Real Image Forensics
-    const { performImageForensics } = require('./imageForensics');
-    forensicRes = await performImageForensics({
-      fileInfo: validation.fileInfo,
-      buffer: file?.buffer,
-      url,
-      options
+    // C. Real Image Forensics Engine & deepTrust Asset Report Item
+    const { generateStructuredImageForensicReport } = require('./imageForensics');
+    const imageReportItem = await generateStructuredImageForensicReport(buffer, validation.fileInfo, {
+      ...options,
+      enableReverseSearch: options.enableReverseSearch !== false,
+      visionObserved: observed,
+      visualDescription,
+      entities: observed.entities || [],
+      ocrText: ocrRes.ocrText || observed.visibleText || '',
+      // Visible text alone is not evidence that text was replaced. Only an
+      // explicit comparison result may set this signal.
+      ocrDifference: Boolean(options.ocrDifference)
     });
-
-    reverseSearch = forensicRes.reverseSearch || { status: 'UNAVAILABLE', matches: [] };
-    if (forensicRes.artifacts?.signals) {
-      manipulationSignals.push(...forensicRes.artifacts.signals);
+    
+    imageForensics = {
+      ...imageReportItem.forensics,
+      reportItem: imageReportItem
+    };
+    
+    forensicEvidence = imageForensics.forensicEvidence || [];
+    forensicVerdict = imageForensics.verdict;
+    forensicConfidence = imageForensics.confidence;
+    reverseSearch = imageForensics.reverseSearch;
+    const { verifyImageSourceContext } = require('./imageSourceContextVerifier');
+    imageSourceContextComparison = await verifyImageSourceContext({
+      imageReportItem,
+      reverseSearch,
+      visualSummary: visualDescription,
+      ocrText: ocrRes.ocrText || observed.visibleText || '',
+      entities: observed.entities || []
+    }, options);
+    imageReportItem.sourceContextComparison = imageSourceContextComparison;
+    imageForensics.sourceContextComparison = imageSourceContextComparison;
+    if (imageForensics.ela?.manipulationSignals) {
+      manipulationSignals.push(...imageForensics.ela.manipulationSignals);
     }
-  } else {
-    // VIDEO PIPELINE: Metadata -> Keyframe Sampling -> Audio Extraction -> Whisper -> Visual Frame Analysis -> Frame OCR -> Temporal Consistency
-    const vidRes = await analyzeVideo(validation.fileInfo, file?.buffer, url, options);
+  } else if (validation.mediaType === 'PDF' || validation.mediaType === 'DOCX') {
+    // Document Forensics Engine
+    docForensics = performDocumentForensicAnalysis(buffer, validation.fileInfo.mimeType, {
+      text: text || '',
+      ...options
+    });
+    forensicEvidence = docForensics.forensicEvidence || [];
+    forensicVerdict = docForensics.verdict;
+    forensicConfidence = docForensics.confidence;
+
+    // Structured OCR on document payload
+    ocrRes = await extractOcrText(validation.fileInfo, buffer, {
+      ...options,
+      visionExtractedText: text
+    });
+    allLimitations.push(...(ocrRes.limitations || []));
+  } else if (validation.mediaType === 'VIDEO') {
+    // Video Multimodal + Forensics Engine
+    const vidRes = await analyzeVideo(validation.fileInfo, buffer, url, {
+      ...options,
+      userClaim: text || options.userClaim || ''
+    });
     visualDescription = vidRes.visualDescription || '';
     transcript = vidRes.transcript || '';
+    translatedTranscript = vidRes.translatedTranscript || '';
+    transcriptLanguage = vidRes.transcriptLanguage || null;
     transcriptSegments = vidRes.transcriptSegments || [];
-    ocrText = vidRes.ocrText || '';
-    rawOcrText = ocrText;
-    extractedFrames = vidRes.extractedFrames || [];
-    manipulationSignals = vidRes.manipulationSignals || [];
-    observed.entities = vidRes.entities || [];
-    forensicRes = vidRes.forensics || null;
+    videoKeyframes = vidRes.extractedFrames || [];
+    observed = vidRes.observed || {
+      ...observed,
+      visibleText: vidRes.ocrText || '',
+      entities: vidRes.entities || []
+    };
+    inferred = vidRes.inferred || inferred;
     allLimitations.push(...(vidRes.limitations || []));
+
+    videoAudioForensics = vidRes.forensics || await performVideoAndAudioForensics(validation.fileInfo, buffer, {
+      duration: vidRes.duration || metaRes.metadata?.durationSeconds || 10.0,
+      keyframes: vidRes.extractedFrames || [],
+      metadata: metaRes.metadata,
+      audioBuffer: null
+    });
+    forensicEvidence = videoAudioForensics.forensicEvidence || [];
+    videoContextReport = vidRes.videoContextReport || videoAudioForensics.contextReport || null;
+    forensicVerdict = videoAudioForensics.verdict;
+    forensicConfidence = videoAudioForensics.confidence;
+  } else if (validation.mediaType === 'AUDIO') {
+    videoAudioForensics = await performVideoAndAudioForensics(validation.fileInfo, buffer, {
+      duration: options.duration || 10.0,
+      ...options
+    });
+    forensicEvidence = videoAudioForensics.forensicEvidence || [];
+    forensicVerdict = videoAudioForensics.verdict;
+    forensicConfidence = videoAudioForensics.confidence;
   }
 
-  // Combine entities across metadata, vision observed entities, and user context
-  const combinedEntities = Array.from(new Set([
-    ...(observed.entities || []),
-    ...(observed.landmarks || [])
-  ]));
-
-  // 6. Agent 2 Claim Extraction (User Notes + Audio Transcript + OCR Text + Visual Findings)
-  const claimRes = await extractMediaClaims({
+  // 4. Claim Extraction from Media Observations
+  const claimExtraction = await extractMediaClaims({
     userNotes: text || '',
-    transcript,
-    ocrText: rawOcrText || ocrText,
     visualDescription,
-    entities: combinedEntities,
+    ocrText: ocrRes.ocrText || '',
+    transcript,
+    translatedTranscript,
+    transcriptLanguage,
+    entities: observed.entities || [],
     isVideo: validation.mediaType === 'VIDEO'
   }, options);
-  allLimitations.push(...(claimRes.limitations || []));
+  const extractedClaims = Array.isArray(claimExtraction?.claims) ? claimExtraction.claims : [];
+  allLimitations.push(...(claimExtraction?.limitations || []));
 
-  let finalClaims = claimRes.claims || [];
-  if (finalClaims.length === 0 && visualDescription) {
-    finalClaims = [{
-      id: 'media_claim_visual_1',
-      claimText: `The submitted ${validation.mediaType === 'VIDEO' ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`,
-      text: `The submitted ${validation.mediaType === 'VIDEO' ? 'video' : 'image'} depicts ${visualDescription.replace(/\.$/, '')}.`,
-      entities: combinedEntities,
-      searchQuery: visualDescription.substring(0, 120),
-      scope: 'National',
-      importance: 'High',
-      verifiability: 'High',
-      origin: 'VISUAL_SCENE_DESCRIPTION'
-    }];
-  }
-
-  // 7. Optional Immediate Verification (for standalone test harnesses)
-  if (options.verifyImmediately) {
-    const verificationRes = await verifyMediaClaims(finalClaims, {
-      mainTopic: validation.fileInfo.filename,
-      location: (observed.visibleLocationClues || [])[0] || '',
-      date: (observed.visibleDates || [])[0] || ''
+  // Standalone media-analysis callers can request Agent 3 verification in the
+  // same pass. The main four-agent pipeline verifies later, so it does not pay
+  // for duplicate searches. Test/provider injections also use this path.
+  let finalClaims = extractedClaims;
+  if (options.verifyClaims === true || Array.isArray(options.mockSearchResults) || Array.isArray(options.mockVerifiedClaims)) {
+    const verification = await verifyMediaClaims(extractedClaims, {
+      sourceText: text || '',
+      transcript,
+      visualDescription,
+      mediaType: validation.mediaType
     }, options);
-    finalClaims = verificationRes.verifiedClaims || finalClaims;
-    allLimitations.push(...(verificationRes.limitations || []));
+    if (Array.isArray(verification.verifiedClaims) && verification.verifiedClaims.length > 0) {
+      finalClaims = verification.verifiedClaims;
+    }
+    allLimitations.push(...(verification.limitations || []));
   }
 
-  const uniqueLimitations = Array.from(new Set(allLimitations));
+  // 5. Connect Forensic Evidence to Claims
+  const mappedForensicEvidence = mapForensicFindingsToClaims(finalClaims, forensicEvidence);
 
-  // Normalized MediaAnalysis Object
-  const mediaAnalysis = {
+  return {
     valid: true,
-    mediaType: validation.mediaType,
-    file: {
-      filename: validation.fileInfo.filename,
-      mimeType: validation.fileInfo.mimeType,
-      sizeBytes: validation.fileInfo.sizeBytes,
-      sha256: validation.fileInfo.sha256
-    },
+    mediaType: inputType || validation.mediaType,
+    file: validation.fileInfo,
     metadata: metaRes.metadata,
-    ocrText,
-    rawOcrText,
+    ocrText: ocrRes.ocrText || '',
+    rawOcrText: ocrRes.rawOcrText || '',
+    ocrBlocks: ocrRes.blocks || [],
+    ocrUncertainty: ocrRes.uncertaintyScore || 0,
     visualDescription,
     transcript,
     transcriptSegments,
-    extractedFrames,
+    keyframes: videoKeyframes,
     observed,
     inferred,
-    visualInconsistencies,
-    entities: claimRes.entities && claimRes.entities.length > 0 ? claimRes.entities : combinedEntities,
+    entities: observed.entities || [],
     claims: finalClaims,
     manipulationSignals,
     reverseSearch,
-    forensics: forensicRes,
-    limitations: uniqueLimitations
+    imageSourceContextComparison,
+    forensics: imageForensics || docForensics || videoAudioForensics,
+    imageForensics,
+    images: imageForensics?.reportItem ? [imageForensics.reportItem] : [],
+    docForensics,
+    videoAudioForensics,
+    videoContextReport,
+    forensicVerdict,
+    forensicConfidence,
+    forensicEvidence,
+    mappedForensicEvidence,
+    limitations: allLimitations
   };
-
-  return mediaAnalysis;
 }
 
 module.exports = {

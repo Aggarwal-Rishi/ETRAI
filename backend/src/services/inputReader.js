@@ -1,14 +1,28 @@
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 const fetch = require('node-fetch');
 const path = require('path');
 const crypto = require('crypto');
 const { processMediaAnalysis } = require('./media/mediaOrchestrator');
+const { fetchRemoteMediaBuffer, fetchRemoteText } = require('./media/remoteMediaFetcher');
 const { isSsrfSafeUrl } = require('./ssrfGuard');
 
-const MIN_WORD_COUNT = 15;
+const MIN_WORD_COUNT = 1;
 const MAX_CHAR_LIMIT = 48000; // ~12,000 tokens
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+
+async function parsePdfBuffer(buffer) {
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getText();
+    return {
+      text: result.text || '',
+      numpages: result.total || result.pages?.length || null
+    };
+  } finally {
+    await parser.destroy();
+  }
+}
 
 /**
  * Counts words in a string
@@ -236,12 +250,82 @@ function cleanExtractedText(rawStr) {
 }
 
 /**
+ * Extracts metadata, captions, OpenGraph tags, and context for video URLs (Instagram, YouTube, TikTok, Vimeo, web video)
+ */
+async function extractVideoUrlContent(videoUrl, userNotes = '') {
+  const isYouTubeUrl = /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i.test(videoUrl);
+  const isInstagram = /instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)/i.test(videoUrl);
+  const isTikTok = /tiktok\.com\/@[^/]+\/video\/(\d+)/i.test(videoUrl);
+  const isVimeo = /vimeo\.com\/(\d+)/i.test(videoUrl);
+
+  let provider = 'web_video';
+  if (isYouTubeUrl) provider = 'youtube';
+  else if (isInstagram) provider = 'instagram';
+  else if (isTikTok) provider = 'tiktok';
+  else if (isVimeo) provider = 'vimeo';
+
+  let title = `${provider.toUpperCase()} Video Broadcast: ${videoUrl}`;
+  let description = '';
+  let extractedText = '';
+  let mediaThumb = null;
+
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+  try {
+    const resp = await fetch(videoUrl, { headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const html = await resp.text();
+      const meta = extractHtmlAssetsAndMetadata(html, videoUrl);
+      if (meta.metadata.title) title = meta.metadata.title;
+      if (meta.metadata.description) description = meta.metadata.description;
+      if (meta.discoveredAssets?.images?.[0]?.url) mediaThumb = meta.discoveredAssets.images[0].url;
+      const cleanBody = cleanHtml(html);
+      if (cleanBody && cleanBody.length > 30) extractedText = cleanBody;
+    }
+  } catch (e) {
+    clearTimeout(timeoutId);
+  }
+
+  // Combine title, description, and user notes
+  const contentParts = [
+    title !== videoUrl ? title : '',
+    description,
+    extractedText && extractedText !== description && extractedText.length < 3000 ? extractedText : '',
+    userNotes ? `User Provided Video Context: ${userNotes}` : ''
+  ].filter(Boolean);
+
+  let fullText = contentParts.join('\n\n').trim();
+  if (!fullText || countWords(fullText) < 2) {
+    fullText = `Video stream verification payload for ${videoUrl}. ${userNotes ? 'User notes: ' + userNotes : ''}`;
+  }
+
+  return {
+    provider,
+    title,
+    description,
+    fullText,
+    thumbnailUrl: mediaThumb
+  };
+}
+
+/**
  * Unified Multi-Modal Input Processor (Agent 1)
  * Handles URLs, Files (PDF/DOCX/TXT), Raw Text, and Media with truthful metadata extraction.
  */
-async function processInputContent({ inputType, text, url, file }) {
+async function processInputContent({ inputType, text, url, file }, options = {}) {
   let rawText = '';
   let sourceTitle = '';
+  // Preserve the complete media result for the verification pipeline and report UI.
+  // Previously only a few fields were copied into metadata, which caused image/video
+  // reports to fall back to fabricated placeholder values and disabled comparison UI.
+  let mediaAnalysis = null;
   let metadata = {
     author: null,
     publisher: null,
@@ -295,29 +379,174 @@ async function processInputContent({ inputType, text, url, file }) {
 
     try {
       if (ext === '.pdf' || file.mimetype === 'application/pdf') {
-        const parsed = await pdfParse(file.buffer);
-        rawText = parsed.text;
+        const parsed = await parsePdfBuffer(file.buffer);
+        rawText = parsed.text || '';
         metadata.pageCount = parsed.numpages || null;
+        const docForensics = await processMediaAnalysis({ inputType: 'PDF', file, text: rawText }, options);
+        mediaAnalysis = docForensics;
+        metadata.documentForensics = docForensics.docForensics;
+        metadata.forensicEvidence = docForensics.forensicEvidence || [];
+        metadata.forensicVerdict = docForensics.forensicVerdict;
       } else if (
         ext === '.docx' ||
         file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       ) {
         const parsed = await mammoth.extractRawText({ buffer: file.buffer });
-        rawText = parsed.value;
+        rawText = parsed.value || '';
+        const docForensics = await processMediaAnalysis({ inputType: 'DOCX', file, text: rawText }, options);
+        mediaAnalysis = docForensics;
+        metadata.documentForensics = docForensics.docForensics;
+        metadata.forensicEvidence = docForensics.forensicEvidence || [];
+        metadata.forensicVerdict = docForensics.forensicVerdict;
       } else if (ext === '.txt' || file.mimetype === 'text/plain') {
         rawText = file.buffer.toString('utf-8');
       } else {
-        const err = new Error('Unsupported file format. Accepted formats are PDF (.pdf), Word Document (.docx), and plain text (.txt).');
+        const err = new Error('Unsupported document format. Accepted document formats are PDF (.pdf), Word (.docx), and Plain Text (.txt).');
         err.status = 400;
         throw err;
       }
     } catch (parseError) {
       if (parseError.status) throw parseError;
-      const err = new Error('Failed to parse document content. Unsupported or corrupted file format.');
+      const err = new Error(`Failed to parse file content: ${parseError.message}`);
       err.status = 400;
       throw err;
     }
   } 
+  else if (inputType === 'PHOTO' || inputType === 'IMAGE') {
+    if (file && file.buffer) {
+      const filename = file.originalname || 'Uploaded Image';
+      sourceTitle = `Photo: ${filename}`;
+      metadata.mimeType = file.mimetype || 'image/jpeg';
+      metadata.sizeBytes = file.buffer.length;
+      metadata.sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+      const imgMedia = await processMediaAnalysis({ inputType: 'IMAGE', file, url, text }, options);
+      mediaAnalysis = imgMedia;
+      rawText = imgMedia.ocrText || imgMedia.visualDescription || (text ? text.trim() : `Image file: ${filename}`);
+      metadata.imageForensics = imgMedia.imageForensics;
+      metadata.forensicEvidence = imgMedia.forensicEvidence || [];
+      metadata.forensicVerdict = imgMedia.forensicVerdict;
+    } else if (url && typeof url === 'string') {
+      const ssrfCheck = isSsrfSafeUrl(url);
+      if (!ssrfCheck.safe) {
+        const err = new Error(`Invalid or restricted URL: ${ssrfCheck.reason}`);
+        err.status = 400;
+        throw err;
+      }
+      const remote = await fetchRemoteMediaBuffer(url, { expectedKind: 'image' });
+      const remoteFile = {
+        originalname: remote.filename,
+        mimetype: remote.mimeType,
+        buffer: remote.buffer,
+        size: remote.sizeBytes
+      };
+      sourceTitle = `Image URL: ${url}`;
+      discoveredAssets.images.push({ url: remote.finalUrl, alt: 'Submitted image asset', isLead: true });
+      metadata.mimeType = remote.mimeType;
+      metadata.sizeBytes = remote.sizeBytes;
+      metadata.sha256 = crypto.createHash('sha256').update(remote.buffer).digest('hex');
+      const imgMedia = await processMediaAnalysis({ inputType: 'IMAGE', file: remoteFile, url: remote.finalUrl, text }, options);
+      mediaAnalysis = imgMedia;
+      rawText = imgMedia.ocrText || imgMedia.visualDescription || (text ? text.trim() : `Image asset verification for URL: ${remote.finalUrl}`);
+      metadata.imageForensics = imgMedia.imageForensics;
+      metadata.forensicEvidence = imgMedia.forensicEvidence || [];
+      metadata.forensicVerdict = imgMedia.forensicVerdict;
+    } else {
+      const err = new Error('An image file or valid image URL is required.');
+      err.status = 400;
+      throw err;
+    }
+  }
+  else if (inputType === 'VIDEO') {
+    if (file && file.buffer) {
+      const filename = file.originalname || 'Uploaded Video';
+      sourceTitle = `Video: ${filename}`;
+      metadata.mimeType = file.mimetype || 'video/mp4';
+      metadata.sizeBytes = file.buffer.length;
+      metadata.sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+      const vidMedia = await processMediaAnalysis({ inputType: 'VIDEO', file, text }, options);
+      mediaAnalysis = vidMedia;
+      rawText = vidMedia.transcript || vidMedia.visualDescription || (text ? text.trim() : `Video file: ${filename}`);
+      metadata.videoAudioForensics = vidMedia.videoAudioForensics;
+      metadata.forensicEvidence = vidMedia.forensicEvidence || [];
+      metadata.forensicVerdict = vidMedia.forensicVerdict;
+    } else if (url && typeof url === 'string') {
+      const ssrfCheck = isSsrfSafeUrl(url);
+      if (!ssrfCheck.safe) {
+        const err = new Error(`Invalid or restricted URL: ${ssrfCheck.reason}`);
+        err.status = 400;
+        throw err;
+      }
+
+      const isPlatformPage = /(?:youtube\.com|youtu\.be|vimeo\.com|facebook\.com|instagram\.com|tiktok\.com|x\.com|twitter\.com)\//i.test(url);
+      const isDirectVideo = !isPlatformPage;
+      if (isDirectVideo) {
+        const remote = await fetchRemoteMediaBuffer(url, { expectedKind: 'video' });
+        const remoteFile = {
+          originalname: remote.filename,
+          mimetype: remote.mimeType,
+          buffer: remote.buffer,
+          size: remote.sizeBytes
+        };
+        const vidMedia = await processMediaAnalysis({ inputType: 'VIDEO', file: remoteFile, url: remote.finalUrl, text }, options);
+        mediaAnalysis = vidMedia;
+        sourceTitle = `Video URL: ${url}`;
+        rawText = vidMedia.transcript || vidMedia.visualDescription || (text ? text.trim() : `Video asset verification for URL: ${remote.finalUrl}`);
+        discoveredAssets.videos.push({ url: remote.finalUrl, provider: 'direct', title: sourceTitle, thumbnail: null });
+        metadata.mimeType = remote.mimeType;
+        metadata.sizeBytes = remote.sizeBytes;
+        metadata.sha256 = crypto.createHash('sha256').update(remote.buffer).digest('hex');
+        metadata.videoAudioForensics = vidMedia.videoAudioForensics;
+        metadata.forensicEvidence = vidMedia.forensicEvidence || [];
+        metadata.forensicVerdict = vidMedia.forensicVerdict;
+        metadata.videoUrl = remote.finalUrl;
+        metadata.videoProvider = 'direct';
+      } else {
+      const videoUrlInfo = await extractVideoUrlContent(url, text);
+      sourceTitle = videoUrlInfo.title;
+      rawText = videoUrlInfo.fullText;
+      discoveredAssets.videos.push({
+        url,
+        provider: videoUrlInfo.provider,
+        title: videoUrlInfo.title,
+        thumbnail: videoUrlInfo.thumbnailUrl
+      });
+      if (videoUrlInfo.thumbnailUrl) {
+        discoveredAssets.images.push({
+          url: videoUrlInfo.thumbnailUrl,
+          alt: videoUrlInfo.title,
+          isLead: true
+        });
+      }
+      metadata.videoUrl = url;
+      metadata.videoProvider = videoUrlInfo.provider;
+      metadata.mimeType = 'video/mp4';
+      metadata.videoForensicsStatus = 'UNAVAILABLE_REMOTE_PLATFORM_PAGE';
+      }
+    } else {
+      const err = new Error('A video file or valid video URL is required.');
+      err.status = 400;
+      throw err;
+    }
+  }
+  else if (inputType === 'AUDIO') {
+    if (file && file.buffer) {
+      const filename = file.originalname || 'Uploaded Audio';
+      sourceTitle = `Audio: ${filename}`;
+      metadata.mimeType = file.mimetype || 'audio/mpeg';
+      metadata.sizeBytes = file.buffer.length;
+      metadata.sha256 = crypto.createHash('sha256').update(file.buffer).digest('hex');
+      const audMedia = await processMediaAnalysis({ inputType: 'AUDIO', file, text }, options);
+      mediaAnalysis = audMedia;
+      rawText = audMedia.transcript || (text ? text.trim() : `Audio file: ${filename}`);
+      metadata.videoAudioForensics = audMedia.videoAudioForensics;
+      metadata.forensicEvidence = audMedia.forensicEvidence || [];
+      metadata.forensicVerdict = audMedia.forensicVerdict;
+    } else {
+      const err = new Error('An audio file upload is required.');
+      err.status = 400;
+      throw err;
+    }
+  }
   else if (inputType === 'URL') {
     if (!url || typeof url !== 'string') {
       const err = new Error('A valid URL is required.');
@@ -342,23 +571,15 @@ async function processInputContent({ inputType, text, url, file }) {
     }
     
     let htmlContent = '';
-    const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    };
-
     try {
-      const response = await fetch(url, { headers, timeout: 12000 });
-      if (response.ok) {
-        htmlContent = await response.text();
-      } else {
-        const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
-        const cacheResp = await fetch(cacheUrl, { headers, timeout: 8000 });
-        if (cacheResp.ok) {
-          htmlContent = await cacheResp.text();
-        }
-      }
-    } catch (e) {}
+      const remotePage = await fetchRemoteText(url);
+      htmlContent = remotePage.text;
+      url = remotePage.finalUrl;
+    } catch (error) {
+      const err = new Error(`Unable to extract content from the provided URL: ${error.message}`);
+      err.status = 422;
+      throw err;
+    }
 
     if (!htmlContent) {
       const err = new Error('Unable to extract content from the provided URL. The page may be paywalled, blocked, or offline.');
@@ -381,42 +602,6 @@ async function processInputContent({ inputType, text, url, file }) {
     }
 
     rawText = cleanHtml(htmlContent);
-  } 
-  else if (inputType === 'PHOTO' || inputType === 'IMAGE' || inputType === 'VIDEO') {
-    const mediaTitle = file ? file.originalname : (url || 'Submitted Media');
-    sourceTitle = `${inputType === 'VIDEO' ? 'Video' : 'Photo'} Verification: ${mediaTitle}`;
-
-    const mediaAnalysis = await processMediaAnalysis({ inputType, text, url, file });
-
-    const contextParts = [
-      (text || '').trim(),
-      mediaAnalysis.ocrText ? `OCR Text: ${mediaAnalysis.ocrText}` : '',
-      mediaAnalysis.visualDescription ? `Visual Description: ${mediaAnalysis.visualDescription}` : '',
-      mediaAnalysis.transcript ? `Transcript: ${mediaAnalysis.transcript}` : ''
-    ].filter(Boolean);
-
-    rawText = contextParts.join('\n\n');
-    if (!rawText || countWords(rawText) < 5) {
-      rawText = `Media verification payload for ${mediaTitle}. ${text ? 'User notes: ' + text : ''}`;
-    }
-
-    return {
-      sourceTitle,
-      rawText: cleanExtractedText(rawText),
-      extractedText: cleanExtractedText(rawText),
-      wordCount: countWords(rawText),
-      characterCount: rawText.length,
-      mediaAnalysis,
-      metadata: {
-        ...metadata,
-        mimeType: file?.mimetype || (inputType === 'VIDEO' ? 'video/mp4' : 'image/jpeg'),
-        sizeBytes: file?.size || 0,
-        sha256: mediaAnalysis.file?.sha256 || null
-      },
-      discoveredAssets,
-      truncated: false,
-      extractedAt: new Date().toISOString()
-    };
   } else {
     const err = new Error('Invalid input type specified. Must be URL, FILE, TEXT, PHOTO, or VIDEO.');
     err.status = 400;
@@ -429,7 +614,7 @@ async function processInputContent({ inputType, text, url, file }) {
   // 2. Validate Word Count Minimum
   const wordCount = countWords(cleanedText);
   if (wordCount < MIN_WORD_COUNT) {
-    const err = new Error('Pasted text is too short. A minimum of 15 words is required for accurate fact-checking.');
+    const err = new Error('Input text is empty. Please enter or upload content to verify.');
     err.status = 400;
     throw err;
   }
@@ -461,6 +646,7 @@ async function processInputContent({ inputType, text, url, file }) {
     characterCount: processedText.length,
     metadata,
     discoveredAssets,
+    mediaAnalysis,
     unifiedAsset: {
       inputType,
       sourceTitle,

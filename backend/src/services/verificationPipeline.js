@@ -9,14 +9,135 @@ const { dbService, prisma } = require('../utils/prisma');
 const { getProviderStatus } = require('./providerManager');
 const { incrementVerificationUsage } = require('./subscriptionBillingService');
 const { operationalIntelligence } = require('./operationalIntelligenceService');
+const { compactReportMediaPayload } = require('../utils/reportMediaPayload');
 
 const JOB_MAX_TIMEOUT_MS = 180000; // 3 minutes maximum timeout per verification job
+
+function buildImageSourceEvidence(mediaAnalysis) {
+  const comparison = mediaAnalysis?.imageSourceContextComparison;
+  const source = comparison?.source;
+  if (!source?.url) return [];
+  return [{
+    title: source.title || `Matched image source · ${source.domain || 'web source'}`,
+    url: source.url,
+    link: source.url,
+    domain: source.domain || null,
+    snippet: source.description || comparison.sourceSummary || '',
+    publishedAt: source.publishedAt || null,
+    evidenceType: comparison.decisive ? 'VERIFIED_IMAGE_SOURCE_CONTEXT' : 'IMAGE_SOURCE_CONTEXT_CANDIDATE',
+    sourceRole: 'IMAGE_CONTEXT'
+  }];
+}
+
+function verifyObservationClaimsAgainstImageSource(claims = [], mediaAnalysis = null) {
+  const comparison = mediaAnalysis?.imageSourceContextComparison;
+  const sources = buildImageSourceEvidence(mediaAnalysis);
+  const baseConfidence = Math.max(0, Math.min(100, Number(comparison?.confidence) || 0));
+
+  if (comparison?.decisive && comparison.status === 'MATCHED') {
+    return claims.map(claim => ({
+      ...claim,
+      status: 'TRUSTED',
+      verdict: 'VERIFIED',
+      confidence: baseConfidence,
+      sources,
+      evidenceState: 'SUPPORTED',
+      evidenceEvaluations: sources.map(source => ({
+        source,
+        stance: 'SUPPORTS',
+        relevance: 'DIRECT_IMAGE_CONTEXT',
+        explanation: comparison.rationale
+      })),
+      explanation: `A locally verified same-image source page supports the AI visual summary. ${comparison.rationale}`,
+      verificationMode: 'VERIFIED_IMAGE_SOURCE_CONTEXT'
+    }));
+  }
+
+  if (comparison?.decisive && comparison.status === 'CONTRADICTED') {
+    return claims.map(claim => ({
+      ...claim,
+      status: 'FABRICATED',
+      verdict: 'FALSE',
+      confidence: baseConfidence,
+      sources,
+      evidenceState: 'CONTRADICTED',
+      evidenceEvaluations: sources.map(source => ({
+        source,
+        stance: 'CONTRADICTS',
+        relevance: 'DIRECT_IMAGE_CONTEXT',
+        explanation: comparison.rationale
+      })),
+      explanation: `The locally verified same-image source page materially contradicts the AI-generated context. ${comparison.rationale}`,
+      verificationMode: 'VERIFIED_IMAGE_SOURCE_CONTEXT'
+    }));
+  }
+
+  return claims.map(claim => ({
+    ...claim,
+    status: 'SUSPICIOUS',
+    verdict: 'OBSERVATION_ONLY',
+    confidence: Math.max(0, 100 - (mediaAnalysis?.ocrUncertainty || 20)),
+    sources,
+    evidenceState: 'INSUFFICIENT',
+    evidenceEvaluations: [],
+    explanation: comparison?.rationale
+      ? `Extracted from the submitted pixels, but source context is inconclusive. ${comparison.rationale}`
+      : 'Extracted directly from the submitted pixels. This is a visual observation, not an independently verified real-world claim.',
+    verificationMode: 'PIXEL_OBSERVATION_ONLY'
+  }));
+}
+
+function buildImageSourceResearchContext(mediaAnalysis, topic) {
+  const comparison = mediaAnalysis?.imageSourceContextComparison;
+  const sources = buildImageSourceEvidence(mediaAnalysis);
+  if (!comparison || comparison.status === 'UNAVAILABLE') {
+    return {
+      status: 'SKIPPED_FOR_VISUAL_OBSERVATIONS',
+      topic,
+      summary: '',
+      sources: [],
+      overallSources: [],
+      articleEvidencePool: [],
+      explanation: 'Pixel observations are not sent through generic article search unless the user supplies a factual caption or claim.'
+    };
+  }
+
+  return {
+    status: comparison.status,
+    topic,
+    summary: comparison.sourceSummary || comparison.rationale || '',
+    sources,
+    overallSources: sources,
+    articleEvidencePool: sources.map(source => ({
+      title: source.title,
+      domain: source.domain,
+      snippet: source.snippet,
+      fullText: comparison.sourceSummary || source.snippet,
+      url: source.url
+    })),
+    isCovered: comparison.status !== 'INCONCLUSIVE',
+    comparison,
+    explanation: comparison.rationale,
+    timestamp: new Date().toISOString()
+  };
+}
 
 /**
  * Orchestrates the authoritative 4-agent verification pipeline with Observability & Telemetry Instrumentation.
  * Unified Architecture: MEDIA/TEXT OBSERVATION (Agent 1) -> CLAIM (Agent 2) -> EXTERNAL EVIDENCE (Agent 3) -> REPORT (Agent 4)
  */
-async function runVerificationPipeline({ jobId, userId, inputType, text, url, file, selectedTypes }) {
+async function runVerificationPipeline({
+  jobId,
+  userId,
+  inputType,
+  text,
+  url,
+  file,
+  selectedTypes,
+  enableReverseSearch = true,
+  traceProvenance = true,
+  detectEntities = true
+}) {
   const logger = new PipelineLogger(jobId);
   const providerStatus = getProviderStatus();
 
@@ -60,8 +181,13 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     }
 
     // Process Input via Agent 1
-    const contentRes = await processInputContent({ inputType, text, url, file });
+    const contentRes = await processInputContent(
+      { inputType, text, url, file },
+      { enableReverseSearch }
+    );
     const mediaAnalysis = contentRes.mediaAnalysis || null;
+    const hasAttachedNews = Boolean(text && text.trim().length > 10);
+    const observationOnlyImage = mediaCategory === 'PHOTO' && !hasAttachedNews;
 
     if (mediaCategory === 'VIDEO') {
       if (mediaAnalysis?.transcript) {
@@ -165,7 +291,6 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     // Article-Level Deep Research & Related News Search
     // ----------------------------------------------------
     const { performArticleDeepResearch } = require('./articleResearch');
-    const hasAttachedNews = !!(text && text.trim().length > 10);
     const mediaTopicStr = isMediaJob 
       ? (hasAttachedNews ? text.trim().substring(0, 100) : (mediaAnalysis?.visualDescription || mediaAnalysis?.ocrText || mediaAnalysis?.transcript || contentRes.sourceTitle))
       : contentRes.sourceTitle;
@@ -180,7 +305,9 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     });
 
     const firstArticleCtx = claims[0]?.articleContext || { mainTopic: mediaTopicStr };
-    const articleResearchContext = await performArticleDeepResearch(firstArticleCtx, claims);
+    const articleResearchContext = observationOnlyImage
+      ? buildImageSourceResearchContext(mediaAnalysis, mediaTopicStr)
+      : await performArticleDeepResearch(firstArticleCtx, claims);
 
     // ----------------------------------------------------
     // Phase 3: Fact Verification Agent (Agent 3) with Parallel Concurrency & Progress Callback
@@ -206,13 +333,15 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
       });
     };
 
-    const verifiedClaims = await verifyClaims(
-      claims,
-      { onProgress: progressCallback },
-      articleResearchContext,
-      inputType === 'URL' ? url : null,
-      progressCallback
-    );
+    const verifiedClaims = observationOnlyImage
+      ? verifyObservationClaimsAgainstImageSource(claims, mediaAnalysis)
+      : await verifyClaims(
+          claims,
+          { onProgress: progressCallback },
+          articleResearchContext,
+          inputType === 'URL' ? url : null,
+          progressCallback
+        );
 
     const verifiedCount = verifiedClaims.filter(c => c.status === 'TRUSTED' || c.status === 'Verified').length;
     const suspiciousCount = verifiedClaims.filter(c => c.status === 'SUSPICIOUS' || c.status === 'Suspicious').length;
@@ -238,9 +367,26 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
       stage: 'REPORT_GENERATION'
     });
 
-    // Perform Entity & Intent Analysis
+    // Perform Entity, Attribution & Framing Analysis
     const { performEntityAndIntentAnalysis } = require('./entityIntentService');
-    const entityIntentRes = await performEntityAndIntentAnalysis(contentRes.extractedText || mediaAnalysis?.transcript || '');
+    const allDiscoveredSources = [];
+    (verifiedClaims || []).forEach(c => {
+      if (Array.isArray(c.sources)) c.sources.forEach(s => allDiscoveredSources.push(s));
+    });
+    const entityIntentRes = detectEntities
+      ? await performEntityAndIntentAnalysis(
+        contentRes.extractedText || mediaAnalysis?.transcript || '',
+        { claims: verifiedClaims, sources: allDiscoveredSources }
+      )
+      : {
+        entities: [],
+        entitiesCount: 0,
+        quotes: [],
+        entityClaimConnections: [],
+        entityInconsistencies: [],
+        intentAnalysis: { primaryIntent: 'DISABLED', confidence: 0 },
+        framingAnalysis: { status: 'DISABLED' }
+      };
 
     // Perform Deep Numerical Fact Analysis
     const { performNumericalFactAnalysis } = require('./numericalFactService');
@@ -263,6 +409,7 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     );
 
     const reportData = await generateReport({
+      inputType,
       sourceTitle: contentRes.sourceTitle || sourceTitle,
       extractedText: contentRes.extractedText,
       verifiedClaims,
@@ -276,16 +423,21 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
       hasAttachedNews,
       entities: entityIntentRes.entities,
       intentAnalysis: entityIntentRes.intentAnalysis,
+      framingAnalysis: entityIntentRes.framingAnalysis,
       quotes: entityIntentRes.quotes,
+      entityClaimConnections: entityIntentRes.entityClaimConnections,
       numericalAnalysis: numericalRes,
       textAnalysis: textAnalysisRes,
       linkIntelligence: linkAssetRes.linkIntelligence,
-      assetInventory: linkAssetRes.assetInventory
+      assetInventory: linkAssetRes.assetInventory,
+      traceProvenance
     });
 
     reportData.entities = entityIntentRes.entities;
     reportData.intentAnalysis = entityIntentRes.intentAnalysis;
+    reportData.framingAnalysis = entityIntentRes.framingAnalysis;
     reportData.quotes = entityIntentRes.quotes;
+    reportData.entityClaimConnections = entityIntentRes.entityClaimConnections;
     reportData.entityInconsistencies = entityIntentRes.entityInconsistencies;
     reportData.numericalAnalysis = numericalRes;
     reportData.numericalFacts = numericalRes.facts;
@@ -300,6 +452,8 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     reportData.discoveredImages = linkAssetRes.assetInventory.images;
     reportData.discoveredVideos = linkAssetRes.assetInventory.videos;
     reportData.discoveredDocuments = linkAssetRes.assetInventory.documents;
+    reportData.analysisOptions = { enableReverseSearch, traceProvenance, detectEntities };
+    compactReportMediaPayload(reportData);
 
     logger.log('phase4_reportGenerator', 'INFO', `Calculated deterministic category scores`, {
       scores: reportData.scores,
@@ -318,6 +472,15 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     telemetry.providerStatus = providerStatus;
     reportData.observability = telemetry;
 
+    const crypto = require('crypto');
+    const sealedAt = new Date().toISOString();
+    reportData.integritySeal = {
+      algorithm: 'SHA-256',
+      digest: crypto.createHash('sha256').update(JSON.stringify(reportData)).digest('hex'),
+      sealedAt,
+      scope: 'Complete report payload before persistence'
+    };
+
     // ----------------------------------------------------
     // Step 5: Save Full Analysis Record to Database
     // ----------------------------------------------------
@@ -329,37 +492,55 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     if (prisma && userId) {
       try {
         const userExists = await prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
-        const finalTokens = reportData.observability?.totalTokens || 0;
-        const finalCost = reportData.observability?.estimatedCostUsd || 0.0;
-        const finalScore = reportData.scores?.overallTrustScore !== undefined ? reportData.scores.overallTrustScore : 50;
-        const finalVerdict = reportData.verdict || (finalScore >= 75 ? 'Real' : finalScore >= 40 ? 'Suspicious' : 'Fake');
+        if (userExists) {
+          const finalTokens = reportData.observability?.totalTokens || 0;
+          const finalCost = reportData.observability?.estimatedCostUsd || 0.0;
+          const finalScore = reportData.scores?.overallTrustScore !== undefined ? reportData.scores.overallTrustScore : 50;
+          const finalVerdict = reportData.verdict || (finalScore >= 75 ? 'Real' : finalScore >= 40 ? 'Suspicious' : 'Fake');
 
-        savedRecord = await prisma.analysis.create({
-          data: {
-            id: jobId,
-            title: contentRes.sourceTitle || sourceTitle,
-            inputType: String(inputType),
-            inputSource: inputSourceStr,
-            selectedTypes: selectedTypesStr,
-            status: 'COMPLETED',
-            summary: reportData.summary,
-            overallMetrics: overallMetricsStr,
-            reportData: reportDataStr,
-            truncated: Boolean(contentRes.truncated),
-            tokensConsumed: finalTokens,
-            costUsd: finalCost,
-            trustScore: finalScore,
-            verdict: finalVerdict,
-            runVersion: 1,
-            ...(userExists ? { user: { connect: { id: userId } } } : {}),
+          savedRecord = await prisma.analysis.create({
+            data: {
+              id: jobId,
+              title: contentRes.sourceTitle || sourceTitle,
+              inputType: String(inputType),
+              inputSource: inputSourceStr,
+              selectedTypes: selectedTypesStr,
+              status: 'COMPLETED',
+              summary: reportData.summary,
+              overallMetrics: overallMetricsStr,
+              reportData: reportDataStr,
+              truncated: Boolean(contentRes.truncated),
+              tokensConsumed: finalTokens,
+              costUsd: finalCost,
+              trustScore: finalScore,
+              verdict: finalVerdict,
+              runVersion: 1,
+              user: { connect: { id: userExists.id } },
             ...(entityIntentRes.entities && entityIntentRes.entities.length > 0 ? {
               entities: {
-                create: entityIntentRes.entities.slice(0, 15).map(e => ({
+                create: entityIntentRes.entities.slice(0, 20).map(e => ({
                   name: e.normalizedName || e.name,
                   role: e.jurisdiction || null,
-                  type: e.type,
+                  type: e.type || 'ORGANIZATION',
                   status: 'VERIFIED',
-                  finding: `Identified with ${e.confidence}% confidence across ${e.mentionsCount} mention(s)`
+                  finding: `Identified with ${e.confidence || 80}% confidence across ${e.mentionsCount || 1} mention(s)`,
+                  confidence: e.confidence || 80.0,
+                  mentionsCount: e.mentionsCount || 1
+                }))
+              }
+            } : {}),
+            ...(entityIntentRes.quotes && entityIntentRes.quotes.length > 0 ? {
+              quoteAttributions: {
+                create: entityIntentRes.quotes.slice(0, 15).map(q => ({
+                  quoteText: q.quoteText,
+                  claimedSpeaker: q.claimedSpeaker || null,
+                  claimedAffiliation: q.claimedAffiliation || null,
+                  verificationStatus: q.verificationStatus || 'UNATTRIBUTED_ASSERTION',
+                  isAltered: Boolean(q.isAltered),
+                  alterationDetails: q.alterationDetails || null,
+                  isAuthoritative: Boolean(q.isAuthoritative),
+                  confidence: q.confidence || 50.0,
+                  originalSourceUrl: q.originalSourceUrl || null
                 }))
               }
             } : {}),
@@ -441,9 +622,15 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
                   codec: mediaAnalysis.metadata?.codec || null,
                   metadataJson: JSON.stringify(mediaAnalysis.metadata || {}),
                   ocrText: mediaAnalysis.ocrText || '',
+                  ocrBlocksJson: JSON.stringify(mediaAnalysis.ocrBlocks || []),
                   transcriptJson: JSON.stringify(mediaAnalysis.transcript || null),
                   visualFindingsJson: JSON.stringify(mediaAnalysis.visualFindings || []),
-                  manipulationSignalsJson: JSON.stringify(mediaAnalysis.manipulationSignals || []),
+                  perceptualHash: mediaAnalysis.imageForensics?.perceptualHash || mediaAnalysis.perceptualHash || null,
+                  forensicVerdict: mediaAnalysis.forensicVerdict || 'NO_MANIPULATION_SIGNAL_FOUND',
+                  forensicConfidence: mediaAnalysis.forensicConfidence || 85.0,
+                  c2paJson: JSON.stringify(mediaAnalysis.imageForensics?.c2pa || {}),
+                  documentForensicsJson: JSON.stringify(mediaAnalysis.docForensics || {}),
+                  audioAnalysisJson: JSON.stringify(mediaAnalysis.videoAudioForensics || {}),
                   reverseSearchJson: JSON.stringify(mediaAnalysis.reverseSearch || {})
                 }
               }
@@ -457,6 +644,42 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
                   status: t.status || 'UNVERIFIED',
                   sequenceIndex: t.sequenceIndex !== undefined ? t.sequenceIndex : idx + 1
                 }))
+              }
+            } : {}),
+            ...(reportData.provenance?.graph?.nodes && reportData.provenance.graph.nodes.length > 0 ? {
+              provenanceNodes: {
+                create: reportData.provenance.graph.nodes.slice(0, 20).map((n, idx) => ({
+                  url: n.url || null,
+                  domain: n.domain || 'unknown',
+                  publishedAt: n.timestamp ? new Date(n.timestamp) : null,
+                  contentHash: n.contentHash || null,
+                  mediaHash: n.mediaHash || null,
+                  sourceRelationship: n.sourceRelationship || 'REPOST',
+                  nodeType: n.nodeType || 'ARTICLE',
+                  confidence: n.confidence || 50.0,
+                  isFirstKnownAppearance: Boolean(n.isFirstKnownAppearance),
+                  sequenceOrder: n.sequenceOrder || idx + 1,
+                  title: n.title || null,
+                  publisher: n.publisher || null
+                }))
+              }
+            } : {}),
+            ...(reportData.spreadAnalysis ? {
+              spreadClusters: {
+                create: [
+                  {
+                    clusterName: reportData.spreadAnalysis.amplificationPattern || 'General Spread',
+                    clusterType: reportData.spreadAnalysis.amplificationPattern === 'COORDINATED_AMPLIFICATION_SUSPECTED' ? 'COORDINATED_REPOSTING' : 'SYNDICATION',
+                    repostCount: reportData.spreadAnalysis.repostCount || 0,
+                    domainCount: reportData.spreadAnalysis.distinctDomainsCount || 0,
+                    velocityLabel: reportData.spreadAnalysis.propagationSpanHours ? `${reportData.spreadAnalysis.propagationSpanHours}h span` : 'N/A',
+                    coordinationConfidence: reportData.spreadAnalysis.coordinationAssessment?.confidence || 0.0,
+                    coordinationPattern: reportData.spreadAnalysis.coordinationAssessment?.pattern || 'UNSUPPORTED',
+                    evidenceRationale: reportData.spreadAnalysis.coordinationAssessment?.rationale || null,
+                    domainsJson: JSON.stringify(reportData.spreadAnalysis.domainsInvolved || []),
+                    timelineJson: JSON.stringify(reportData.spreadAnalysis.chronologicalPropagation || [])
+                  }
+                ]
               }
             } : {})
           }
@@ -482,10 +705,55 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
         } catch (usageErr) {
           console.error('[Usage Telemetry Recording Error]:', usageErr.message);
         }
-      } catch (dbErr) {
-        console.error('[Pipeline DB Save Error]:', dbErr.message);
+      }
+    } catch (dbErr) {
+      console.error('[Pipeline DB Save Error]:', dbErr.message);
+      // Nested forensic/evidence records must never make the completed dossier
+      // disappear. Preserve the complete report payload even if a child model
+      // is temporarily out of sync with the generated Prisma client.
+      try {
+        const userExists = await prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
+        if (userExists) {
+          reportData.persistenceWarnings = [
+            ...(reportData.persistenceWarnings || []),
+            'Detailed relational records could not be saved; the complete dossier payload was preserved.'
+          ];
+          const fallbackScore = reportData.scores?.overallTrustScore !== undefined
+            ? reportData.scores.overallTrustScore
+            : 50;
+          const fallbackVerdict = reportData.verdict ||
+            (fallbackScore >= 75 ? 'Real' : fallbackScore >= 40 ? 'Suspicious' : 'Fake');
+          const coreData = {
+            title: contentRes.sourceTitle || sourceTitle,
+            inputType: String(inputType),
+            inputSource: inputSourceStr,
+            selectedTypes: selectedTypesStr,
+            status: 'COMPLETED',
+            summary: reportData.summary,
+            overallMetrics: overallMetricsStr,
+            reportData: JSON.stringify(reportData),
+            truncated: Boolean(contentRes.truncated),
+            tokensConsumed: reportData.observability?.totalTokens || 0,
+            costUsd: reportData.observability?.estimatedCostUsd || 0.0,
+            trustScore: fallbackScore,
+            verdict: fallbackVerdict
+          };
+          savedRecord = await prisma.analysis.upsert({
+            where: { id: jobId },
+            create: {
+              id: jobId,
+              ...coreData,
+              runVersion: 1,
+              user: { connect: { id: userExists.id } }
+            },
+            update: coreData
+          });
+        }
+      } catch (fallbackErr) {
+        console.error('[Pipeline Core Report Save Error]:', fallbackErr.message);
       }
     }
+  }
 
     sseManager.emitProgress(jobId, {
       status: 'COMPLETED',
@@ -530,20 +798,23 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
     if (prisma && userId) {
       try {
         const userExists = await prisma.user.findUnique({ where: { id: userId } }).catch(() => null);
-        await prisma.analysis.create({
-          data: {
-            id: jobId,
-            title: sourceTitle,
-            inputType: String(inputType),
-            inputSource: inputSourceStr,
-            selectedTypes: typeof selectedTypes === 'string' ? selectedTypes : JSON.stringify(selectedTypes),
-            status: 'FAILED',
-            summary: `Analysis failed: ${error.message}`,
-            overallMetrics: '{}',
-            reportData: JSON.stringify({ error: error.message, status: 'FAILED' }),
-            ...(userExists ? { user: { connect: { id: userId } } } : {})
-          }
-        });
+        if (userExists) {
+          await prisma.analysis.create({
+            data: {
+              id: jobId,
+              userId: userExists.id,
+              title: sourceTitle,
+              inputType: String(inputType),
+              inputSource: inputSourceStr,
+              selectedTypes: typeof selectedTypes === 'string' ? selectedTypes : JSON.stringify(selectedTypes),
+              status: 'FAILED',
+              summary: `Analysis failed: ${error.message}`,
+              overallMetrics: '{}',
+              reportData: JSON.stringify({ error: error.message, status: 'FAILED' }),
+              user: { connect: { id: userExists.id } }
+            }
+          });
+        }
       } catch (e) {}
     }
 
@@ -561,5 +832,8 @@ async function runVerificationPipeline({ jobId, userId, inputType, text, url, fi
 }
 
 module.exports = {
-  runVerificationPipeline
+  runVerificationPipeline,
+  buildImageSourceEvidence,
+  verifyObservationClaimsAgainstImageSource,
+  buildImageSourceResearchContext
 };

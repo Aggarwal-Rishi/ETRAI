@@ -15,6 +15,10 @@ import BillingPage from './pages/BillingPage';
 import LatestNewsPage from './pages/LatestNewsPage';
 import FakeNewsPage from './pages/FakeNewsPage';
 import SettingsPage from './pages/SettingsPage';
+import { FEATURE_FLAGS } from './utils/featureFlags';
+import AppExperience from './components/AppExperience';
+
+const HomePage = React.lazy(() => import('./pages/HomePage'));
 
 // Protected Route Wrapper
 function ProtectedRoute({ children }) {
@@ -38,10 +42,21 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <AppExperience />
+      <div className={`etrai-route-stage ${isHome ? 'etrai-route-stage--home' : 'etrai-route-stage--app'}`}>
+        <Routes>
+        <Route
+          path="/"
+          element={
+            <React.Suspense fallback={<div className="min-h-screen bg-[#050810]" aria-label="Loading homepage" />}>
+              <HomePage />
+            </React.Suspense>
+          }
+        />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         
@@ -66,7 +81,7 @@ export default function App() {
           path="/fake-news"
           element={
             <ProtectedRoute>
-              <FakeNewsPage />
+              {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? <FakeNewsPage /> : <Navigate to="/dashboard" replace />}
             </ProtectedRoute>
           }
         />
@@ -137,7 +152,8 @@ export default function App() {
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+        </Routes>
+      </div>
     </AuthProvider>
   );
 }

@@ -151,7 +151,7 @@ function extractFullQuantities(text) {
 
 function extractTimeFromText(text) {
   if (!text || typeof text !== 'string') return null;
-  const match = text.match(/\b(?:january|february|march|april|may|june|july|august|september|october|november|december)?\s*(?:19|20)\d{2}\b/i);
+  const match = text.match(/\b(?:(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+(?:\d{1,2}(?:,\s*(?:19|20)\d{2})?|(?:19|20)\d{2})|(?:19|20)\d{2})\b/i);
   return match ? match[0].trim() : null;
 }
 
@@ -276,7 +276,8 @@ function extractLocationFromText(text) {
     // Exclude common false positives (months, days, pronouns used after prepositions)
     const falsePositives = new Set(['january','february','march','april','may','june','july','august',
       'september','october','november','december','monday','tuesday','wednesday','thursday',
-      'friday','saturday','sunday','the','this','that','these','those']);
+      'friday','saturday','sunday','the','this','that','these','those','parliament','congress',
+      'court','office','hospital','university','school','session']);
     if (!falsePositives.has(candidate)) {
       return candidate;
     }
@@ -325,6 +326,9 @@ function normalizeEvidenceProposition(evidenceItem, fetchedPassage = null) {
 
   const canonicalEvent = normalizeCanonicalEvent(textWithoutFrame || text);
   const hasCausality = /\b(because of|caused by|due to|linked to|resulted from|as a result of)\b/i.test(textLower);
+  const certainty = /\b(?:analysts?|experts?|observers?|commentators?)\s+(?:believe|think|suspect|speculate|suggest)|\b(?:may|might|could|possibly|perhaps|reportedly|allegedly)\b/i.test(textLower)
+    ? 'hedged'
+    : 'asserted';
 
   return {
     evidencePassage: text.substring(0, 400),
@@ -337,6 +341,7 @@ function normalizeEvidenceProposition(evidenceItem, fetchedPassage = null) {
     direction,
     negation: hasNegation,
     completionStatus,
+    certainty,
     attribution: reportingSource ? { source: reportingSource, verb: reportingVerb, type: 'REPORTING' } : null,
     causality: hasCausality
   };
@@ -498,7 +503,7 @@ function evaluate15Dimensions(claimProp, evidenceProp) {
   if (claimProp.time) {
     const timeLower = claimProp.time.toLowerCase();
     if (text.includes(timeLower)) timeMatch = 'MATCH';
-    else timeMatch = 'MISMATCH';
+    else if (extractTimeFromText(`${evidenceProp.title} ${evidenceProp.evidencePassage}`)) timeMatch = 'MISMATCH';
   }
 
   // 6. Location Match (General entity-level city/state/country comparison — not limited to a fixed list)
@@ -587,6 +592,9 @@ function evaluate15Dimensions(claimProp, evidenceProp) {
 
   // 11. Certainty Match
   let certaintyMatch = 'MATCH';
+  if (claimProp.certainty === 'asserted' && evidenceProp.certainty === 'hedged') {
+    certaintyMatch = 'MISMATCH';
+  }
 
   // 12. Attribution Match
   let attributionMatch = 'MATCH';
@@ -650,7 +658,10 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   }
 
   // Direct Refutation Triggers:
-  if (dimensions.negation === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && dimensions.completionStatus !== 'MISMATCH') {
+  if (dimensions.negation === 'MISMATCH' &&
+      (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') &&
+      (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') &&
+      dimensions.completionStatus !== 'MISMATCH') {
     return { stance: 'REFUTES', reason: 'Explicit negation contradiction: Evidence explicitly contradicts claim assertion.' };
   }
 
@@ -664,7 +675,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
 
   // Direct Action Rejection / Refutation (e.g. Tribunal rejected request vs claim asserted approved/cleared)
   const isDirectDebunk = /\b(debunked|false|fabricated|incorrect|refuted|fake|hoax|denied|denies|rejected|opposed|declined|turned down|refused|dismissed|capping|capped)\b/i.test(textEv);
-  const isClaimAffirmative = !/\b(rejected|denied|opposed|refused|declined)\b/i.test(textClaim);
+  const isClaimAffirmative = claimProp.canonicalEvent !== 'REJECTION' && !/\b(rejected|denied|opposed|refused|declined)\b/i.test(textClaim);
   if (isDirectDebunk && isClaimAffirmative && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN')) {
     return { stance: 'REFUTES', reason: 'Action contradiction: Evidence confirms the action or permission was rejected, denied, or debunked.' };
   }
@@ -672,6 +683,12 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   // If action and event match, but subject entity is different (e.g. Apple acquired X vs Microsoft acquired X) -> REFUTES
   if (dimensions.subject === 'MISMATCH' && dimensions.action === 'MATCH' && dimensions.event === 'MATCH') {
     return { stance: 'REFUTES', reason: 'Subject entity mismatch: Evidence states a different entity performed this action.' };
+  }
+
+  // Same-topic evidence that omits the claim's actor/action is insufficient,
+  // not irrelevant (for example: the proposal is described but the response is not).
+  if (dimensions.subject === 'MISMATCH' && dimensions.object === 'MATCH') {
+    return { stance: 'NEUTRAL', reason: 'Evidence describes the same topic or target but does not confirm the claimed actor or action.' };
   }
 
   // Irrelevant Triggers:
@@ -711,6 +728,10 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
 
   if (dimensions.subject === 'MATCH' && dimensions.action !== 'MATCH' && dimensions.event !== 'MATCH') {
     return { stance: 'NEUTRAL', reason: 'Evidence mentions the subject/topic but provides insufficient detail to confirm the specific action.' };
+  }
+
+  if (dimensions.certainty === 'MISMATCH') {
+    return { stance: 'NEUTRAL', reason: 'Evidence presents the proposition as belief or possibility rather than establishing it as fact.' };
   }
 
   // Support Trigger:

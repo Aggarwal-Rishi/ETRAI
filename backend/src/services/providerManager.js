@@ -22,6 +22,12 @@ function isKeyValid(key) {
   if (trimmed.includes('your_gemini_api_key') || trimmed === 'YOUR_GEMINI_API_KEY_HERE') {
     return false;
   }
+  if (trimmed.includes('your_google_vision_api_key') || trimmed === 'YOUR_GOOGLE_VISION_API_KEY_HERE') {
+    return false;
+  }
+  if (trimmed.includes('your_serpapi_api_key') || trimmed === 'YOUR_SERPAPI_API_KEY_HERE') {
+    return false;
+  }
   return true;
 }
 
@@ -53,12 +59,16 @@ function createOpenAIClient(apiKeyOverride = null) {
  * - gemini: reflects GEMINI_API_KEY (primary AI provider for all agents)
  * - openai: mirrors gemini or OPENAI_API_KEY for backward compatibility
  * - webSearch: reflects SERPER_API_KEY
+ * - googleVision: reflects GOOGLE_VISION_API_KEY
+ * - googleLens: reflects SERPAPI_API_KEY
  * - mode: MOCK only when ETRAI_TEST_MODE=mock
  */
 function getProviderStatus() {
   const geminiKey = process.env.GEMINI_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
   const serperKey = process.env.SERPER_API_KEY;
+  const googleVisionKey = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_API_KEY;
+  const serpApiKey = process.env.SERPAPI_API_KEY;
   const testMode = (process.env.ETRAI_TEST_MODE || '').toLowerCase().trim();
 
   const isMockMode = testMode === 'mock';
@@ -69,6 +79,8 @@ function getProviderStatus() {
     gemini: isGeminiAvailable ? 'AVAILABLE' : 'UNAVAILABLE',
     openai: isOpenAiAvailable ? 'AVAILABLE' : 'UNAVAILABLE',
     webSearch: isKeyValid(serperKey) ? 'AVAILABLE' : 'UNAVAILABLE',
+    googleVision: isKeyValid(googleVisionKey) ? 'AVAILABLE' : 'UNAVAILABLE',
+    googleLens: isKeyValid(serpApiKey) ? 'AVAILABLE' : 'UNAVAILABLE',
     mode: isMockMode ? 'MOCK' : 'REAL'
   };
 }

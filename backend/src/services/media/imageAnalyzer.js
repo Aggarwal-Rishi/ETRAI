@@ -1,6 +1,28 @@
 const { GoogleGenAI } = require('@google/genai');
 const { getProviderStatus, isKeyValid } = require('../providerManager');
 
+const EMPTY_OBSERVED = Object.freeze({
+  visibleText: '',
+  entities: [],
+  publicFigures: [],
+  logos: [],
+  signs: [],
+  landmarks: [],
+  flags: [],
+  objects: [],
+  vehicleMarkings: [],
+  badges: [],
+  uniforms: [],
+  attire: [],
+  securityDetails: [],
+  visibleDates: [],
+  visibleLocationClues: []
+});
+
+function emptyObserved() {
+  return Object.fromEntries(Object.entries(EMPTY_OBSERVED).map(([key, value]) => [key, Array.isArray(value) ? [] : value]));
+}
+
 /**
  * Image Visual Analyzer Service
  * Uses multimodal Gemini Vision API when available to analyze visual elements.
@@ -13,17 +35,7 @@ async function analyzeImage(fileInfo, buffer = null, url = null, options = {}) {
   if (!hasGemini) {
     return {
       status: 'UNAVAILABLE',
-      observed: {
-        visibleText: '',
-        entities: [],
-        logos: [],
-        signs: [],
-        landmarks: [],
-        flags: [],
-        objects: [],
-        visibleDates: [],
-        visibleLocationClues: []
-      },
+      observed: emptyObserved(),
       inferred: {
         possibleContext: '',
         possibleEvent: '',
@@ -50,11 +62,17 @@ OUTPUT FORMAT (JSON):
   "observed": {
     "visibleText": "all visible text transcribed",
     "entities": ["visible public figures/people"],
+    "publicFigures": [{"name": "name only when visually recognizable with high confidence", "visibleAppearance": "directly visible features", "attire": "directly visible clothing", "confidence": 0, "basis": "visual basis or uncertainty"}],
     "logos": ["visible brand/agency logos"],
     "signs": ["street/building signs"],
     "landmarks": ["visible architectural landmarks"],
     "flags": ["visible national/organization flags"],
     "objects": ["key visible physical objects"],
+    "vehicleMarkings": ["text, emblems, registration or campaign markings visible on vehicles"],
+    "badges": ["visible badges, insignia or passes"],
+    "uniforms": ["directly visible uniforms and identifying markings"],
+    "attire": ["distinctive clothing relevant to identification, without guessing identity"],
+    "securityDetails": ["visible security personnel, formations, equipment or protective detail"],
     "visibleDates": ["dates explicitly visible"],
     "visibleLocationClues": ["location clues explicitly visible"]
   },
@@ -89,7 +107,7 @@ OUTPUT FORMAT (JSON):
     } else {
       return {
         status: 'UNAVAILABLE',
-        observed: { visibleText: '', entities: [], logos: [], signs: [], landmarks: [], flags: [], objects: [], visibleDates: [], visibleLocationClues: [] },
+        observed: emptyObserved(),
         inferred: { possibleContext: '', possibleEvent: '', uncertainties: [] },
         visualDescription: '',
         visualInconsistencies: [],
@@ -128,7 +146,7 @@ OUTPUT FORMAT (JSON):
 
     return {
       status: 'AVAILABLE',
-      observed: parsed.observed || { visibleText: '', entities: [], logos: [], signs: [], landmarks: [], flags: [], objects: [], visibleDates: [], visibleLocationClues: [] },
+      observed: { ...emptyObserved(), ...(parsed.observed || {}) },
       inferred: parsed.inferred || { possibleContext: '', possibleEvent: '', uncertainties: [] },
       visualDescription: parsed.visualDescription || '',
       visualInconsistencies: parsed.visualInconsistencies || [],
@@ -138,7 +156,7 @@ OUTPUT FORMAT (JSON):
   } catch (e) {
     return {
       status: 'ERROR',
-      observed: { visibleText: '', entities: [], logos: [], signs: [], landmarks: [], flags: [], objects: [], visibleDates: [], visibleLocationClues: [] },
+      observed: emptyObserved(),
       inferred: { possibleContext: '', possibleEvent: '', uncertainties: [] },
       visualDescription: '',
       visualInconsistencies: [],

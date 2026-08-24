@@ -110,8 +110,8 @@ async function runStage8Audit() {
   const phase1Inputs = telemetry.phases.phase1_contentReader.inputs;
 
   assert(
-    phase1Inputs.geminiApiKey === '[REDACTED]' &&
-    phase1Inputs.jwtSecret === '[REDACTED]' &&
+    phase1Inputs.geminiApiKey === '[REDACTED_SECRET]' &&
+    phase1Inputs.jwtSecret === '[REDACTED_SECRET]' &&
     phase1Inputs.normalField === 'verified_text',
     '[Suite A] A3 — PipelineLogger Recursive Secret Redaction Telemetry'
   );

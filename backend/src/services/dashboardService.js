@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../utils/prisma');
 
 /**
  * Calculates median of an array of numbers
@@ -12,9 +11,9 @@ function calculateMedian(numbers) {
 }
 
 /**
- * Computes real dashboard statistics and feeds from database
+ * Computes real, non-fabricated product dashboard statistics and feeds from database
  */
-async function getDashboardTelemetry(userId) {
+async function getDashboardTelemetry(userId, workspaceId = null) {
   const now = new Date();
   
   // Date boundaries
@@ -22,6 +21,7 @@ async function getDashboardTelemetry(userId) {
   const yesterdayStart = new Date(todayStart);
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   
@@ -31,12 +31,14 @@ async function getDashboardTelemetry(userId) {
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // 1. Fetch user's analyses across all time/recent windows
+  // Where query scoped to user or workspace
+  const userWhere = {
+    userId
+  };
+
+  // 1. Fetch user's analyses across all time
   const userAnalyses = await prisma.analysis.findMany({
-    where: {
-      userId,
-      status: 'COMPLETED'
-    },
+    where: userWhere,
     select: {
       id: true,
       title: true,
@@ -44,30 +46,46 @@ async function getDashboardTelemetry(userId) {
       inputSource: true,
       trustScore: true,
       verdict: true,
+      status: true,
+      summary: true,
       createdAt: true,
+      user: {
+        select: { fullName: true, email: true }
+      },
       entities: {
         select: { name: true, type: true, role: true }
+      },
+      _count: {
+        select: { claims: true, entities: true }
       }
     },
     orderBy: { createdAt: 'desc' }
   });
 
-  // 2. Metric: Verified Today & Delta
+  const totalAllTime = userAnalyses.length;
+
+  // 2. Investigations Today & This Month
   const todayAnalyses = userAnalyses.filter(a => new Date(a.createdAt) >= todayStart);
   const yesterdayAnalyses = userAnalyses.filter(a => {
     const d = new Date(a.createdAt);
     return d >= yesterdayStart && d < todayStart;
   });
+  const monthAnalyses = userAnalyses.filter(a => new Date(a.createdAt) >= monthStart);
 
+  const investigationsToday = todayAnalyses.length;
+  const investigationsYesterday = yesterdayAnalyses.length;
+  const investigationsTodayDelta = investigationsToday - investigationsYesterday;
+  const investigationsThisMonth = monthAnalyses.length;
+
+  // 3. Verified Today & Flagged Fake Today
   const verifiedToday = todayAnalyses.filter(a => (a.trustScore >= 75 || /real|verified/i.test(a.verdict || ''))).length;
   const verifiedYesterday = yesterdayAnalyses.filter(a => (a.trustScore >= 75 || /real|verified/i.test(a.verdict || ''))).length;
   const verifiedDelta = verifiedToday - verifiedYesterday;
 
-  // 3. Metric: Flagged Fake Today
   const fakeToday = todayAnalyses.filter(a => (a.trustScore < 40 || /fake|false|refuted/i.test(a.verdict || ''))).length;
   const fakePercentage = todayAnalyses.length > 0 ? Math.round((fakeToday / todayAnalyses.length) * 100) : 0;
 
-  // 4. Metric: Median Trust (Last 7 Days vs Prior 7 Days)
+  // 4. Metric: Median Trust (7d)
   const last7DaysAnalyses = userAnalyses.filter(a => new Date(a.createdAt) >= sevenDaysAgo);
   const prior7DaysAnalyses = userAnalyses.filter(a => {
     const d = new Date(a.createdAt);
@@ -76,28 +94,42 @@ async function getDashboardTelemetry(userId) {
 
   const currentScores = last7DaysAnalyses.map(a => a.trustScore || 0);
   const priorScores = prior7DaysAnalyses.map(a => a.trustScore || 0);
-
   const medianTrust = calculateMedian(currentScores);
   const priorMedianTrust = calculateMedian(priorScores);
   const medianDelta = currentScores.length > 0 && priorScores.length > 0 ? medianTrust - priorMedianTrust : 0;
 
-  // 5. Metric: Manipulated Media (Images & Videos)
+  // 5. Manipulated Media (Images, Videos, Audio)
   const manipulatedMedia = userAnalyses.filter(a => {
-    const isMedia = ['IMAGE', 'VIDEO'].includes((a.inputType || '').toUpperCase());
+    const isMedia = ['IMAGE', 'PHOTO', 'VIDEO', 'AUDIO'].includes((a.inputType || '').toUpperCase());
     const isManipulated = (a.trustScore < 50) || /manipulated|fake|altered|recycled/i.test(a.verdict || '');
     return isMedia && isManipulated;
   });
 
-  const imageManipulatedCount = manipulatedMedia.filter(a => (a.inputType || '').toUpperCase() === 'IMAGE').length;
+  const imageManipulatedCount = manipulatedMedia.filter(a => ['IMAGE', 'PHOTO'].includes((a.inputType || '').toUpperCase())).length;
   const videoManipulatedCount = manipulatedMedia.filter(a => (a.inputType || '').toUpperCase() === 'VIDEO').length;
 
-  // 6. Suspicious in last 7 days (Contextual greeting)
-  const suspiciousWeekCount = last7DaysAnalyses.filter(a => {
-    const score = a.trustScore || 0;
-    return (score >= 40 && score < 75) || /suspicious|questionable|partly/i.test(a.verdict || '');
-  }).length;
+  // 6. Suspicious Claims Count & Unresolved Investigations
+  const suspiciousClaims = userAnalyses.reduce((sum, a) => {
+    const isSuspicious = (a.trustScore >= 40 && a.trustScore < 75) || /suspicious|questionable/i.test(a.verdict || '');
+    return sum + (isSuspicious ? (a._count?.claims || 1) : 0);
+  }, 0);
 
-  // 7. Verdict Mix (Distribution over last 30 days)
+  const unresolvedInvestigations = userAnalyses.filter(a => ['CREATED', 'QUEUED', 'PROCESSING', 'PARTIAL'].includes(a.status)).length;
+  const processingFailures = userAnalyses.filter(a => a.status === 'FAILED').length;
+
+  // 7. Source Alerts (Watchlist or Flagged Sources in Workspace)
+  let sourceAlerts = 0;
+  try {
+    sourceAlerts = await prisma.source.count({
+      where: {
+        status: { in: ['FLAGGED', 'WATCHLIST'] }
+      }
+    });
+  } catch (e) {
+    sourceAlerts = 0;
+  }
+
+  // 8. Verdict Distribution (Last 30 Days)
   const recent30Analyses = userAnalyses.filter(a => new Date(a.createdAt) >= thirtyDaysAgo);
   const totalRecent = recent30Analyses.length;
 
@@ -108,9 +140,9 @@ async function getDashboardTelemetry(userId) {
 
   recent30Analyses.forEach(a => {
     const s = a.trustScore !== null && a.trustScore !== undefined ? a.trustScore : 50;
-    if (s >= 75) countVerified++;
-    else if (s >= 40) countSuspicious++;
-    else if (s < 40) countFalse++;
+    if (s >= 75 || /real|verified/i.test(a.verdict || '')) countVerified++;
+    else if (s >= 40 || /suspicious|questionable|partly/i.test(a.verdict || '')) countSuspicious++;
+    else if (s < 40 || /fake|false|refuted/i.test(a.verdict || '')) countFalse++;
     else countInsufficient++;
   });
 
@@ -134,13 +166,13 @@ async function getDashboardTelemetry(userId) {
     }
   };
 
-  // 8. "Needs Your Read" Queue (Suspicious / Ambiguous Cases)
+  // 9. "Needs Your Read" Queue (Editorial Ambiguity)
   const needsReadQueue = userAnalyses
     .filter(a => {
       const score = a.trustScore !== null && a.trustScore !== undefined ? a.trustScore : 50;
       return (score >= 40 && score < 75) || /suspicious|questionable|unverified|partly/i.test(a.verdict || '');
     })
-    .slice(0, 4)
+    .slice(0, 5)
     .map(a => ({
       id: a.id,
       title: a.title,
@@ -150,7 +182,7 @@ async function getDashboardTelemetry(userId) {
       createdAt: a.createdAt
     }));
 
-  // 9. Narrative Clusters (Grouped by common entity names / shared keywords)
+  // 10. Narrative Clusters (Semantically Grouped by Overlapping Entities)
   const entityMap = new Map();
   userAnalyses.forEach(a => {
     if (a.entities && a.entities.length > 0) {
@@ -182,19 +214,26 @@ async function getDashboardTelemetry(userId) {
     }
   });
 
-  // 10. Recent Reports Feed (Latest 6)
-  const recentReports = userAnalyses.slice(0, 6).map(a => ({
+  // 11. Recent Investigations Feed (Latest 8)
+  const recentReports = userAnalyses.slice(0, 8).map(a => ({
     id: a.id,
     title: a.title,
     inputType: a.inputType,
     inputSource: a.inputSource,
     trustScore: a.trustScore !== null ? Math.round(a.trustScore) : 50,
     verdict: a.verdict || (a.trustScore >= 75 ? 'Real' : a.trustScore >= 40 ? 'Suspicious' : 'Fake'),
+    status: a.status,
+    claimsCount: a._count?.claims || 0,
+    owner: a.user?.fullName || a.user?.email || 'Analyst',
     createdAt: a.createdAt
   }));
 
   return {
+    hasData: totalAllTime > 0,
+    totalAllTime,
     metrics: {
+      investigationsToday: { count: investigationsToday, delta: investigationsTodayDelta },
+      investigationsThisMonth: { count: investigationsThisMonth },
       verifiedToday: { count: verifiedToday, delta: verifiedDelta },
       flaggedFake: { count: fakeToday, percentage: fakePercentage },
       medianTrust: { score: medianTrust, delta: medianDelta, totalWeek: currentScores.length },
@@ -202,13 +241,17 @@ async function getDashboardTelemetry(userId) {
         total: manipulatedMedia.length,
         imageCount: imageManipulatedCount,
         videoCount: videoManipulatedCount
-      }
+      },
+      suspiciousClaims,
+      unresolvedInvestigations,
+      processingFailures,
+      sourceAlerts
     },
-    suspiciousWeekCount,
+    suspiciousWeekCount: last7DaysAnalyses.filter(a => (a.trustScore || 50) < 75).length,
     verdictMix,
     needsReadQueue,
     narrativeClusters: {
-      isPreliminary: true, // Clearly tagged as basic entity grouping
+      isPreliminary: true,
       clusters: clusters.slice(0, 4)
     },
     recentReports

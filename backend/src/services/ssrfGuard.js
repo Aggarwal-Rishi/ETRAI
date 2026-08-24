@@ -31,6 +31,7 @@ function isSsrfSafeUrl(urlString) {
     hostname === 'localhost' ||
     hostname === '0.0.0.0' ||
     hostname.endsWith('.localhost') ||
+    (hostname.endsWith('.local') && process.env.ETRAI_TEST_MODE !== 'mock') ||
     hostname === 'metadata.google.internal' ||
     hostname.endsWith('.internal') ||
     hostname === '169.254.169.254'
@@ -45,13 +46,13 @@ function isSsrfSafeUrl(urlString) {
     }
   }
 
-  // 4. Mock test domain allowance (only if host is NOT restricted)
-  if (
-    trimmed.includes('.example.local') ||
-    trimmed.includes('.local') ||
-    trimmed.includes('test-fixture') ||
-    process.env.ETRAI_TEST_MODE === 'mock'
-  ) {
+  // 4. Mock fixtures are permitted only while the explicit mock mode is active.
+  // Never allow a production request merely because its hostname ends in .local.
+  if (process.env.ETRAI_TEST_MODE === 'mock' && (
+    hostname.endsWith('.example.local') ||
+    hostname.endsWith('.local') ||
+    hostname.includes('test-fixture')
+  )) {
     return { safe: true, reason: 'Mock test URL allowed in test mode' };
   }
 

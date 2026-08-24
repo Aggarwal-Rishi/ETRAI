@@ -1,4 +1,5 @@
 const { dbService, prisma } = require('../utils/prisma');
+const { compactReportMediaPayload } = require('../utils/reportMediaPayload');
 
 const activeStreams = new Map(); // jobId -> Set of express res streams
 const activeJobs = new Map(); // jobId -> process-local current state object (userId, status, progress, step, reportData, createdAt, updatedAt)
@@ -72,7 +73,7 @@ async function registerStream(jobId, res, req, requestingUserId) {
         status: dbRecord.status === 'COMPLETED' ? 'COMPLETED' : 'FAILED',
         progress: 100,
         step: dbRecord.status === 'COMPLETED' ? 'Analysis report complete' : 'Analysis pipeline execution failed',
-        reportData: dbRecord.reportData || null,
+        reportData: compactReportMediaPayload(dbRecord.reportData || null),
         error: dbRecord.errorMessage || null
       };
 
@@ -174,7 +175,7 @@ async function getJobState(jobId, requestingUserId) {
       status: dbRecord.status,
       progress: 100,
       step: dbRecord.status === 'COMPLETED' ? 'Analysis report complete' : 'Analysis pipeline execution failed',
-      reportData: dbRecord.reportData || null,
+      reportData: compactReportMediaPayload(dbRecord.reportData || null),
       error: dbRecord.errorMessage || null,
       createdAt: dbRecord.createdAt,
       updatedAt: dbRecord.updatedAt

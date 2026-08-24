@@ -263,6 +263,9 @@ model Analysis {
   entities       NamedEntity[]
   numericalFacts NumericalFact[]
   provenance     ProvenanceEvent[]
+  provenanceNodes ProvenanceNode[]
+  spreadClusters SpreadCluster[]
+  quoteAttributions QuoteAttribution[]
   reportSections ReportSection[]
 
   @@index([userId])
@@ -301,6 +304,8 @@ model Claim {
   createdAt            DateTime       @default(now())
 
   evidenceItems        EvidenceItem[]
+  entityConnections    EntityClaimConnection[]
+  quoteAttributions    QuoteAttribution[]
 
   @@index([analysisId])
   @@index([verdict])
@@ -350,13 +355,127 @@ model NamedEntity {
   analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   name        String
   role        String?
-  type        String   @default("PERSON") // PERSON | ORGANIZATION | PHONE | DOCUMENT
+  type        String   @default("PERSON") // PERSON | ORGANIZATION | GOVERNMENT_BODY | COMPANY | PRODUCT | LOCATION | EVENT | DOCUMENT
   status      String   @default("UNVERIFIED") // VERIFIED | SUSPICIOUS | FABRICATED | UNVERIFIED
   finding     String?
+  confidence  Float    @default(80.0)
+  mentionsCount Int    @default(1)
+  metadataJson String?
   createdAt   DateTime @default(now())
 
+  claimConnections EntityClaimConnection[]
+
   @@index([analysisId])
+  @@index([type])
   @@map("named_entities")
+}
+
+model EntityClaimConnection {
+  id         String      @id @default(uuid())
+  entityId   String
+  entity     NamedEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  claimId    String
+  claim      Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  roleInClaim String     @default("SUBJECT") // SUBJECT | OBJECT | QUOTED_SPEAKER | TARGET | JURISDICTION | EVIDENCE_ANCHOR
+  confidence Float       @default(85.0)
+  createdAt  DateTime    @default(now())
+
+  @@unique([entityId, claimId])
+  @@index([entityId])
+  @@index([claimId])
+  @@map("entity_claim_connections")
+}
+
+model QuoteAttribution {
+  id                 String   @id @default(uuid())
+  analysisId         String
+  analysis           Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  claimId            String?
+  claim              Claim?   @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  quoteText          String
+  claimedSpeaker     String?
+  claimedAffiliation String?
+  verificationStatus String   @default("UNATTRIBUTED_ASSERTION") // VERIFIED_ATTRIBUTION | UNVERIFIED_ATTRIBUTION | MISATTRIBUTED | UNATTRIBUTED_ASSERTION | FABRICATED_QUOTE
+  isAltered          Boolean  @default(false)
+  alterationDetails  String?
+  isAuthoritative    Boolean  @default(false)
+  confidence         Float    @default(50.0)
+  originalSourceUrl  String?
+  originalContext    String?
+  createdAt          DateTime @default(now())
+
+  @@index([analysisId])
+  @@index([claimId])
+  @@index([verificationStatus])
+  @@map("quote_attributions")
+}
+
+model ProvenanceNode {
+  id                     String   @id @default(uuid())
+  analysisId             String
+  analysis               Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  url                    String?
+  domain                 String
+  publishedAt            DateTime?
+  discoveredAt           DateTime @default(now())
+  contentHash            String?
+  mediaHash              String?
+  sourceRelationship     String   @default("REPOST") // ORIGINAL | SOURCE | REPOST | ARTICLE | SOCIAL_POST | CURRENT_INPUT | OFFICIAL_DEBUNK
+  nodeType               String   @default("ARTICLE") // ORIGINAL | SOURCE | REPOST | ARTICLE | SOCIAL_POST | CURRENT_INPUT
+  confidence             Float    @default(50.0)
+  isFirstKnownAppearance Boolean  @default(false)
+  sequenceOrder          Int      @default(0)
+  title                  String?
+  publisher              String?
+  metadataJson           String?
+  createdAt              DateTime @default(now())
+
+  outgoingEdges          ProvenanceEdge[] @relation("SourceNode")
+  incomingEdges          ProvenanceEdge[] @relation("TargetNode")
+
+  @@index([analysisId])
+  @@index([domain])
+  @@index([sourceRelationship])
+  @@index([isFirstKnownAppearance])
+  @@map("provenance_nodes")
+}
+
+model ProvenanceEdge {
+  id               String         @id @default(uuid())
+  fromNodeId       String
+  fromNode         ProvenanceNode @relation("SourceNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNodeId         String
+  toNode           ProvenanceNode @relation("TargetNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  relationshipType String         @default("PROPAGATION") // SYNDICATION | REPOST | DERIVATIVE | QUOTE_ATTRIBUTION | AMPLIFICATION | MODIFICATION
+  timeDeltaHours   Float?
+  confidence       Float          @default(70.0)
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  @@index([fromNodeId])
+  @@index([toNodeId])
+  @@map("provenance_edges")
+}
+
+model SpreadCluster {
+  id                     String   @id @default(uuid())
+  analysisId             String
+  analysis               Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  clusterName            String
+  clusterType            String   @default("SYNDICATION") // SYNDICATION | SOCIAL_VIRAL | NEWSROOM_NETWORK | COORDINATED_REPOSTING
+  repostCount            Int      @default(1)
+  domainCount            Int      @default(1)
+  velocityLabel          String?
+  coordinationConfidence Float    @default(0.0) // 0-100
+  coordinationPattern    String   @default("UNSUPPORTED") // HIGH | MEDIUM | LOW | UNSUPPORTED
+  evidenceRationale      String?
+  domainsJson            String?  // Stored JSON array of domains
+  timelineJson           String?  // Stored JSON array of propagation points
+  createdAt              DateTime @default(now())
+
+  @@index([analysisId])
+  @@index([clusterType])
+  @@map("spread_clusters")
 }
 
 model NumericalFact {
@@ -421,6 +540,13 @@ model MediaAnalysis {
   transcriptJson          String?  // Stored as JSON stringified string
   visualFindingsJson      String?  // Stored as JSON stringified string
   manipulationSignalsJson String?  // Stored as JSON stringified string
+  perceptualHash          String?
+  forensicVerdict         String?  @default("NO_MANIPULATION_SIGNAL_FOUND")
+  forensicConfidence      Float?   @default(85.0)
+  c2paJson                String?
+  documentForensicsJson   String?
+  audioAnalysisJson       String?
+  ocrBlocksJson           String?
   reverseSearchJson       String?  // Stored as JSON stringified string
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

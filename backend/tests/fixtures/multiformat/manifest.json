@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-08-23T22:57:07.565Z",
+  "cases": [
+    {
+      "id": "real",
+      "expected": "TRUSTED",
+      "text": "The World Health Organization is the United Nations agency responsible for international public health."
+    },
+    {
+      "id": "false",
+      "expected": "FABRICATED",
+      "text": "The World Health Organization announced that drinking ocean saltwater cures every viral infection within ten seconds."
+    },
+    {
+      "id": "ambiguous",
+      "expected": "UNVERIFIED",
+      "text": "A neighborhood clinic in Pune reported a 17 percent increase in walk-in visits last Tuesday."
+    }
+  ]
+}

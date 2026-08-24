@@ -21,10 +21,12 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+import { FEATURE_FLAGS } from '../utils/featureFlags';
+
 const QUICK_PAGES = [
   { t: 'Dashboard', m: 'Today’s volume, verdict mix and narrative clusters', path: '/dashboard', ic: FileText },
   { t: 'Latest News Desk', m: 'Live intake from your ranked sources', path: '/news', ic: Radio },
-  { t: 'Fake News Desk', m: 'Debunked stories scored under 40', path: '/fake-news', ic: ShieldAlert },
+  ...(FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? [{ t: 'Fake News Desk', m: 'Debunked stories scored under 40', path: '/fake-news', ic: ShieldAlert }] : []),
   { t: 'History & Sealed Ledger', m: 'Runs, tokens and cost per verification', path: '/history', ic: Clock },
   { t: 'New DeepTrust Analysis', m: 'Verify a link, video, image, PDF or text', path: '/analysis', ic: Sparkles },
   { t: 'Scoring Algorithm', m: 'Factor weights, thresholds and penalties', path: '/settings?tab=algo', ic: Sliders },

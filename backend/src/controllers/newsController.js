@@ -87,8 +87,43 @@ const verifyNewsArticle = async (req, res) => {
   }
 };
 
+const { listMonitoringFeeds, pollFeedIngestion } = require('../services/monitoringService');
+
+/**
+ * GET /api/v1/news/monitoring/feeds
+ * Returns configured source monitoring feeds and status
+ */
+const getMonitoringFeeds = async (req, res) => {
+  try {
+    const workspaceId = req.user ? (await dbService.getWorkspaceForUser(req.user.id))?.id : null;
+    const data = await listMonitoringFeeds(workspaceId);
+    return res.status(200).json({ success: true, ...data });
+  } catch (err) {
+    console.error('[Monitoring Feeds Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve monitoring feeds.' });
+  }
+};
+
+/**
+ * POST /api/v1/news/monitoring/poll
+ * Triggers background polling for a specific feed
+ */
+const triggerFeedPoll = async (req, res) => {
+  try {
+    const { feedId } = req.body;
+    if (!feedId) return res.status(400).json({ error: 'feedId is required.' });
+    const result = await pollFeedIngestion(feedId);
+    return res.status(200).json({ success: result.success, ...result });
+  } catch (err) {
+    console.error('[Feed Poll Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to poll feed.' });
+  }
+};
+
 module.exports = {
   getLiveNews,
   getNewsCategories,
-  verifyNewsArticle
+  verifyNewsArticle,
+  getMonitoringFeeds,
+  triggerFeedPoll
 };

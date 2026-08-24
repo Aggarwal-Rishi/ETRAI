@@ -64,9 +64,9 @@ async function runStage17ContentProvenanceTests() {
   });
 
   // ----------------------------------------------------------------
-  // Test 2: Origin Status Classification (CONFIRMED vs PROBABLE vs EARLIEST vs UNKNOWN)
+  // Test 2: Origin Status Classification (CONFIRMED vs FIRST_KNOWN_APPEARANCE vs PROVENANCE_INSUFFICIENT)
   // ----------------------------------------------------------------
-  await runTest('2. Origin confidence distinguishing CONFIRMED, PROBABLE, EARLIEST_DISCOVERED, UNKNOWN', async () => {
+  await runTest('2. Origin confidence distinguishing CONFIRMED_ORIGIN, FIRST_KNOWN_APPEARANCE, and PROVENANCE_INSUFFICIENT', async () => {
     // Scenario A: Confirmed Origin (Official Government Gazette)
     const confirmedSources = [
       { domain: 'pib.gov.in', authorityRank: 1, stance: 'SUPPORTS', publishedAt: '2026-08-19T05:00:00Z' }
@@ -75,24 +75,24 @@ async function runStage17ContentProvenanceTests() {
     assert.strictEqual(resA.originAnalysis.originStatus, 'CONFIRMED_ORIGIN');
     assert.ok(resA.originAnalysis.originConfidence >= 90);
 
-    // Scenario B: Probable Origin (Major Newsroom of Record)
+    // Scenario B: First Known Appearance (Major Newsroom of Record)
     const probableSources = [
       { domain: 'reuters.com', authorityRank: 2, stance: 'SUPPORTS', publishedAt: '2026-08-19T05:00:00Z' }
     ];
     const resB = analyzeContentProvenance({ sources: probableSources });
-    assert.strictEqual(resB.originAnalysis.originStatus, 'PROBABLE_ORIGIN');
+    assert.strictEqual(resB.originAnalysis.originStatus, 'FIRST_KNOWN_APPEARANCE');
     assert.ok(resB.originAnalysis.originConfidence >= 75);
 
-    // Scenario C: Earliest Discovered Source (General web / unranked blog)
+    // Scenario C: First Known Appearance (General web / unranked blog)
     const earliestSources = [
       { domain: 'unranked-blog.xyz', authorityRank: 3, stance: 'SUPPORTS', publishedAt: '2026-08-19T05:00:00Z' }
     ];
     const resC = analyzeContentProvenance({ sources: earliestSources });
-    assert.strictEqual(resC.originAnalysis.originStatus, 'EARLIEST_DISCOVERED_SOURCE');
+    assert.strictEqual(resC.originAnalysis.originStatus, 'FIRST_KNOWN_APPEARANCE');
 
-    // Scenario D: Unknown Origin (Zero discoverable evidence)
+    // Scenario D: Provenance Insufficient (Zero discoverable evidence)
     const resD = analyzeContentProvenance({ sources: [] });
-    assert.strictEqual(resD.originAnalysis.originStatus, 'UNKNOWN_ORIGIN');
+    assert.strictEqual(resD.originAnalysis.originStatus, 'PROVENANCE_INSUFFICIENT');
   });
 
   // ----------------------------------------------------------------
@@ -104,7 +104,7 @@ async function runStage17ContentProvenanceTests() {
       sources: []
     });
 
-    assert.strictEqual(emptyProvenance.originAnalysis.originStatus, 'UNKNOWN_ORIGIN');
+    assert.strictEqual(emptyProvenance.originAnalysis.originStatus, 'PROVENANCE_INSUFFICIENT');
     assert.strictEqual(emptyProvenance.originAnalysis.originPublisher, 'Unknown');
     assert.strictEqual(emptyProvenance.timeline.length, 0);
   });

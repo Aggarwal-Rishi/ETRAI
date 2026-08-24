@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "node tests/runAuthTests.js",
+    "test:audit": "node tests/runProjectAudit.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -19,12 +20,15 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "ffmpeg-static": "^5.2.0",
+    "form-data": "^4.0.4",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.7.0",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.7.0",
     "openai": "^4.28.4",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.35.3",
     "vader-sentiment": "^1.1.3"
   },
   "devDependencies": {

@@ -41,6 +41,12 @@ const config = {
   serper: {
     apiKey: process.env.SERPER_API_KEY || ''
   },
+  googleVision: {
+    apiKey: process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_API_KEY || ''
+  },
+  serpApi: {
+    apiKey: process.env.SERPAPI_API_KEY || ''
+  },
   limits: {
     maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '10', 10),
     maxSearchQueriesPerClaim: parseInt(process.env.MAX_SEARCH_QUERIES_PER_CLAIM || '4', 10),
@@ -71,6 +77,12 @@ function validateConfig() {
     if (!config.serper.apiKey) {
       warnings.push('SERPER_API_KEY is not set. Agent 3 web retrieval will run in fallback mode.');
     }
+    if (!config.googleVision.apiKey) {
+      warnings.push('GOOGLE_VISION_API_KEY is not set. Reverse-image search will use locally verified keyword candidates instead of pixel-based Web Detection.');
+    }
+    if (!config.serpApi.apiKey) {
+      warnings.push('SERPAPI_API_KEY is not set. Google Lens exact-match retrieval will be unavailable.');
+    }
   }
 
   return {
@@ -91,7 +103,9 @@ function getSanitizedConfigSummary() {
     clientUrl: config.clientUrl,
     geminiConfigured: Boolean(config.gemini.apiKey && config.gemini.apiKey.length > 5),
     geminiModel: config.gemini.model,
-    serperConfigured: Boolean(config.serper.apiKey && config.serper.apiKey.length > 5)
+    serperConfigured: Boolean(config.serper.apiKey && config.serper.apiKey.length > 5),
+    googleVisionConfigured: Boolean(config.googleVision.apiKey && config.googleVision.apiKey.length > 5),
+    googleLensConfigured: Boolean(config.serpApi.apiKey && config.serpApi.apiKey.length > 5)
   };
 }
 

@@ -279,7 +279,7 @@ async function runFormalSemanticVerificationSuite() {
       name: '5. Unrelated Topic',
       claim: 'ISRO launched the EOS-08 satellite aboard the SSLV-D3 rocket.',
       evidence: 'ISRO announced the annual budget allocation for space research in New Delhi.',
-      expectedStance: 'NEUTRAL'
+      expectedStance: 'IRRELEVANT'
     }
   ];
 

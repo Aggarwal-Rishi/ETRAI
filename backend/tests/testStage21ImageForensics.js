@@ -135,7 +135,7 @@ async function runStage21ImageForensicsTests() {
     assert.strictEqual(res.mimeType, 'image/jpeg');
     assert.strictEqual(res.integrity.status, 'INTEGRITY_VERIFIED');
     assert.strictEqual(res.firstAppearance.earliestDomain, 'pib.gov.in');
-    assert.strictEqual(res.forensicSummary.verdict, 'ORGANIC_UNALTERED');
+    assert.strictEqual(res.forensicSummary.verdict, 'NO_MANIPULATION_SIGNAL_FOUND');
   });
 
   // ----------------------------------------------------------------

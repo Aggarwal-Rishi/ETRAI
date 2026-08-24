@@ -21,7 +21,12 @@ import {
   Zap,
   Info,
   Check,
-  X
+  X,
+  Clipboard,
+  ClipboardPaste,
+  Trash2,
+  Camera,
+  Link2
 } from 'lucide-react';
 
 const SAMPLE_PRESETS = [
@@ -54,9 +59,14 @@ export default function NewAnalysisPage() {
   
   // Inputs
   const [urlInput, setUrlInput] = useState('');
-  const [textInput, setTextInput] = useState(location.state?.initialText || SAMPLE_PRESETS[0].text);
+  // Presets are opt-in. Pre-filling one contaminated image/video reports with
+  // an unrelated sample claim when users switched input modes.
+  const [textInput, setTextInput] = useState(location.state?.initialText || '');
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
   // Pipeline Toggles
   const [optReverseSearch, setOptReverseSearch] = useState(true);
@@ -74,6 +84,88 @@ export default function NewAnalysisPage() {
   const [errorMessage, setErrorMessage] = useState(null);
 
   const timerRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Generate and cleanup object URL for image and video previews
+  useEffect(() => {
+    if (uploadedFile && uploadedFile.type && uploadedFile.type.startsWith('image/')) {
+      const url = URL.createObjectURL(uploadedFile);
+      setImagePreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setImagePreviewUrl(null);
+    }
+  }, [uploadedFile]);
+
+  useEffect(() => {
+    if (uploadedFile && uploadedFile.type && uploadedFile.type.startsWith('video/')) {
+      const url = URL.createObjectURL(uploadedFile);
+      setVideoPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setVideoPreviewUrl(null);
+    }
+  }, [uploadedFile]);
+
+  // Global Clipboard Paste Listener (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      // Don't intercept text pastes when user is actively typing in text input/textarea
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      const isInputActive = activeTag === 'textarea' || (activeTag === 'input' && document.activeElement.type === 'text');
+
+      if (e.clipboardData && e.clipboardData.items) {
+        for (const item of e.clipboardData.items) {
+          if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            const blob = item.getAsFile();
+            if (blob) {
+              const ext = blob.type.split('/')[1] || 'png';
+              const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, { type: blob.type });
+              setSelectedCard('IMAGE');
+              setUploadedFile(file);
+              setErrorMessage(null);
+              showToast('Image pasted from clipboard!');
+              return;
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, []);
+
+  // Dedicated Button: Paste from Clipboard API
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.split('/')[1] || 'png';
+            const file = new File([blob], `pasted-image-${Date.now()}.${ext}`, { type: imageType });
+            setSelectedCard('IMAGE');
+            setUploadedFile(file);
+            setErrorMessage(null);
+            showToast('Image pasted from clipboard!');
+            return;
+          }
+        }
+      }
+      setErrorMessage('No image found in clipboard. Copy an image or screenshot and press Ctrl+V.');
+    } catch (err) {
+      console.warn('[Clipboard Read Error]:', err);
+      setErrorMessage('Clipboard access blocked by browser. Please press Ctrl+V anywhere to paste your image directly.');
+    }
+  };
 
   // Timer effect
   useEffect(() => {
@@ -100,12 +192,16 @@ export default function NewAnalysisPage() {
       setErrorMessage('Please enter a valid webpage or article URL.');
       return;
     }
-    if ((selectedCard === 'IMAGE' || selectedCard === 'PDF' || selectedCard === 'VIDEO') && !uploadedFile && !urlInput.trim() && !textInput.trim()) {
-      setErrorMessage('Please upload a file or provide a source URL / claim text.');
+    if ((selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && !uploadedFile && !urlInput.trim()) {
+      setErrorMessage('Please upload a media file or provide a direct media URL.');
       return;
     }
-    if (selectedCard === 'TEXT' && textInput.trim().split(/\s+/).length < 8) {
-      setErrorMessage('Please enter at least 8 words of claim text for verification.');
+    if (selectedCard === 'PDF' && !uploadedFile) {
+      setErrorMessage('Please upload a PDF, DOCX, or TXT document.');
+      return;
+    }
+    if (selectedCard === 'TEXT' && !textInput.trim()) {
+      setErrorMessage('Please enter claim text for verification.');
       return;
     }
 
@@ -133,6 +229,9 @@ export default function NewAnalysisPage() {
         if (textInput.trim()) formData.append('text', textInput.trim());
         if (urlInput.trim()) formData.append('url', urlInput.trim());
         formData.append('selectedTypes', JSON.stringify(['FACT_CHECKING', 'FAKE_NEWS_DETECTION']));
+        formData.append('enableReverseSearch', String(optReverseSearch));
+        formData.append('traceProvenance', String(optTraceProvenance));
+        formData.append('detectEntities', String(optDetectEntities));
         body = formData;
       } else {
         headers['Content-Type'] = 'application/json';
@@ -140,7 +239,10 @@ export default function NewAnalysisPage() {
           inputType,
           url: urlInput.trim() || undefined,
           text: textInput.trim() || undefined,
-          selectedTypes: ['FACT_CHECKING', 'FAKE_NEWS_DETECTION']
+          selectedTypes: ['FACT_CHECKING', 'FAKE_NEWS_DETECTION'],
+          enableReverseSearch: optReverseSearch,
+          traceProvenance: optTraceProvenance,
+          detectEntities: optDetectEntities
         });
       }
 
@@ -216,7 +318,7 @@ export default function NewAnalysisPage() {
     { id: 'CLAIMS', label: 'Claim Extraction Engine', desc: 'Decomposes narrative into atomic, verifiable assertions' },
     { id: 'FACT_MATCH', label: 'Cross-Source Fact Match', desc: 'Queries primary web indices and evaluates corroboration signals' },
     { id: 'FORENSICS', label: 'Media & Forensics Rails', desc: 'ELA pixel analysis, keyframe splice detection, spectral match' },
-    { id: 'SYNTHESIS', label: 'Dossier Sealing & Derivation', desc: 'Calculates signature trust score and cryptographically seals report' }
+    { id: 'SYNTHESIS', label: 'Dossier Sealing & Derivation', desc: 'Calculates trust score and creates a SHA-256 report integrity seal' }
   ];
 
   const getStageStatus = (stageId, index) => {
@@ -235,8 +337,16 @@ export default function NewAnalysisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
       <Navbar />
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#0c1427] border border-indigo-500/50 text-white text-xs font-mono rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
         
@@ -248,11 +358,11 @@ export default function NewAnalysisPage() {
             
             {/* Header */}
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#E88F6B]/20 text-[#E88F6B] border border-[#E88F6B]/30 text-[11px] font-mono font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3 h-3" /> Intake Studio v2.4
+              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#131f38] text-blue-300 border border-blue-800/40 text-[11px] font-mono font-bold uppercase tracking-wider mb-2">
+                <Sparkles className="w-3 h-3 text-blue-400" /> Multi-Agent Intake Rail
               </div>
               <h1 className="text-3xl font-extrabold text-white tracking-tight">
-                DeepTrust Verification Studio
+                AI Content Verification Studio
               </h1>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
                 Select your source asset type to launch the multi-agent evidentiary verification pipeline.
@@ -275,8 +385,8 @@ export default function NewAnalysisPage() {
                   id: 'VIDEO',
                   label: 'Video clip',
                   icon: Film,
-                  sub: 'Upload file',
-                  badge: 'Upload only'
+                  sub: 'Link or File',
+                  badge: 'File or Link'
                 },
                 { id: 'PDF', label: 'PDF document', icon: FileText, sub: 'Notices / Briefs' },
                 { id: 'TEXT', label: 'Claim text', icon: Layers, sub: 'Raw statements' },
@@ -293,12 +403,12 @@ export default function NewAnalysisPage() {
                     }}
                     className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
                       isSelected
-                        ? 'bg-gradient-to-b from-[#000D59] to-slate-900 border-indigo-500 shadow-xl ring-2 ring-indigo-500/20 scale-[1.02]'
-                        : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                        ? 'bg-gradient-to-b from-[#131f38] to-[#0c1427] border-indigo-500 shadow-xl ring-2 ring-indigo-500/20 scale-[1.02]'
+                        : 'bg-[#0c1427] border-[#17233f] hover:border-slate-700'
                     }`}
                   >
                     {card.badge && (
-                      <span className="absolute -top-2 right-2 px-1.5 py-0.2 bg-[#B0512F] text-white rounded text-[9px] font-mono font-bold">
+                      <span className="absolute -top-2 right-2 px-1.5 py-0.2 bg-indigo-600 text-white rounded text-[9px] font-mono font-bold">
                         {card.badge}
                       </span>
                     )}
@@ -323,18 +433,8 @@ export default function NewAnalysisPage() {
               })}
             </div>
 
-            {/* Video Limitation Honest Notice */}
-            {selectedCard === 'VIDEO' && (
-              <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl text-xs text-slate-300 flex items-center gap-3">
-                <Info className="w-4 h-4 text-[#E88F6B] flex-shrink-0" />
-                <span>
-                  <strong>Supported Input:</strong> Direct MP4/WebM video file uploads and transcripts are fully processed for splice and voice-clone checks. Direct social URL scraping (YouTube/X) is scheduled for Phase 2.
-                </span>
-              </div>
-            )}
-
             {/* Conditional Input Field Box */}
-            <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
+            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-4 shadow-xl">
               
               {/* URL Input */}
               {(selectedCard === 'NEWS_URL' || selectedCard === 'MIXED_URL') && (
@@ -347,7 +447,7 @@ export default function NewAnalysisPage() {
                       placeholder="https://news-outlet.com/article/2026/08/policy-notice"
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
+                      className="w-full pl-10 pr-4 py-3 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
                     />
                   </div>
                 </div>
@@ -367,16 +467,383 @@ export default function NewAnalysisPage() {
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
                     placeholder="Paste the statement, press note, or forwarded message here..."
-                    className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 leading-relaxed placeholder-slate-500"
+                    className="w-full p-4 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 leading-relaxed placeholder-slate-500"
                   />
                 </div>
               )}
 
-              {/* File Drop Zone (Image / PDF / Video) */}
-              {(selectedCard === 'IMAGE' || selectedCard === 'PDF' || selectedCard === 'VIDEO') && (
+              {/* IMAGE SECTION (Dedicated Paste Option + Preview + Dropzone) */}
+              {selectedCard === 'IMAGE' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-white">
+                      Image Asset Forensics (ELA, EXIF, Duplicate Match)
+                    </label>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Supports PNG, JPG, JPEG, WEBP
+                    </span>
+                  </div>
+
+                  {uploadedFile && imagePreviewUrl ? (
+                    /* Attached Image Preview Card */
+                    <div className="p-5 bg-[#070b14] border border-indigo-500/40 rounded-2xl space-y-4 shadow-lg">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Image Loaded for Forensic Intake</span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded text-[10px] font-mono font-bold uppercase">
+                          {uploadedFile.type?.split('/')[1] || 'IMAGE'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-5">
+                        {/* Thumbnail */}
+                        <div className="relative w-40 h-40 bg-black/60 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Uploaded preview"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+
+                        {/* File Details & Actions */}
+                        <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
+                          <div className="space-y-1">
+                            <span className="text-sm font-bold text-white block truncate" title={uploadedFile.name}>
+                              {uploadedFile.name}
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono block">
+                              {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'image/png'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={handlePasteFromClipboard}
+                              className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                            >
+                              <ClipboardPaste className="w-3.5 h-3.5" />
+                              <span>Paste Another (Ctrl+V)</span>
+                            </button>
+
+                            <input
+                              type="file"
+                              id="studio-file-input-image"
+                              accept="image/*"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setUploadedFile(e.target.files[0]);
+                                  setErrorMessage(null);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="studio-file-input-image"
+                              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Replace File</span>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadedFile(null);
+                                setImagePreviewUrl(null);
+                              }}
+                              className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Dropzone & Paste Box */
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                      onDragLeave={() => setIsDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          setUploadedFile(e.dataTransfer.files[0]);
+                          setErrorMessage(null);
+                        }
+                      }}
+                      className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-4 transition-colors ${
+                        isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="p-3 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center text-indigo-400">
+                        <ImageIcon className="w-7 h-7" />
+                      </div>
+
+                      <div className="space-y-1 max-w-md mx-auto">
+                        <p className="text-xs font-semibold text-white">
+                          Paste from clipboard, drag & drop, or browse your device
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          Max 50MB · Preserves camera EXIF, hash signatures & tamper regions
+                        </p>
+                      </div>
+
+                      {/* Primary Actions: Paste & Browse */}
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={handlePasteFromClipboard}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-2 hover:scale-[1.02]"
+                        >
+                          <ClipboardPaste className="w-4 h-4" />
+                          <span>Paste Image (Ctrl+V)</span>
+                        </button>
+
+                        <input
+                          type="file"
+                          id="studio-file-input-image"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setUploadedFile(e.target.files[0]);
+                              setErrorMessage(null);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="studio-file-input-image"
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-2"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span>Browse Local Disk</span>
+                        </label>
+                      </div>
+
+                      {/* Tip Pill */}
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-full text-[10.5px] font-mono text-slate-400">
+                        <Sparkles className="w-3 h-3 text-indigo-400" />
+                        <span>Tip: Take a screenshot (Win+Shift+S or PrtScn) and press Ctrl+V directly</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional Image URL Input */}
+                  <div className="pt-2">
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                      Or verify an Image by Direct Web URL
+                    </label>
+                    <div className="relative">
+                      <Globe className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        placeholder="https://example.com/press-photo.jpg"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* VIDEO SECTION (Link Option + File Dropzone + Video Preview) */}
+              {selectedCard === 'VIDEO' && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-white">
+                      Video Forensics & Speech Analysis
+                    </label>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Verify via Video Link or File Upload
+                    </span>
+                  </div>
+
+                  {/* Option 1: Video Web URL / Broadcast Link */}
+                  <div className="p-4 bg-[#070b14] border border-[#17233f] rounded-2xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Video URL / Web Broadcast Link</span>
+                      </label>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        YouTube, Vimeo, MP4 direct stream, or News video URL
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <Film className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        placeholder="https://www.youtube.com/watch?v=... or https://news.com/video.mp4"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        className="w-full pl-10 pr-20 py-2.5 bg-[#0c1427] border border-[#17233f] rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
+                      />
+                      {urlInput && (
+                        <button
+                          type="button"
+                          onClick={() => setUrlInput('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-mono"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Visual Divider */}
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-slate-800"></div>
+                    <span className="flex-shrink mx-4 text-[10px] font-mono uppercase text-slate-500 font-bold tracking-wider">
+                      OR UPLOAD LOCAL VIDEO FILE
+                    </span>
+                    <div className="flex-grow border-t border-slate-800"></div>
+                  </div>
+
+                  {/* Option 2: Upload Video File or View Attached Preview */}
+                  {uploadedFile && videoPreviewUrl ? (
+                    <div className="p-5 bg-[#070b14] border border-indigo-500/40 rounded-2xl space-y-4 shadow-lg">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Video Clip Loaded for Forensic Keyframe Analysis</span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded text-[10px] font-mono font-bold uppercase">
+                          {uploadedFile.type?.split('/')[1] || 'VIDEO'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-5">
+                        {/* Video Player Preview */}
+                        <div className="relative w-48 max-h-32 bg-black border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+                          <video
+                            src={videoPreviewUrl}
+                            controls
+                            className="w-full h-full max-h-32 object-contain"
+                          />
+                        </div>
+
+                        {/* Details & Actions */}
+                        <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
+                          <div className="space-y-1">
+                            <span className="text-sm font-bold text-white block truncate" title={uploadedFile.name}>
+                              {uploadedFile.name}
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono block">
+                              {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'video/mp4'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
+                            <input
+                              type="file"
+                              id="studio-file-input-video-replace"
+                              accept="video/*"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setUploadedFile(e.target.files[0]);
+                                  setErrorMessage(null);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="studio-file-input-video-replace"
+                              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Replace Video</span>
+                            </label>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadedFile(null);
+                                setVideoPreviewUrl(null);
+                              }}
+                              className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                      onDragLeave={() => setIsDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          setUploadedFile(e.dataTransfer.files[0]);
+                          setErrorMessage(null);
+                        }
+                      }}
+                      className={`p-7 border-2 border-dashed rounded-2xl text-center space-y-3 transition-colors ${
+                        isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
+                      }`}
+                    >
+                      <Film className="w-8 h-8 text-blue-400 mx-auto" />
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-white">
+                          Drag and drop video clip here, or click to browse
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          Max 50MB · Supports MP4, WebM, MOV · Keyframe & Voice Splice Forensics
+                        </p>
+                      </div>
+
+                      <input
+                        type="file"
+                        id="studio-file-input-video"
+                        accept="video/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setUploadedFile(e.target.files[0]);
+                            setErrorMessage(null);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="studio-file-input-video"
+                        className="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition"
+                      >
+                        Browse Video File
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Optional Transcript / Context */}
+                  <div className="pt-2">
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                      Optional: Spoken Dialogue / Context Notes
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Speech by official claiming tax policy change at the conference..."
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* PDF Document Drop Zone */}
+              {selectedCard === 'PDF' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-white">
-                    Upload {selectedCard === 'IMAGE' ? 'Image File (PNG/JPG/WEBP)' : selectedCard === 'PDF' ? 'PDF / DOCX Notice' : 'Video Clip (MP4/MOV)'}
+                    Upload PDF / DOCX Document
                   </label>
                   
                   <div
@@ -387,34 +854,37 @@ export default function NewAnalysisPage() {
                       setIsDragOver(false);
                       if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                         setUploadedFile(e.dataTransfer.files[0]);
+                        setErrorMessage(null);
                       }
                     }}
                     className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-3 transition-colors ${
-                      isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
+                      isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
                     }`}
                   >
-                    <Upload className="w-8 h-8 text-[#E88F6B] mx-auto" />
+                    <FileText className="w-8 h-8 text-blue-400 mx-auto" />
                     <div>
                       <p className="text-xs font-semibold text-white">
-                        {uploadedFile ? uploadedFile.name : 'Drag and drop file here, or click to browse'}
+                        {uploadedFile ? uploadedFile.name : 'Drag and drop PDF/DOCX file here, or click to browse'}
                       </p>
                       <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                        {uploadedFile ? `${(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB` : 'Max 50MB · Forensic metadata preserved'}
+                        {uploadedFile ? `${(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB` : 'Max 50MB · OCR and digital signature extraction'}
                       </p>
                     </div>
 
                     <input
                       type="file"
-                      id="studio-file-input"
+                      id="studio-file-input-doc"
+                      accept=".pdf,.docx,.doc,.txt"
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           setUploadedFile(e.target.files[0]);
+                          setErrorMessage(null);
                         }
                       }}
                       className="hidden"
                     />
                     <label
-                      htmlFor="studio-file-input"
+                      htmlFor="studio-file-input-doc"
                       className="inline-block px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition"
                     >
                       {uploadedFile ? 'Replace File' : 'Browse Local Disk'}
@@ -424,7 +894,7 @@ export default function NewAnalysisPage() {
               )}
 
               {/* "Try One" Real Preset Buttons */}
-              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="pt-2 border-t border-[#17233f] space-y-2">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
                   1-Click Real Presets:
                 </span>
@@ -438,7 +908,7 @@ export default function NewAnalysisPage() {
                         setTextInput(preset.text);
                         setErrorMessage(null);
                       }}
-                      className="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs text-slate-300 hover:text-white transition flex items-center gap-2"
+                      className="px-3 py-1.5 bg-[#070b14] hover:bg-slate-800 border border-[#17233f] hover:border-slate-700 rounded-xl text-xs text-slate-300 hover:text-white transition flex items-center gap-2"
                     >
                       <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded text-[9.5px] font-mono">
                         {preset.tag}
@@ -451,7 +921,7 @@ export default function NewAnalysisPage() {
             </div>
 
             {/* Pipeline Configuration Options */}
-            <div className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4">
+            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-4 shadow-xl">
               <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">
                 Verification Pipeline Modules
               </h3>
@@ -459,7 +929,7 @@ export default function NewAnalysisPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 
                 {/* Module 1: Reverse Search */}
-                <label className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
                   <input
                     type="checkbox"
                     checked={optReverseSearch}
@@ -473,7 +943,7 @@ export default function NewAnalysisPage() {
                 </label>
 
                 {/* Module 2: Provenance */}
-                <label className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
                   <input
                     type="checkbox"
                     checked={optTraceProvenance}
@@ -487,7 +957,7 @@ export default function NewAnalysisPage() {
                 </label>
 
                 {/* Module 3: Detect Public Figures */}
-                <label className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
                   <input
                     type="checkbox"
                     checked={optDetectEntities}
@@ -495,13 +965,13 @@ export default function NewAnalysisPage() {
                     className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
                   />
                   <div>
-                    <span className="font-semibold text-white block">Detect public figures & entities</span>
+                    <span className="font-semibold text-white block">Detect public figures &amp; entities</span>
                     <span className="text-slate-400 text-[11px]">NER extraction and official statement reconciliation</span>
                   </div>
                 </label>
 
                 {/* Module 4: Deep Archive (Coming Soon) */}
-                <label className="p-3.5 bg-slate-950/40 border border-slate-800/60 rounded-2xl flex items-start gap-3 opacity-60 cursor-not-allowed">
+                <label className="p-3.5 bg-[#070b14]/40 border border-[#17233f]/60 rounded-2xl flex items-start gap-3 opacity-60 cursor-not-allowed">
                   <input
                     type="checkbox"
                     disabled
@@ -513,7 +983,7 @@ export default function NewAnalysisPage() {
                       <span className="font-semibold text-slate-300">Deep historical archive search</span>
                       <span className="px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9px] font-mono">Phase 2</span>
                     </div>
-                    <span className="text-slate-500 text-[11px]">Indexed gazette & registrar repositories (2000–2020)</span>
+                    <span className="text-slate-500 text-[11px]">Indexed gazette &amp; registrar repositories (2000–2020)</span>
                   </div>
                 </label>
               </div>
@@ -522,10 +992,10 @@ export default function NewAnalysisPage() {
             {/* Launch CTA */}
             <button
               onClick={handleLaunchVerification}
-              className="w-full py-4 bg-gradient-to-r from-[#D97757] via-indigo-600 to-[#B0512F] hover:from-[#B0512F] hover:to-[#D97757] text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-[#D97757]/20 transition flex items-center justify-center gap-2 group"
+              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center gap-2 group"
             >
               <Zap className="w-4 h-4 fill-white" />
-              <span>Launch 4-Agent DeepTrust Verification</span>
+              <span>Launch 4-Agent Verification Pipeline</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
@@ -537,12 +1007,12 @@ export default function NewAnalysisPage() {
           <div className="space-y-6 animate-fadeIn">
             
             {/* Top Running Banner */}
-            <div className="p-6 sm:p-8 bg-[#000D59] border border-slate-800 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="p-6 sm:p-8 bg-[#0b1329] border border-[#17233f] rounded-3xl space-y-4 shadow-2xl relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E88F6B]">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">
                       Running Multi-Agent Rail
                     </span>
                   </div>
@@ -560,23 +1030,23 @@ export default function NewAnalysisPage() {
                     <span className="text-[10px] text-slate-400 uppercase">Execution Time</span>
                   </div>
                   <div className="w-14 h-14 relative flex items-center justify-center">
-                    <div className="w-full h-full rounded-full border-4 border-indigo-500/20 border-t-[#D97757] animate-spin" />
+                    <div className="w-full h-full rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
                     <span className="absolute font-mono font-bold text-xs text-white">{progress}%</span>
                   </div>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden relative z-10">
+              <div className="w-full h-2 bg-[#070b14] rounded-full overflow-hidden relative z-10">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-[#D97757] transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             {/* Vertical Timeline of Stages */}
-            <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-6 shadow-xl">
               <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">
                 Pipeline Stage Execution
               </h3>
@@ -589,16 +1059,16 @@ export default function NewAnalysisPage() {
                       key={stage.id}
                       className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
                         status === 'ACTIVE'
-                          ? 'bg-[#000D59]/60 border-indigo-500 shadow-md ring-1 ring-indigo-500/20'
+                          ? 'bg-[#131f38] border-indigo-500 shadow-md ring-1 ring-indigo-500/20'
                           : status === 'COMPLETED'
-                          ? 'bg-slate-950/80 border-slate-800'
-                          : 'bg-slate-950/30 border-slate-850 opacity-40'
+                          ? 'bg-[#070b14]/80 border-[#17233f]'
+                          : 'bg-[#070b14]/30 border-[#17233f]/50 opacity-40'
                       }`}
                     >
                       <div className="flex items-start gap-3.5">
                         <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold font-mono flex-shrink-0 mt-0.5 ${
                           status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                          status === 'ACTIVE' ? 'bg-[#D97757] text-white animate-pulse' :
+                          status === 'ACTIVE' ? 'bg-indigo-600 text-white animate-pulse' :
                           'bg-slate-800 text-slate-500'
                         }`}>
                           {status === 'COMPLETED' ? <Check className="w-4 h-4 stroke-[3]" /> : `0${idx + 1}`}
@@ -619,7 +1089,7 @@ export default function NewAnalysisPage() {
 
                       <div className="flex-shrink-0 font-mono text-[11px]">
                         {status === 'COMPLETED' && <span className="text-emerald-400 font-bold">Passed</span>}
-                        {status === 'ACTIVE' && <span className="text-[#E88F6B] font-bold">Executing...</span>}
+                        {status === 'ACTIVE' && <span className="text-blue-400 font-bold">Executing...</span>}
                         {status === 'PENDING' && <span className="text-slate-600">Pending</span>}
                       </div>
                     </div>

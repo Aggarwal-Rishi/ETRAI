@@ -1,0 +1,111 @@
+.etrai-global-experience {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.etrai-global-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  opacity: 0.58;
+  filter: saturate(1.4) contrast(1.12) drop-shadow(0 0 10px rgba(99, 102, 241, 0.18));
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(circle at 68% 28%, #000 0%, rgba(0, 0, 0, 0.96) 43%, transparent 82%);
+  mask-image: radial-gradient(circle at 68% 28%, #000 0%, rgba(0, 0, 0, 0.96) 43%, transparent 82%);
+  pointer-events: none;
+}
+
+.etrai-global-glow {
+  position: absolute;
+  z-index: 0;
+  border-radius: 999px;
+  filter: blur(110px);
+  opacity: 0.24;
+}
+
+.etrai-global-glow-a {
+  top: -180px;
+  right: -120px;
+  width: 520px;
+  height: 520px;
+  background: #312e81;
+}
+
+.etrai-global-glow-b {
+  bottom: -220px;
+  left: -170px;
+  width: 480px;
+  height: 480px;
+  background: #164e63;
+}
+
+.etrai-global-cursor-dot,
+.etrai-global-cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483000;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  will-change: left, top, width, height;
+}
+
+.etrai-global-cursor-dot {
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  box-shadow: 0 0 5px 1px #fff, 0 0 16px 5px rgba(139, 92, 246, 0.95);
+}
+
+.etrai-global-cursor-ring {
+  width: 38px;
+  height: 38px;
+  border: 2px solid rgba(165, 180, 252, 0.95);
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.7), inset 0 0 9px rgba(99, 102, 241, 0.18);
+  transition: width 0.22s ease, height 0.22s ease, border-color 0.22s ease, background 0.22s ease, border-radius 0.22s ease;
+}
+
+.etrai-global-cursor-ring.is-interactive {
+  width: 62px;
+  height: 62px;
+  border-color: #67e8f9;
+  background: rgba(34, 211, 238, 0.12);
+  box-shadow: 0 0 12px rgba(103, 232, 249, 0.9), 0 0 30px rgba(34, 211, 238, 0.28);
+}
+
+.etrai-global-cursor-ring.is-text {
+  width: 5px;
+  height: 32px;
+  border-radius: 3px;
+  border-color: #a5f3fc;
+  background: rgba(34, 211, 238, 0.65);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.8);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .etrai-global-cursor-dot,
+  .etrai-global-cursor-ring {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .etrai-global-scene {
+    opacity: 0.48;
+  }
+}
+
+@media (max-width: 720px) {
+  .etrai-global-scene {
+    opacity: 0.48;
+    -webkit-mask-image: radial-gradient(circle at 50% 18%, #000 0%, rgba(0, 0, 0, 0.9) 42%, transparent 80%);
+    mask-image: radial-gradient(circle at 50% 18%, #000 0%, rgba(0, 0, 0, 0.9) 42%, transparent 80%);
+  }
+}

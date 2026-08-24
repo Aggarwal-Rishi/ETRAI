@@ -1,65 +1,71 @@
 import React from 'react';
 
 /**
- * DeepTrust Standard Status Washes & Verdict Badge Component
- * 
- * Status Categories:
- * - 'verified' | 'real' | 'supported'   -> moss-wash (#E4EFE7), text: #2C5B3E, border: #C6DFCF
- * - 'suspicious' | 'questionable'      -> ochre-wash (#F7EEDA), text: #8A6212, border: #EBD9AE
- * - 'fake' | 'false' | 'refuted'       -> brick-wash (#F7E3E0), text: #8E2F27, border: #EBC7C2
- * - 'unverified' | 'neutral' | 'noted' -> slate-wash (#E9ECF0), text: #4C596A, border: #D3D9E1
- * - 'clay' | 'run'                     -> clay-wash (#F6E7DF), text: #B0512F, border: #EFD3C6
+ * ETRAI Standard Verdict & Status Badge Component (Sleek Dark Theme)
  */
 
 export function getStatusStyle(status = 'neutral') {
   const norm = String(status).toLowerCase().trim();
 
-  if (['verified', 'real', 'true', 'supported', 'active', 'paid', 'clean'].includes(norm)) {
+  if (['verified', 'real', 'true', 'supported'].includes(norm)) {
     return {
-      bg: 'bg-moss-wash',
-      text: 'text-moss-text',
-      border: 'border-moss-border',
-      dot: 'bg-[#2C5B3E]',
-      label: 'Verified Real'
+      bg: 'bg-emerald-950/60',
+      text: 'text-emerald-400',
+      border: 'border-emerald-800/40',
+      dot: 'bg-emerald-400',
+      label: 'Verified'
     };
   }
 
-  if (['suspicious', 'susp', 'questionable', 'partly true', 'caution', 'warn'].includes(norm)) {
+  if (norm === 'completed') {
+    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Completed' };
+  }
+  if (norm === 'active') {
+    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Active' };
+  }
+  if (norm === 'paid') {
+    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Paid' };
+  }
+  if (norm === 'clean') {
+    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Clean' };
+  }
+
+  if (['partly true', 'partially_verified'].includes(norm)) {
     return {
-      bg: 'bg-ochre-wash',
-      text: 'text-ochre-text',
-      border: 'border-ochre-border',
-      dot: 'bg-[#8A6212]',
+      bg: 'bg-amber-950/60',
+      text: 'text-amber-400',
+      border: 'border-amber-800/40',
+      dot: 'bg-amber-400',
+      label: 'Partially Verified'
+    };
+  }
+
+  if (['suspicious', 'susp', 'questionable', 'caution', 'warn'].includes(norm)) {
+    return {
+      bg: 'bg-amber-950/60',
+      text: 'text-amber-400',
+      border: 'border-amber-800/40',
+      dot: 'bg-amber-400',
       label: 'Suspicious'
     };
   }
 
   if (['fake', 'false', 'refuted', 'fabricated', 'manipulated', 'flagged', 'danger'].includes(norm)) {
     return {
-      bg: 'bg-brick-wash',
-      text: 'text-brick-text',
-      border: 'border-brick-border',
-      dot: 'bg-[#8E2F27]',
+      bg: 'bg-rose-950/60',
+      text: 'text-rose-400',
+      border: 'border-rose-800/40',
+      dot: 'bg-rose-400',
       label: 'Flagged Fake'
-    };
-  }
-
-  if (['clay', 'run', 'lead', 'action'].includes(norm)) {
-    return {
-      bg: 'bg-clay-wash',
-      text: 'text-clay-deep',
-      border: 'border-[#EFD3C6]',
-      dot: 'bg-[#B0512F]',
-      label: 'Run DeepTrust'
     };
   }
 
   // Default: Neutral / Unverified
   return {
-    bg: 'bg-slateWash-wash',
-    text: 'text-slateWash-text',
-    border: 'border-slateWash-border',
-    dot: 'bg-[#4C596A]',
+    bg: 'bg-slate-900/80',
+    text: 'text-slate-300',
+    border: 'border-slate-800',
+    dot: 'bg-slate-400',
     label: 'Unverified'
   };
 }
@@ -75,10 +81,10 @@ export default function VerdictBadge({
   const displayLabel = label !== null ? label : style.label;
 
   const sizeClasses = {
-    sm: 'px-2 py-0.5 text-[9.5px]',
-    md: 'px-2.5 py-1 text-[10.5px]',
+    sm: 'px-2 py-0.5 text-[10px]',
+    md: 'px-2.5 py-1 text-[11px]',
     lg: 'px-3.5 py-1.5 text-xs font-semibold'
-  }[size] || 'px-2.5 py-1 text-[10.5px]';
+  }[size] || 'px-2.5 py-1 text-[11px]';
 
   return (
     <span

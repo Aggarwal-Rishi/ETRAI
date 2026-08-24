@@ -5,6 +5,7 @@ const {
   getUsageAndCostReport,
   reverifyExistingAnalysis
 } = require('../services/historyLedgerService');
+const { compactReportMediaPayload } = require('../utils/reportMediaPayload');
 
 /**
  * GET /api/v1/reports
@@ -113,6 +114,8 @@ const getReportById = async (req, res) => {
         reportPayload = JSON.parse(reportPayload);
       } catch (e) {}
     }
+
+    compactReportMediaPayload(reportPayload);
 
     return res.status(200).json({
       success: true,

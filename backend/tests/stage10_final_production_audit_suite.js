@@ -414,9 +414,9 @@ async function runStage10FinalProductionAudit() {
     });
     const lastLog = testLogger.logs[testLogger.logs.length - 1];
     assert(
-      lastLog.data.apiKey === '[REDACTED]' &&
-      lastLog.data.password === '[REDACTED]' &&
-      lastLog.data.token === '[REDACTED]',
+      lastLog.data.apiKey === '[REDACTED_SECRET]' &&
+      lastLog.data.password === '[REDACTED_SECRET]' &&
+      lastLog.data.token === '[REDACTED_SECRET]',
       '[Suite H] H2 — Sensitive Credentials Recursively Redacted from Observability Logs'
     );
 

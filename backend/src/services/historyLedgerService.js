@@ -40,7 +40,24 @@ async function listVerificationHistory(userId, filters = {}, pagination = {}) {
     where.inputType = filters.inputType;
   }
 
-  // 4. Date Range Filters
+  // 4. Status Filter (CREATED, QUEUED, PROCESSING, PARTIAL, COMPLETED, FAILED, ARCHIVED)
+  if (filters.status && filters.status !== 'ALL') {
+    where.status = filters.status;
+  }
+
+  // 5. Workspace Filter
+  if (filters.workspaceId) {
+    where.workspaceId = filters.workspaceId;
+  }
+
+  // 6. Score Range Filters (minScore / maxScore)
+  if (filters.minScore !== undefined || filters.maxScore !== undefined) {
+    where.trustScore = {};
+    if (filters.minScore !== undefined) where.trustScore.gte = parseFloat(filters.minScore);
+    if (filters.maxScore !== undefined) where.trustScore.lte = parseFloat(filters.maxScore);
+  }
+
+  // 7. Date Range Filters
   if (filters.startDate || filters.endDate) {
     where.createdAt = {};
     if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
@@ -128,6 +145,13 @@ async function listVerificationHistory(userId, filters = {}, pagination = {}) {
     currentPage: page,
     limit,
     hasMore: page < totalPages,
+    pagination: {
+      totalCount,
+      totalPages,
+      currentPage: page,
+      limit,
+      hasMore: page < totalPages
+    },
     items: formattedItems
   };
 }

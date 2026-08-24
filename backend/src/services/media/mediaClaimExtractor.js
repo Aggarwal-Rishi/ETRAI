@@ -1,5 +1,13 @@
 const { extractClaims, extractMockClaims } = require('../claimExtractor');
 
+function isUsefulOcrText(value = '') {
+  const text = String(value).replace(/\[model-extracted text\]\s*:\s*/gi, '').replace(/\s+/g, ' ').trim();
+  if (text.length < 3 || /([^\p{L}\p{N}\s])\1{5,}/u.test(text)) return false;
+  const compact = text.replace(/\s/g, '');
+  const readableCount = (compact.match(/[\p{L}\p{N}]/gu) || []).length;
+  return compact.length > 0 && readableCount / compact.length >= 0.65;
+}
+
 /**
  * Visual, Audio & Textual Media Claim Extractor
  * Feeds user claim + transcript + OCR text + visual findings into Agent 2.
@@ -69,8 +77,9 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
   }
 
   // 3. Extract OCR Text Claim (if visible text is detected on image)
-  if (ocrText && ocrText.trim().length >= 8) {
-    const cleanOcr = ocrText.trim().replace(/\s+/g, ' ');
+  const usableOcrText = isUsefulOcrText(ocrText) ? ocrText : '';
+  if (usableOcrText && usableOcrText.trim().length >= 8) {
+    const cleanOcr = usableOcrText.trim().replace(/\s+/g, ' ');
     const formattedOcrClaim = `The submitted media displays visible text stating: "${cleanOcr.substring(0, 240)}"`;
     claims.push({
       id: 'media_claim_ocr_1',
@@ -107,7 +116,7 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
   const combinedContext = [
     trimmedUserClaim ? `User Submitted Context: ${trimmedUserClaim}.` : '',
     trimmedTranscript ? `Video Audio Transcript: ${trimmedTranscript}.` : '',
-    ocrText ? `Visible OCR Text: ${ocrText}.` : '',
+    usableOcrText ? `Visible OCR Text: ${usableOcrText}.` : '',
     visualDescription ? `Visual Scene Description: ${visualDescription}.` : ''
   ].filter(Boolean).join('\n\n');
 
@@ -151,5 +160,6 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
 }
 
 module.exports = {
-  extractMediaClaims
+  extractMediaClaims,
+  isUsefulOcrText
 };

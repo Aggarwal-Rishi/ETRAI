@@ -1,23 +1,161 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
+const bundledFfmpegPath = require('ffmpeg-static');
 const { GoogleGenAI } = require('@google/genai');
+const sharp = require('sharp');
 const { getProviderStatus, isKeyValid } = require('../providerManager');
 const { extractMediaMetadata } = require('./mediaMetadata');
 const { analyzeImage } = require('./imageAnalyzer');
 const { extractOcrText } = require('./ocrService');
+
+async function createFrameDifferenceHash(buffer) {
+  const pixels = await sharp(buffer)
+    .rotate()
+    .resize(9, 8, { fit: 'fill' })
+    .greyscale()
+    .raw()
+    .toBuffer();
+  let hash = '';
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const offset = row * 9 + col;
+      hash += pixels[offset] > pixels[offset + 1] ? '1' : '0';
+    }
+  }
+  return hash;
+}
 
 /**
  * Checks if system FFmpeg CLI tool is available on system PATH
  */
 function isFfmpegAvailable() {
   try {
-    execSync('ffmpeg -version', { stdio: 'ignore' });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-version'], { stdio: 'ignore' });
     return true;
   } catch (e) {
     return false;
   }
+}
+
+/**
+ * Detects real scene boundaries from the encoded video timeline. Unlike the
+ * legacy evenly-spaced keyframe comparison, FFmpeg's scene score reports the
+ * timestamp of the transition itself. Test callers may inject explicit
+ * boundaries without invoking FFmpeg.
+ */
+function detectTemporalBoundaries(fileInfo, buffer = null, options = {}) {
+  if (Array.isArray(options.mockTemporalBoundaries)) {
+    const hardCutThreshold = Number(options.hardCutThreshold || 0.65);
+    return {
+      status: 'AVAILABLE',
+      method: 'INJECTED_TEST_BOUNDARIES',
+      boundaries: options.mockTemporalBoundaries.map((item, index) => ({
+        boundaryId: item.boundaryId || `boundary_${index + 1}`,
+        timestampSec: Number(item.timestampSec ?? item.timestamp ?? 0),
+        boundaryType: item.boundaryType || (Number(item.sceneScore || 0) >= hardCutThreshold ? 'HARD_CUT' : 'SCENE_TRANSITION'),
+        confidence: Number(item.confidence || 90),
+        sceneScore: Number(item.sceneScore || 0)
+      })).filter(item => item.timestampSec > 0),
+      limitations: []
+    };
+  }
+
+  if (!buffer || !Buffer.isBuffer(buffer) || !isFfmpegAvailable()) {
+    return {
+      status: 'UNAVAILABLE',
+      method: 'FFMPEG_SCENE_SCORE',
+      boundaries: [],
+      limitations: ['Exact temporal boundary detection requires a decodable video and FFmpeg.']
+    };
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'etrai_video_boundaries_'));
+  const safeName = path.basename(fileInfo.filename || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const inputPath = path.join(tmpDir, `input_${Date.now()}_${safeName}`);
+  try {
+    fs.writeFileSync(inputPath, buffer);
+    const sceneThreshold = Number(options.sceneThreshold || 0.32);
+    const hardCutThreshold = Number(options.hardCutThreshold || 0.65);
+    const result = spawnSync(bundledFfmpegPath || 'ffmpeg', [
+      '-hide_banner', '-i', inputPath,
+      '-vf', `select=gt(scene\\,${sceneThreshold}),metadata=print`,
+      '-an', '-vsync', 'vfr', '-f', 'null', '-'
+    ], { encoding: 'utf8', maxBuffer: 12 * 1024 * 1024 });
+    const diagnosticText = `${result.stderr || ''}\n${result.stdout || ''}`;
+    const detected = [];
+    const metadataRegex = /frame:\d+\s+pts:[^\s]+\s+pts_time:([0-9]+(?:\.[0-9]+)?)[\s\S]{0,500}?lavfi\.scene_score=([0-9]+(?:\.[0-9]+)?)/g;
+    let match;
+    while ((match = metadataRegex.exec(diagnosticText)) !== null) {
+      const timestampSec = Number(Number(match[1]).toFixed(3));
+      const sceneScore = Number(Number(match[2]).toFixed(4));
+      if (timestampSec > 0.05 && !detected.some(value => Math.abs(value.timestampSec - timestampSec) < 0.12)) {
+        detected.push({ timestampSec, sceneScore });
+      }
+    }
+
+    // Older FFmpeg builds may omit metadata values even though they print the
+    // selected timestamps. Retain those boundaries, but label their type as
+    // unknown rather than inventing a hard-cut score.
+    if (detected.length === 0) {
+      const timestampRegex = /pts_time:([0-9]+(?:\.[0-9]+)?)/g;
+      while ((match = timestampRegex.exec(diagnosticText)) !== null) {
+        const timestampSec = Number(Number(match[1]).toFixed(3));
+        if (timestampSec > 0.05 && !detected.some(value => Math.abs(value.timestampSec - timestampSec) < 0.12)) {
+          detected.push({ timestampSec, sceneScore: null });
+        }
+      }
+    }
+
+    return {
+      status: result.error ? 'ERROR' : 'AVAILABLE',
+      method: 'FFMPEG_SCENE_SCORE',
+      threshold: sceneThreshold,
+      hardCutThreshold,
+      boundaries: detected.slice(0, 30).map((item, index) => ({
+        boundaryId: `boundary_${index + 1}`,
+        timestampSec: item.timestampSec,
+        boundaryType: item.sceneScore === null ? 'SCENE_CHANGE' : (item.sceneScore >= hardCutThreshold ? 'HARD_CUT' : 'SCENE_TRANSITION'),
+        confidence: item.sceneScore === null ? 75 : Math.min(99, Math.round(72 + item.sceneScore * 27)),
+        sceneScore: item.sceneScore
+      })),
+      limitations: result.error ? [`FFmpeg scene-boundary analysis failed: ${result.error.message}`] : []
+    };
+  } catch (error) {
+    return {
+      status: 'ERROR',
+      method: 'FFMPEG_SCENE_SCORE',
+      boundaries: [],
+      limitations: [`FFmpeg scene-boundary analysis failed: ${error.message}`]
+    };
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
+function buildRepresentativeTimestamps(duration, boundaries = [], sampleCount = 5) {
+  const safeDuration = Math.max(0.2, Number(duration) || 10);
+  const boundaryTimes = boundaries
+    .map(item => Number(item.timestampSec ?? item.timestamp))
+    .filter(value => Number.isFinite(value) && value > 0.05 && value < safeDuration - 0.05)
+    .sort((a, b) => a - b);
+  const segmentEdges = [0, ...boundaryTimes, safeDuration];
+  const representatives = [0];
+  for (let index = 0; index < segmentEdges.length - 1; index += 1) {
+    const start = segmentEdges[index];
+    const end = segmentEdges[index + 1];
+    representatives.push(Number(Math.min(safeDuration - 0.05, start + 0.08).toFixed(3)));
+    if (end - start > 12) representatives.push(Number(((start + end) / 2).toFixed(3)));
+  }
+  representatives.push(Number(Math.max(0, safeDuration - 0.08).toFixed(3)));
+
+  if (boundaryTimes.length === 0) {
+    for (let index = 0; index < sampleCount; index += 1) {
+      representatives.push(Number(((index / Math.max(1, sampleCount - 1)) * (safeDuration - 0.08)).toFixed(3)));
+    }
+  }
+  return Array.from(new Set(representatives)).sort((a, b) => a - b).slice(0, 14);
 }
 
 /**
@@ -83,23 +221,26 @@ async function extractKeyframes(fileInfo, buffer = null, url = null, options = {
     const metaRes = extractMediaMetadata(fileInfo, buffer, options.mockMetadata);
     const duration = metaRes.metadata.durationSeconds || 10.0;
 
-    // Sample keyframes with ffmpeg
-    const outputPattern = path.join(tmpDir, 'frame_%03d.jpg');
-    const fps = Math.max(0.1, sampleCount / duration);
-    execSync(`ffmpeg -y -i "${inputPath}" -vf "fps=${fps.toFixed(3)}" "${outputPattern}"`, { stdio: 'ignore' });
-
-    const files = fs.readdirSync(tmpDir).filter(f => f.startsWith('frame_') && f.endsWith('.jpg')).sort();
-    files.forEach((fName, idx) => {
-      const fPath = path.join(tmpDir, fName);
+    // Sample immediately inside each detected segment plus long-segment
+    // midpoints. With no detected boundary this falls back to even coverage.
+    const timestamps = buildRepresentativeTimestamps(duration, options.boundaryTimestamps || [], sampleCount);
+    for (let idx = 0; idx < timestamps.length; idx += 1) {
+      const calcTimestamp = timestamps[idx];
+      const fPath = path.join(tmpDir, `frame_${String(idx).padStart(3, '0')}.jpg`);
+      execFileSync(bundledFfmpegPath || 'ffmpeg', [
+        '-y', '-ss', String(calcTimestamp), '-i', inputPath,
+        '-frames:v', '1', '-q:v', '3', fPath
+      ], { stdio: 'ignore' });
+      if (!fs.existsSync(fPath)) continue;
       const fBuffer = fs.readFileSync(fPath);
-      const calcTimestamp = Number((idx * (duration / Math.max(1, files.length - 1))).toFixed(1));
       keyframes.push({
         frameIndex: idx,
         timestamp: calcTimestamp,
         buffer: fBuffer,
-        mimeType: 'image/jpeg'
+        mimeType: 'image/jpeg',
+        dHash: await createFrameDifferenceHash(fBuffer)
       });
-    });
+    }
 
     return {
       status: keyframes.length > 0 ? 'AVAILABLE' : 'NO_FRAMES_EXTRACTED',
@@ -134,6 +275,8 @@ async function extractAudio(fileInfo, buffer = null, options = {}) {
     return {
       status: 'AVAILABLE',
       audioBuffer: options.mockAudioBuffer,
+      pcmAudioBuffer: options.mockPcmAudioBuffer || options.mockAudioBuffer,
+      pcmSampleFormat: options.mockPcmSampleFormat || 'u8',
       mimeType: 'audio/mp3',
       limitations: []
     };
@@ -151,16 +294,21 @@ async function extractAudio(fileInfo, buffer = null, options = {}) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'etrai_video_audio_'));
   const inputPath = path.join(tmpDir, `input_${Date.now()}_${fileInfo.filename}`);
   const outputPath = path.join(tmpDir, 'extracted_audio.mp3');
+  const pcmPath = path.join(tmpDir, 'forensic_audio.pcm');
 
   try {
     fs.writeFileSync(inputPath, buffer);
-    execSync(`ffmpeg -y -i "${inputPath}" -vn -acodec libmp3lame -q:a 4 "${outputPath}"`, { stdio: 'ignore' });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', outputPath], { stdio: 'ignore' });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-ac', '1', '-ar', '16000', '-f', 's16le', pcmPath], { stdio: 'ignore' });
 
     if (fs.existsSync(outputPath)) {
       const audioBuffer = fs.readFileSync(outputPath);
+      const pcmAudioBuffer = fs.existsSync(pcmPath) ? fs.readFileSync(pcmPath) : null;
       return {
         status: 'AVAILABLE',
         audioBuffer,
+        pcmAudioBuffer,
+        pcmSampleFormat: pcmAudioBuffer ? 's16le' : null,
         audioPath: outputPath,
         mimeType: 'audio/mp3',
         limitations: []
@@ -189,18 +337,33 @@ async function extractAudio(fileInfo, buffer = null, options = {}) {
 
 /**
  * Audio Speech-to-Text Transcription Service (Whisper API)
- * Returns { text: "...", segments: [{ start, end, text }] }.
+ * Returns language-aware text plus timestamped speech/audio components. Audio
+ * type is an acoustic observation; diegetic/non-diegetic provenance is only
+ * decided later when it can be compared with the visual stream.
  * Returns explicit UNAVAILABLE state when key/audio is missing. NEVER fabricates transcripts.
  */
 async function transcribeAudio(audioBuffer = null, options = {}) {
   // Option A: Mock transcript passed explicitly for unit testing
   if (options.mockTranscript) {
+    const mock = typeof options.mockTranscript === 'string'
+      ? { text: options.mockTranscript }
+      : options.mockTranscript;
+    const defaultSegment = {
+      start: 0.0,
+      end: 5.0,
+      text: mock.text || '',
+      translatedText: mock.translatedText || '',
+      language: mock.language || null,
+      audioType: 'UNKNOWN',
+      backgroundAudio: []
+    };
     return {
       status: 'AVAILABLE',
-      text: typeof options.mockTranscript === 'string' ? options.mockTranscript : (options.mockTranscript.text || ''),
-      segments: Array.isArray(options.mockTranscript.segments) ? options.mockTranscript.segments : [
-        { start: 0.0, end: 5.0, text: typeof options.mockTranscript === 'string' ? options.mockTranscript : options.mockTranscript.text }
-      ],
+      text: mock.text || '',
+      translatedText: mock.translatedText || '',
+      language: mock.language || null,
+      segments: Array.isArray(mock.segments) ? mock.segments.map(segment => ({ ...defaultSegment, ...segment })) : [defaultSegment],
+      provider: 'INJECTED_TEST_TRANSCRIPT',
       limitations: []
     };
   }
@@ -212,6 +375,8 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     return {
       status: 'UNAVAILABLE',
       text: '',
+      translatedText: '',
+      language: null,
       segments: [],
       limitations: ['Audio transcription provider unavailable (missing GEMINI_API_KEY)']
     };
@@ -221,6 +386,8 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     return {
       status: 'UNAVAILABLE',
       text: '',
+      translatedText: '',
+      language: null,
       segments: [],
       limitations: ['No extracted audio buffer available for speech-to-text transcription']
     };
@@ -233,7 +400,7 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [
-        'Transcribe the spoken audio in this file accurately into text. Output ONLY a valid JSON object matching this schema: { "text": "full transcript text", "segments": [ { "start": 0.0, "end": 5.0, "text": "segment text" } ] }',
+        `Transcribe this audio accurately. Preserve speech in its original language and provide an English translation when it is not English. Timestamp speech and significant audio components. Classify audioType only from acoustic evidence as SPEECH, VOICEOVER, MUSIC, SOUND_EFFECT, AMBIENT, MIXED, or UNKNOWN. Do not label sound diegetic or non-diegetic because no video is supplied. Output ONLY JSON matching: { "text": "full original-language transcript", "translatedText": "English translation or empty when already English", "language": "BCP-47 or plain language name", "segments": [ { "start": 0.0, "end": 5.0, "text": "original speech", "translatedText": "English translation", "language": "language", "audioType": "SPEECH", "backgroundAudio": ["music", "crowd"] } ] }`,
         {
           inlineData: {
             mimeType: 'audio/mp3',
@@ -257,23 +424,36 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     const parsed = JSON.parse((rawText || '{}').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
 
     const fullText = (parsed.text || '').trim();
+    const translatedText = (parsed.translatedText || '').trim();
+    const language = parsed.language ? String(parsed.language).trim() : null;
+    const allowedAudioTypes = new Set(['SPEECH', 'VOICEOVER', 'MUSIC', 'SOUND_EFFECT', 'AMBIENT', 'MIXED', 'UNKNOWN']);
     const rawSegments = Array.isArray(parsed.segments) ? parsed.segments : [];
     const segments = rawSegments.map(s => ({
-      start: Number((s.start || 0).toFixed(1)),
-      end: Number((s.end || 0).toFixed(1)),
-      text: (s.text || '').trim()
+      start: Number(Number(s.start || 0).toFixed(1)),
+      end: Number(Number(s.end || 0).toFixed(1)),
+      text: (s.text || '').trim(),
+      translatedText: (s.translatedText || '').trim(),
+      language: s.language ? String(s.language).trim() : language,
+      audioType: allowedAudioTypes.has(String(s.audioType || '').toUpperCase()) ? String(s.audioType).toUpperCase() : 'UNKNOWN',
+      backgroundAudio: Array.isArray(s.backgroundAudio) ? s.backgroundAudio.map(String).slice(0, 8) : []
     }));
 
     return {
       status: fullText ? 'AVAILABLE' : 'NO_SPEECH_DETECTED',
       text: fullText,
-      segments: segments.length > 0 ? segments : (fullText ? [{ start: 0.0, end: 5.0, text: fullText }] : []),
+      translatedText,
+      language,
+      segments: segments.length > 0 ? segments : (fullText ? [{ start: 0.0, end: 5.0, text: fullText, translatedText, language, audioType: 'SPEECH', backgroundAudio: [] }] : []),
+      provider: 'GEMINI_AUDIO_TRANSCRIPTION',
+      model: modelName,
       limitations: fullText ? [] : ['Speech-to-text transcription detected zero spoken audio words']
     };
   } catch (e) {
     return {
       status: 'ERROR',
       text: '',
+      translatedText: '',
+      language: null,
       segments: [],
       limitations: [`Gemini speech-to-text transcription failed: ${e.message}`]
     };
@@ -286,13 +466,21 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
  */
 async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   const allLimitations = [];
+  let extractedAudio = null;
+  let extractedPcmAudio = null;
+  let pcmSampleFormat = null;
 
   // 1. Container Metadata & FFmpeg Diagnostics
   const metaRes = await getVideoMetadata(fileInfo, buffer, options);
   allLimitations.push(...metaRes.limitations);
 
   // 2. Keyframe Extraction
-  const frameRes = await extractKeyframes(fileInfo, buffer, url, options);
+  const boundaryRes = detectTemporalBoundaries(fileInfo, buffer, options);
+  allLimitations.push(...(boundaryRes.limitations || []));
+  const frameRes = await extractKeyframes(fileInfo, buffer, url, {
+    ...options,
+    boundaryTimestamps: boundaryRes.boundaries || []
+  });
   allLimitations.push(...frameRes.limitations);
   const keyframes = frameRes.keyframes || [];
 
@@ -301,6 +489,9 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   if (metaRes.metadata.hasAudio || options.mockAudioBuffer || options.mockTranscript) {
     const audioRes = await extractAudio(fileInfo, buffer, options);
     allLimitations.push(...audioRes.limitations);
+    extractedAudio = audioRes.audioBuffer || null;
+    extractedPcmAudio = audioRes.pcmAudioBuffer || null;
+    pcmSampleFormat = audioRes.pcmSampleFormat || null;
 
     transcriptRes = await transcribeAudio(audioRes.audioBuffer, options);
     allLimitations.push(...transcriptRes.limitations);
@@ -329,9 +520,21 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
       description: imgRes.visualDescription || frame.description || `Frame at ${frame.timestamp}s`,
       visibleText: ocrRes.ocrText || '',
       entities: (imgRes.observed?.entities?.length > 0 ? imgRes.observed.entities : (frame.entities || [])),
+      publicFigures: imgRes.observed?.publicFigures || [],
+      logos: imgRes.observed?.logos || [],
+      signs: imgRes.observed?.signs || [],
+      landmarks: imgRes.observed?.landmarks || [],
+      flags: imgRes.observed?.flags || [],
+      objects: imgRes.observed?.objects || [],
+      vehicleMarkings: imgRes.observed?.vehicleMarkings || [],
+      badges: imgRes.observed?.badges || [],
+      uniforms: imgRes.observed?.uniforms || [],
+      attire: imgRes.observed?.attire || [],
+      securityDetails: imgRes.observed?.securityDetails || [],
       locationClues: imgRes.observed?.visibleLocationClues || [],
       dateClues: imgRes.observed?.visibleDates || [],
-      visualSignals: imgRes.manipulationSignals || []
+      visualSignals: imgRes.manipulationSignals || [],
+      dHash: frame.dHash || null
     });
   }
 
@@ -370,15 +573,37 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
 
   // 6. Real Video & Audio Forensics Pipeline
   const { performVideoAudioForensics } = require('./videoAudioForensics');
-  const forensicsRes = await performVideoAudioForensics({
-    fileInfo,
-    buffer,
+  const forensicsRes = await performVideoAudioForensics(fileInfo, buffer, {
+    ...options,
     metadata: metaRes.metadata,
+    duration: metaRes.metadata?.durationSeconds || options.duration || 10.0,
     keyframes: frameAnalyses,
     transcriptSegments: transcriptRes.segments || [],
-    audioBuffer: options.mockAudioBuffer || (metaRes.metadata.hasAudio ? buffer : null),
-    options
+    audioBuffer: extractedPcmAudio,
+    audioSampleFormat: pcmSampleFormat,
+    temporalBoundaries: boundaryRes.boundaries || []
   });
+
+  // 7. Segment-level context report. This reuses already extracted text and
+  // frame observations; raw video frames are not sent to an additional search
+  // provider.
+  const { generateVideoContextReport } = require('./videoContextVerifier');
+  const videoContextReport = await generateVideoContextReport({
+    fileInfo,
+    durationSeconds: metaRes.metadata?.durationSeconds || options.duration || 10,
+    temporalBoundaries: boundaryRes.boundaries || [],
+    temporalBoundaryDetection: boundaryRes,
+    frames: frameAnalyses,
+    transcriptSegments: transcriptRes.segments || [],
+    transcriptMetadata: {
+      language: transcriptRes.language || null,
+      translatedText: transcriptRes.translatedText || '',
+      provider: transcriptRes.provider || null,
+      model: transcriptRes.model || null
+    },
+    forensics: forensicsRes
+  }, options);
+  forensicsRes.contextReport = videoContextReport;
 
   if (forensicsRes.suspiciousSegments?.length > 0) {
     forensicsRes.suspiciousSegments.forEach(seg => {
@@ -395,6 +620,7 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   const combinedEntities = Array.from(new Set(allObservedEntities));
   const combinedOcrText = ocrTexts.join('\n');
   const primaryDescription = frameAnalyses.map(f => `[${f.timestamp}s]: ${f.description}`).join(' ');
+  const uniqueFrameValues = key => Array.from(new Set(frameAnalyses.flatMap(frame => frame[key] || []).filter(Boolean)));
 
   const uniqueLimitations = Array.from(new Set(allLimitations));
 
@@ -402,13 +628,35 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     status: (keyframes.length > 0 || transcriptRes.text) ? 'AVAILABLE' : 'UNAVAILABLE',
     visualDescription: primaryDescription,
     transcript: transcriptRes.text || '',
+    translatedTranscript: transcriptRes.translatedText || '',
+    transcriptLanguage: transcriptRes.language || null,
     transcriptSegments: transcriptRes.segments || [],
     frameCount: keyframes.length,
     extractedFrames: frameAnalyses,
+    temporalBoundaries: boundaryRes.boundaries || [],
+    temporalBoundaryDetection: boundaryRes,
     ocrText: combinedOcrText,
     entities: combinedEntities,
+    observed: {
+      visibleText: combinedOcrText,
+      entities: combinedEntities,
+      publicFigures: frameAnalyses.flatMap(frame => frame.publicFigures || []),
+      logos: uniqueFrameValues('logos'),
+      signs: uniqueFrameValues('signs'),
+      landmarks: uniqueFrameValues('landmarks'),
+      flags: uniqueFrameValues('flags'),
+      objects: uniqueFrameValues('objects'),
+      vehicleMarkings: uniqueFrameValues('vehicleMarkings'),
+      badges: uniqueFrameValues('badges'),
+      uniforms: uniqueFrameValues('uniforms'),
+      attire: uniqueFrameValues('attire'),
+      securityDetails: uniqueFrameValues('securityDetails'),
+      visibleDates: uniqueFrameValues('dateClues'),
+      visibleLocationClues: uniqueFrameValues('locationClues')
+    },
     manipulationSignals,
     forensics: forensicsRes,
+    videoContextReport,
     limitations: uniqueLimitations
   };
 }
@@ -418,5 +666,7 @@ module.exports = {
   extractKeyframes,
   extractAudio,
   transcribeAudio,
+  detectTemporalBoundaries,
+  buildRepresentativeTimestamps,
   analyzeVideo
 };

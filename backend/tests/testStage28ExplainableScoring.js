@@ -42,7 +42,9 @@ async function runStage28ExplainableScoringTests() {
     const res = computeExplainableTrustScore(analysisData);
 
     assert.ok(res.finalTrustScore >= 80);
-    assert.ok(res.factorScores.claimTruthfulness.score === 100);
+    // A verified claim without an explicit confidence remains calibrated at 85,
+    // rather than being promoted to absolute certainty.
+    assert.ok(res.factorScores.claimTruthfulness.score === 85);
     assert.ok(res.factorScores.sourceAuthority.score === 90);
     assert.ok(res.factorScores.provenanceConfidence.score === 100);
     assert.ok(res.drivers.positiveDrivers.length >= 2);

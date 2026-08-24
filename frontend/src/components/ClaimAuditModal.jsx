@@ -39,7 +39,18 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
               )}
             </div>
 
-            <h3 className="text-base font-semibold text-white leading-snug">"{claim.claimText}"</h3>
+            <h3 className="text-base font-semibold text-white leading-snug">"{claim.claimText || claim.claim}"</h3>
+
+            {(claim.originalSentence || claim.sourceContext?.originalSentence || claim.sourceExcerpt || claim.quoteText) && (
+              <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
+                <span className="text-[10px] font-mono uppercase text-indigo-400 font-bold block mb-0.5">
+                  Original News Passage / Excerpt:
+                </span>
+                <p className="text-slate-300 italic font-serif leading-relaxed">
+                  "{claim.originalSentence || claim.sourceContext?.originalSentence || claim.sourceExcerpt || claim.quoteText}"
+                </p>
+              </div>
+            )}
           </div>
 
           <button

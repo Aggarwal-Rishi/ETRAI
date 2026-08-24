@@ -76,7 +76,7 @@ async function runStage22VideoAudioForensicsTests() {
 
     const res = profileAudioWaveform(audioBuf, 10.0);
 
-    assert.strictEqual(res.status, 'AVAILABLE');
+    assert.strictEqual(res.status, 'COMPLETED');
     assert.strictEqual(res.waveformSegments.length, 10);
     assert.ok(res.waveformSegments[0].energyState);
   });
@@ -99,7 +99,7 @@ async function runStage22VideoAudioForensicsTests() {
 
     assert.strictEqual(res.status, 'AVAILABLE');
     assert.strictEqual(res.isDesynchronized, true);
-    assert.strictEqual(res.syncOffsetMs, 380);
+    assert.strictEqual(res.syncOffsetMs, null, 'No exact offset should be fabricated without a calibrated audiovisual model');
     assert.strictEqual(res.desyncSegments.length, 1);
   });
 

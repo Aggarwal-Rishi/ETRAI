@@ -21,16 +21,12 @@ async function testInputReader() {
     }
   };
 
-  // Test 1: Short text (<15 words) throws error
-  await runTest('Short text (<15 words) returns error', async () => {
+  // Test 1: Short factual claims are valid user input.
+  await runTest('Short factual claim is accepted', async () => {
     const shortText = 'This is short sample text.';
-    try {
-      await processInputContent({ inputType: 'TEXT', text: shortText });
-      assert.fail('Should have thrown error');
-    } catch (err) {
-      assert.strictEqual(err.status, 400);
-      assert.ok(err.message.includes('minimum of 15 words'));
-    }
+    const res = await processInputContent({ inputType: 'TEXT', text: shortText });
+    assert.strictEqual(res.wordCount, 5);
+    assert.strictEqual(res.extractedText, shortText);
   });
 
   // Test 2: Valid text (>15 words) succeeds
@@ -75,7 +71,7 @@ async function testInputReader() {
       assert.fail('Should have rejected unsupported file');
     } catch (err) {
       assert.strictEqual(err.status, 400);
-      assert.ok(err.message.includes('Unsupported file format'));
+      assert.ok(err.message.includes('Unsupported document format'));
     }
   });
 

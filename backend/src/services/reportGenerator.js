@@ -60,15 +60,16 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
   if (manipulationScore >= 60) manipulationRisk = 'HIGH';
   else if (manipulationScore >= 30) manipulationRisk = 'MEDIUM';
 
+  const types = Array.isArray(selectedTypes) ? selectedTypes : ['FACT_CHECKING', 'FAKE_NEWS_DETECTION'];
   const scores = {};
-  if (selectedTypes.includes('FACT_CHECKING')) {
+  if (types.includes('FACT_CHECKING')) {
     scores.factCheckingScore = total === 0 ? "N/A — No claims of this type detected" : factualAccuracyScore;
   }
-  if (selectedTypes.includes('FAKE_NEWS_DETECTION')) {
+  if (types.includes('FAKE_NEWS_DETECTION')) {
     scores.fakeNewsScore = total === 0 ? "N/A — No claims of this type detected" : factualAccuracyScore;
     scores.manipulationAssessment = { manipulationScore, manipulationRisk, sentimentIntensity, consistencyPenalty, vagueSourcingPenalty };
   }
-  if (selectedTypes.includes('BUSINESS_REPORT')) {
+  if (types.includes('BUSINESS_REPORT')) {
     const businessClaims = claims.filter(c => (c.category && (c.category.includes('Metric') || c.category.includes('Financial') || c.category.includes('Business'))));
     if (businessClaims.length === 0) {
       scores.businessReportScore = "N/A — No claims of this type detected";
@@ -105,6 +106,7 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
  * It does NOT invent claims, sources, corrections, confidence values, evidence, or verdicts.
  */
 async function generateReport({
+  inputType = null,
   sourceTitle,
   extractedText,
   verifiedClaims,
@@ -115,8 +117,12 @@ async function generateReport({
   sourcingTransparency = null,
   mediaAnalysis = null,
   articleResearchContext = null,
-  hasAttachedNews = false
+  hasAttachedNews = false,
+  traceProvenance = true
 }) {
+  const resolvedInputType = inputType === 'FILE' && mediaAnalysis?.mediaType
+    ? mediaAnalysis.mediaType
+    : (inputType || mediaAnalysis?.mediaType || (hasAttachedNews ? 'TEXT_MEDIA' : 'TEXT'));
   const canonicalData = calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment, sourceTitle, internalConsistencyIssues, sourcingTransparency);
   const { scores, factualAccuracyScore, evidenceConfidence, articleVerdict, manipulationRisk, manipulationScore, breakdown } = canonicalData;
 
@@ -146,6 +152,8 @@ Media Payload Verification Details:
 - Manipulation Signals: ${JSON.stringify(mediaAnalysis.manipulationSignals || [])}
 - Has Attached News Text: ${hasAttachedNews ? 'YES (Verified against visual findings)' : 'NO (Standalone media submission)'}
 - Related News Research Summary: ${articleResearchContext?.summary || 'N/A'}
+- Matched Source Context Comparison: ${JSON.stringify(mediaAnalysis.imageSourceContextComparison || {})}
+- Segment-Level Video Context Report: ${JSON.stringify(mediaAnalysis.videoContextReport || {})}
 ` : '';
 
       const prompt = `You are Agent 4 (Report Generator) in an AI Fact-Checking system.
@@ -243,6 +251,18 @@ Return ONLY a JSON object with this exact structure:
     if (!explanationOfFindings) {
       explanationOfFindings = `Evaluated ${breakdown.totalClaims} claim(s): ${breakdown.verified} verified, ${breakdown.partiallyVerified} partially verified, ${breakdown.unverified} unverified due to insufficient evidence, and ${breakdown.false} false/contradicted.`;
     }
+
+    const sourceComparison = mediaAnalysis?.imageSourceContextComparison;
+    if (sourceComparison && sourceComparison.status !== 'UNAVAILABLE') {
+      const sourceLabel = sourceComparison.source?.title || sourceComparison.source?.domain || 'matched image source';
+      const contextHighlight = sourceComparison.status === 'MATCHED'
+        ? `Matched source context supports the AI visual summary (${sourceLabel})`
+        : sourceComparison.status === 'CONTRADICTED'
+          ? `Matched source context contradicts the AI visual summary (${sourceLabel})`
+          : `Matched image found, but source-page context is inconclusive (${sourceLabel})`;
+      keyHighlights = [contextHighlight, ...keyHighlights.filter(item => item !== contextHighlight)].slice(0, 4);
+      explanationOfFindings = `${explanationOfFindings} Source-context comparison: ${sourceComparison.rationale || sourceComparison.status}.`;
+    }
   }
 
   const manipulationAnalysis = {
@@ -268,32 +288,115 @@ Return ONLY a JSON object with this exact structure:
       c.sources.forEach(s => allDiscoveredSources.push(s));
     }
   });
+  const uniqueDiscoveredSources = Array.from(new Map(
+    allDiscoveredSources.map((source, index) => [
+      source.url || source.link || `${source.domain || 'source'}-${index}`,
+      source
+    ])
+  ).values());
 
-  const provenance = analyzeContentProvenance({
-    claims: verifiedClaims,
-    sources: allDiscoveredSources,
-    mediaAnalysis,
-    inputSource: sourceTitle
-  });
+  const imageReportItem = mediaAnalysis?.images?.[0] || mediaAnalysis?.imageForensics?.reportItem || null;
+  if (
+    imageReportItem?.originalPageUrl &&
+    ['FOUND', 'CANDIDATE'].includes(imageReportItem.originalFoundStatus) &&
+    imageReportItem.originalImageUrl
+  ) {
+    let provenanceDomain = 'visual-source';
+    try { provenanceDomain = new URL(imageReportItem.originalPageUrl).hostname.replace(/^www\./, ''); } catch (_) {}
+    const alreadyIncluded = uniqueDiscoveredSources.some(source => (source.url || source.link) === imageReportItem.originalPageUrl);
+    if (!alreadyIncluded) uniqueDiscoveredSources.push({
+      title: imageReportItem.originalFoundStatus === 'FOUND'
+        ? `Verified visual match · ${provenanceDomain}`
+        : `Reverse-image candidate · ${provenanceDomain}`,
+      url: imageReportItem.originalPageUrl,
+      domain: provenanceDomain,
+      evidenceType: imageReportItem.originalFoundStatus === 'FOUND' ? 'VERIFIED_VISUAL_MATCH' : 'VISUAL_CANDIDATE',
+      visualSimilarity: imageReportItem.forensics?.reverseSearch?.bestCandidate?.similarity ?? null,
+      sourceRole: 'IMAGE_PROVENANCE'
+    });
+  }
+
+  const videoSegments = mediaAnalysis?.videoContextReport?.segments || [];
+  for (const segment of videoSegments) {
+    const source = segment?.source_evidence;
+    if (!source?.url || uniqueDiscoveredSources.some(item => (item.url || item.link) === source.url)) continue;
+    let domain = source.domain || 'segment-context-source';
+    try { domain = new URL(source.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    uniqueDiscoveredSources.push({
+      title: source.title || `Segment ${segment.segment_index} contextual source`,
+      url: source.url,
+      domain,
+      evidenceType: 'VIDEO_SEGMENT_CONTEXT',
+      sourceRole: 'SEGMENT_CORROBORATION',
+      timestampRange: segment.timestamp_range,
+      limitation: source.limitation || null
+    });
+  }
+
+  const provenance = traceProvenance
+    ? analyzeContentProvenance({
+      claims: verifiedClaims,
+      sources: uniqueDiscoveredSources,
+      mediaAnalysis,
+      inputSource: sourceTitle
+    })
+    : {
+      status: 'DISABLED',
+      originAnalysis: {
+        originStatus: 'DISABLED',
+        originConfidence: 0,
+        rationale: 'Provenance tracing was disabled for this analysis.'
+      },
+      firstKnownAppearance: null,
+      timeline: [],
+      graph: { nodes: [], edges: [], lineagePath: [] },
+      duplicateClusters: [],
+      spreadAnalysis: {
+        repostCount: 0,
+        distinctDomainsCount: 0,
+        domainsInvolved: [],
+        chronologicalPropagation: [],
+        velocityScore: 'DISABLED',
+        amplificationPattern: 'DISABLED'
+      },
+      propagationMetrics: {
+        totalDiscoveredVenues: 0,
+        syndicatedCopyCount: 0,
+        modifiedCopyCount: 0,
+        velocityTrend: 'DISABLED'
+      }
+    };
 
   const { computeExplainableTrustScore } = require('./explainableScoringService');
   const explainableScoring = computeExplainableTrustScore({
     verifiedClaims,
+    sources: uniqueDiscoveredSources,
     provenance,
     mediaAnalysis,
     textAnalysis: arguments[0].textAnalysis,
     numericalAnalysis: arguments[0].numericalAnalysis,
-    linkIntelligence: arguments[0].linkIntelligence
+    linkIntelligence: arguments[0].linkIntelligence,
+    inputType: resolvedInputType
   });
 
+  scores.overallTrustScore = explainableScoring.finalTrustScore;
+  scores.factualAccuracyScore = explainableScoring.finalTrustScore;
+  scores.confidenceRating = explainableScoring.finalTrustScore;
+  scores.evidenceConfidence = evidenceConfidence;
+  scores.explainableScoring = explainableScoring;
+  scores.methodologyVersion = 'ETRAI-v2.4-TransparentScoring';
+
   return {
+    inputType: resolvedInputType,
     sourceTitle,
     selectedTypes,
-    factualAccuracyScore,
+    factualAccuracyScore: explainableScoring.finalTrustScore,
     evidenceConfidence,
     articleVerdict,
     verdict: articleVerdict,
     trustScore: explainableScoring.finalTrustScore,
+    confidenceRating: explainableScoring.finalTrustScore,
+    methodologyVersion: 'ETRAI-v2.4-TransparentScoring',
     explainableScoring,
     extractionMode: verifiedClaims?.[0]?.extractionMode || 'REAL_LLM',
     manipulationRisk,
@@ -310,9 +413,19 @@ Return ONLY a JSON object with this exact structure:
     aiSummaryError,
     chartData,
     claims: verifiedClaims,
+    sources: uniqueDiscoveredSources,
     mediaAnalysis: mediaAnalysis || null,
+    images: mediaAnalysis?.images || (mediaAnalysis?.imageForensics?.reportItem ? [mediaAnalysis.imageForensics.reportItem] : []),
     articleResearchContext: articleResearchContext || null,
     provenance,
+    provenanceGraph: provenance.graph,
+    firstKnownAppearance: provenance.firstKnownAppearance,
+    spreadAnalysis: provenance.spreadAnalysis,
+    duplicateClusters: provenance.duplicateClusters,
+    entities: arguments[0].entities || [],
+    entityClaimConnections: arguments[0].entityClaimConnections || [],
+    quotes: arguments[0].quotes || [],
+    framingAnalysis: arguments[0].framingAnalysis || arguments[0].intentAnalysis,
     hasAttachedNews: !!hasAttachedNews,
     truncated: !!truncated,
     internalConsistencyIssues,

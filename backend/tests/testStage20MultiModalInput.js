@@ -137,18 +137,12 @@ async function runStage20MultiModalInputTests() {
   });
 
   // ----------------------------------------------------------------
-  // Test 6: Enforces Minimum Word Count & Rejects SSRF
+  // Test 6: Accepts concise claims & Rejects SSRF
   // ----------------------------------------------------------------
-  await runTest('6. Enforces word count threshold and blocks SSRF restricted internal URLs', async () => {
-    // A: Short text rejection
-    let shortErr = null;
-    try {
-      await processInputContent({ inputType: 'TEXT', text: 'Too short.' });
-    } catch (e) {
-      shortErr = e;
-    }
-    assert.ok(shortErr);
-    assert.strictEqual(shortErr.status, 400);
+  await runTest('6. Accepts concise claims and blocks SSRF restricted internal URLs', async () => {
+    // A: Concise claim acceptance
+    const concise = await processInputContent({ inputType: 'TEXT', text: 'Too short.' });
+    assert.strictEqual(concise.wordCount, 2);
 
     // B: SSRF rejection
     let ssrfErr = null;

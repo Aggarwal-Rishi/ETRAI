@@ -8,81 +8,90 @@ export default {
   theme: {
     extend: {
       colors: {
-        // DeepTrust Paper tokens
+        // Core ETRAI dark surfaces
+        surface: {
+          DEFAULT: '#050810',
+          card: '#0c1427',
+          cardHover: '#101a33',
+          border: '#17233f',
+          elevated: '#131f38'
+        },
+        // Compatible paper / card tokens mapped to dark theme
         paper: {
-          DEFAULT: 'var(--paper, #FFF6E3)',
-          2: 'var(--paper-2, #EFEEE9)',
+          DEFAULT: '#070b14',
+          2: '#090f1e',
         },
-        // DeepTrust Card tokens
         card: {
-          DEFAULT: 'var(--card, #FFFFFF)',
-          2: 'var(--card-2, #F8F8F6)',
+          DEFAULT: '#0c1427',
+          2: '#101a33',
         },
-        // DeepTrust Ink tokens (text)
         ink: {
-          DEFAULT: 'var(--ink, #0B5CD5)',
-          2: 'var(--ink-2, #2C4E86)',
-          3: 'var(--ink-3, #7386A8)',
-          slab: 'var(--slab, #0E2E63)',
+          DEFAULT: '#ffffff',
+          2: '#94a3b8',
+          3: '#64748b',
+          slab: '#ffffff',
         },
-        // DeepTrust Accent / Action (Clay)
+        // Primary brand & actions
         clay: {
-          DEFAULT: 'var(--clay, #D97757)',
-          deep: 'var(--clay-deep, #B0512F)',
-          wash: 'var(--clay-wash, #F6E7DF)',
+          DEFAULT: '#6366f1',
+          deep: '#8b5cf6',
+          wash: 'rgba(99, 102, 241, 0.15)',
         },
-        // DeepTrust Status Washes
-        moss: {
-          DEFAULT: '#3E7A55',
-          wash: 'var(--moss-wash, #E4EFE7)',
-          text: '#2C5B3E',
-          border: '#C6DFCF',
-        },
-        ochre: {
-          DEFAULT: '#B98520',
-          wash: 'var(--ochre-wash, #F7EEDA)',
-          text: '#8A6212',
-          border: '#EBD9AE',
-        },
-        brick: {
-          DEFAULT: '#B23F35',
-          wash: 'var(--brick-wash, #F7E3E0)',
-          text: '#8E2F27',
-          border: '#EBC7C2',
-        },
-        slateWash: {
-          DEFAULT: '#697788',
-          wash: 'var(--slate-wash, #E9ECF0)',
-          text: '#4C596A',
-          border: '#D3D9E1',
-        },
-        // DeepTrust Topbar Navy & Accents
-        bar: {
-          DEFAULT: 'var(--bar, #000D59)',
-          2: '#031246',
-          accent: 'var(--bar-accent, #E88F6B)',
-          gold: 'var(--bar-gold, #F2C46B)',
-          ink: '#F0EDE9',
-          ink2: '#A7B0D4',
-          line: 'rgba(240, 237, 233, 0.16)',
-          hover: 'rgba(240, 237, 233, 0.10)',
-          on: 'rgba(240, 237, 233, 0.15)',
-          cta: '#0033C4',
-          ctaHover: '#0A45E4',
-        },
-        // Preserved platform tokens for existing views
         brand: {
-          50: '#f0f4ff',
-          100: '#e0e9ff',
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
           500: '#6366f1',
           600: '#4f46e5',
           700: '#4338ca',
+          800: '#3730a3',
           900: '#1e1b4b',
         },
+        // Status Washes
+        moss: {
+          DEFAULT: '#10b981',
+          wash: 'rgba(16, 185, 129, 0.12)',
+          text: '#10b981',
+          border: 'rgba(16, 185, 129, 0.3)',
+        },
+        ochre: {
+          DEFAULT: '#f59e0b',
+          wash: 'rgba(245, 158, 11, 0.12)',
+          text: '#f59e0b',
+          border: 'rgba(245, 158, 11, 0.3)',
+        },
+        brick: {
+          DEFAULT: '#ef4444',
+          wash: 'rgba(239, 68, 68, 0.12)',
+          text: '#ef4444',
+          border: 'rgba(239, 68, 68, 0.3)',
+        },
+        slateWash: {
+          DEFAULT: '#94a3b8',
+          wash: 'rgba(30, 41, 59, 0.6)',
+          text: '#94a3b8',
+          border: 'rgba(51, 65, 85, 0.6)',
+        },
+        // Topbar Dark Theme
+        bar: {
+          DEFAULT: '#050810',
+          2: '#0c1427',
+          accent: '#22d3ee',
+          gold: '#f59e0b',
+          ink: '#ffffff',
+          ink2: '#94a3b8',
+          line: '#1e293b',
+          hover: 'rgba(255, 255, 255, 0.05)',
+          on: '#131f38',
+          cta: '#6366f1',
+          ctaHover: '#8b5cf6',
+        },
         slateDark: {
-          800: '#0f172a',
-          900: '#0b0f19',
-          950: '#060911',
+          800: '#17233f',
+          900: '#0c1427',
+          950: '#070b14',
         },
         status: {
           verified: '#10b981',
@@ -91,9 +100,9 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Roboto', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Inter', 'Roboto', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Roboto Mono"', 'ui-monospace', 'monospace'],
-        serif: ['Roboto', 'Georgia', 'serif'],
+        serif: ['Inter', 'Roboto', 'sans-serif'],
       },
     },
   },

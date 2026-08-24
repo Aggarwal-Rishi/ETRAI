@@ -23,7 +23,7 @@ export default function ReverifyModal({
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Re-Verify Sealed Report?</h3>
+              <h3 className="text-base font-semibold text-white">Re-Verify Stored Report?</h3>
               <p className="text-xs text-slate-400 truncate max-w-xs">{report.claim || report.title || report.id}</p>
             </div>
           </div>
@@ -38,7 +38,7 @@ export default function ReverifyModal({
         {/* Body Content */}
         <div className="p-6 space-y-4">
           <p className="text-xs text-slate-300 leading-relaxed">
-            This report was sealed upon generation. Re-verifying will deploy all nine agents back over the same subject against today's fresh ranked sources, recent debunks, and new wire archives.
+            Re-verifying will run the current verification pipeline over the same subject against today's ranked sources, recent debunks, and available archives.
           </p>
 
           {/* Token & Cost Estimates */}
@@ -62,7 +62,7 @@ export default function ReverifyModal({
           <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
             <span>
-              The existing sealed version is permanently retained in your ledger under <strong>v1</strong>. The re-verification will be archived as <strong>v2</strong>.
+              The existing version is retained in your ledger under <strong>v1</strong>. The re-verification will be stored as <strong>v2</strong>.
             </span>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function ReverifyModal({
             onClick={onClose}
             className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl transition"
           >
-            Keep Sealed
+            Keep Current Version
           </button>
           <button
             onClick={() => { onRerunWatch(report); onClose(); }}
