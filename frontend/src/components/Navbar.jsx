@@ -5,6 +5,7 @@ import {
   Search,
   Plus,
   PlusCircle,
+  Home,
   LayoutDashboard,
   Radio,
   ShieldAlert,
@@ -133,6 +134,7 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
 
   const navLinks = [
+    { to: '/', label: 'Home', icon: Home },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/news', label: 'Latest News', icon: Radio },
     ...(FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? [{

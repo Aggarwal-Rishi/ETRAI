@@ -8,16 +8,22 @@ import {
   BrainCircuit,
   CheckCircle2,
   FileSearch,
+  Gem,
   History,
+  Home,
   LayoutDashboard,
   Link2,
   Plus,
+  Radio,
   Search,
+  ShieldAlert,
   ShieldCheck,
   XCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
+import GlobalSearchModal from '../components/GlobalSearchModal';
 import './HomePage.css';
 
 const createDotTexture = () => {
@@ -379,6 +385,23 @@ export default function HomePage() {
   const rootRef = useRef(null);
   const { user } = useAuth();
   const [telemetry, setTelemetry] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Platform detection for shortcut key
+  const isMac = typeof window !== 'undefined' && /(Mac|iPhone|iPod|iPad)/i.test(navigator?.userAgent || '');
+  const shortcutKey = isMac ? '⌘K' : 'Ctrl+K';
+
+  // Global shortcut listener (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -428,21 +451,52 @@ export default function HomePage() {
       <div className="home3d-content">
         <nav className="home3d-nav" aria-label="Primary navigation">
           <div className="home3d-nav-inner">
-            <a className="home3d-brand" href="#top" aria-label="ETRAI home">
+            <Link className="home3d-brand" to="/" aria-label="ETRAI home">
               <span className="home3d-brand-logo"><ShieldCheck aria-hidden="true" /></span>
               <span>
                 <span className="home3d-brand-name">ETRAI</span>
                 <span className="home3d-brand-sub">AI VERIFICATION</span>
               </span>
-            </a>
+            </Link>
+            
             <div className="home3d-nav-links">
-              <Link to="/dashboard"><LayoutDashboard size={16} /> Dashboard</Link>
-              <Link to="/analysis">New Analysis</Link>
-              <Link to="/history"><History size={16} /> History</Link>
-              <Link className="home3d-nav-cta" to="/analysis">Start New Analysis <ArrowRight size={16} /></Link>
+              <Link to="/" className="home3d-nav-item active"><Home size={15} /> <span>Home</span></Link>
+              <Link to="/dashboard" className="home3d-nav-item"><LayoutDashboard size={15} /> <span>Dashboard</span></Link>
+              <Link to="/news" className="home3d-nav-item"><Radio size={15} /> <span>Latest News</span></Link>
+              {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION && (
+                <Link to="/fake-news" className="home3d-nav-item"><ShieldAlert size={15} /> <span>Fake News</span></Link>
+              )}
+              <Link to="/history" className="home3d-nav-item"><History size={15} /> <span>History</span></Link>
+
+              {/* Quick Search Button */}
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="home3d-nav-search"
+                title={`Search (${shortcutKey})`}
+                aria-label="Search command palette"
+              >
+                <Search size={14} />
+                <span className="home3d-nav-search-label">Search...</span>
+                <kbd className="home3d-nav-kbd">{shortcutKey}</kbd>
+              </button>
+
+              {/* Upgrade Plan Button */}
+              <Link to="/billing" className="home3d-nav-upgrade" title="Upgrade Plan & Quota">
+                <Gem size={14} className="home3d-gem-icon" />
+                <span>Upgrade</span>
+              </Link>
+
+              {/* Start New Analysis CTA */}
+              <Link className="home3d-nav-cta" to="/analysis">
+                <Plus size={15} />
+                <span>New Analysis</span>
+              </Link>
             </div>
           </div>
         </nav>
+
+        <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
         <header className="home3d-hero" id="top">
           <div className="home3d-pill"><span className="home3d-status-dot" />AI MULTI-AGENT PIPELINE ACTIVE</div>
