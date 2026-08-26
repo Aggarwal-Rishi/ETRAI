@@ -35,6 +35,37 @@ const server = app.listen(PORT, () => {
   console.log(`🔍 Serper Configured: ${summary.serperConfigured}`);
   console.log(`🔗 Health Check: http://localhost:${PORT}/api/v1/health`);
   console.log(`====================================================`);
+
+  // Auto-seed demo accounts if user table is empty
+  (async () => {
+    try {
+      if (!prisma || !prisma.user) return;
+      const count = await prisma.user.count().catch(() => null);
+      if (count === 0) {
+        const bcrypt = require('bcryptjs');
+        const hash = await bcrypt.hash('Password123!', 10);
+        const accounts = [
+          { email: 'demo@etrai.io', fullName: 'Demo Analyst', role: 'OWNER', company: 'ETRAI Newsroom' },
+          { email: 'admin@etrai.io', fullName: 'ETRAI Administrator', role: 'OWNER', company: 'ETRAI HQ' },
+          { email: 'demo@etrai.ai', fullName: 'Demo User', role: 'OWNER', company: 'ETRAI Labs' }
+        ];
+        for (const acc of accounts) {
+          await prisma.user.create({
+            data: {
+              email: acc.email,
+              fullName: acc.fullName,
+              passwordHash: hash,
+              role: acc.role,
+              company: acc.company
+            }
+          }).catch(() => {});
+        }
+        console.log('✅ Demo accounts seeded automatically.');
+      }
+    } catch (err) {
+      console.warn('[DB Auto-Seed]:', err.message);
+    }
+  })();
 });
 
 // Graceful Shutdown
