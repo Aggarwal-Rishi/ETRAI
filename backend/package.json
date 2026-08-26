@@ -10,7 +10,8 @@
     "test": "node tests/runAuthTests.js",
     "test:audit": "node tests/runProjectAudit.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "node prisma/seedDemoUser.js"
   },
   "dependencies": {
     "@google/genai": "^2.17.0",
