@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Layers,
   Eye,
@@ -79,6 +80,23 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
       setSelectedAsset(imageList[0]);
     }
   }, [imageList]);
+
+  // Lock body scroll and listen for Escape key when modal is open
+  useEffect(() => {
+    if (!isModalOpen) return undefined;
+    const origOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = origOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isModalOpen]);
 
   const diffList = (selectedAsset.diffs && selectedAsset.diffs.length > 0)
     ? selectedAsset.diffs
@@ -392,9 +410,17 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
       </div>
 
       {/* 2. FULL-PAGE / MODAL SIDE-BY-SIDE INTERACTIVE COMPARISON VIEW */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full p-6 space-y-6 shadow-2xl overflow-hidden my-auto max-h-[95vh] flex flex-col">
+      {isModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full p-4 sm:p-6 space-y-6 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col relative z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -679,7 +705,8 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

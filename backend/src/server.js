@@ -1,3 +1,14 @@
+// Polyfill process.getBuiltinModule for compatibility across Node.js runtimes (e.g. Railway / Docker)
+if (typeof process.getBuiltinModule !== 'function') {
+  process.getBuiltinModule = (id) => {
+    try {
+      return require(id);
+    } catch (_) {
+      return undefined;
+    }
+  };
+}
+
 const app = require('./app');
 const { prisma } = require('./utils/prisma');
 const { config, getSanitizedConfigSummary } = require('./config/env');

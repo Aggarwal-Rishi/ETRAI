@@ -1,4 +1,3 @@
-const { PDFParse } = require('pdf-parse');
 const mammoth = require('mammoth');
 const fetch = require('node-fetch');
 const path = require('path');
@@ -11,17 +10,49 @@ const MIN_WORD_COUNT = 1;
 const MAX_CHAR_LIMIT = 48000; // ~12,000 tokens
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
-async function parsePdfBuffer(buffer) {
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const result = await parser.getText();
-    return {
-      text: result.text || '',
-      numpages: result.total || result.pages?.length || null
-    };
-  } finally {
-    await parser.destroy();
+let pdfModule = null;
+function getPdfParser() {
+  if (!pdfModule) {
+    try {
+      pdfModule = require('pdf-parse');
+    } catch (e) {
+      console.warn('[PDF Parser Warning]:', e.message);
+    }
   }
+  return pdfModule;
+}
+
+async function parsePdfBuffer(buffer) {
+  const mod = getPdfParser();
+  if (!mod) {
+    throw new Error('PDF parsing library is unavailable.');
+  }
+
+  // 1. Standard pdf-parse v1 (function export)
+  if (typeof mod === 'function') {
+    const data = await mod(buffer);
+    return {
+      text: data.text || '',
+      numpages: data.numpages || null
+    };
+  }
+
+  // 2. pdf-parse v2 (PDFParse class export)
+  const ParserClass = mod.PDFParse || mod.default?.PDFParse || mod;
+  if (typeof ParserClass === 'function' && ParserClass.prototype) {
+    const parser = new ParserClass({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return {
+        text: result.text || '',
+        numpages: result.total || result.pages?.length || null
+      };
+    } finally {
+      if (parser.destroy) await parser.destroy();
+    }
+  }
+
+  throw new Error('Unsupported PDF parser interface.');
 }
 
 /**
