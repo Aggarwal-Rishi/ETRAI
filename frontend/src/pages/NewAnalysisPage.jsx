@@ -192,8 +192,12 @@ export default function NewAnalysisPage() {
       setErrorMessage('Please enter a valid webpage or article URL.');
       return;
     }
-    if ((selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && !uploadedFile && !urlInput.trim()) {
-      setErrorMessage('Please upload a media file or provide a direct media URL.');
+    if (selectedCard === 'IMAGE' && !uploadedFile && !urlInput.trim()) {
+      setErrorMessage('Please upload an image file or provide a direct image URL.');
+      return;
+    }
+    if (selectedCard === 'VIDEO' && !uploadedFile) {
+      setErrorMessage('Please upload a video file (MP4, WebM, MOV) for verification.');
       return;
     }
     if (selectedCard === 'PDF' && !uploadedFile) {
@@ -385,8 +389,7 @@ export default function NewAnalysisPage() {
                   id: 'VIDEO',
                   label: 'Video clip',
                   icon: Film,
-                  sub: 'Link or File',
-                  badge: 'File or Link'
+                  sub: 'MP4 / MOV / WebM'
                 },
                 { id: 'PDF', label: 'PDF document', icon: FileText, sub: 'Notices / Briefs' },
                 { id: 'TEXT', label: 'Claim text', icon: Layers, sub: 'Raw statements' },
@@ -652,7 +655,7 @@ export default function NewAnalysisPage() {
                 </div>
               )}
 
-              {/* VIDEO SECTION (Link Option + File Dropzone + Video Preview) */}
+              {/* VIDEO SECTION (Direct File Dropzone + Video Preview) */}
               {selectedCard === 'VIDEO' && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
@@ -660,53 +663,11 @@ export default function NewAnalysisPage() {
                       Video Forensics & Speech Analysis
                     </label>
                     <span className="text-[11px] font-mono text-slate-400">
-                      Verify via Video Link or File Upload
+                      Direct Video File Upload
                     </span>
                   </div>
 
-                  {/* Option 1: Video Web URL / Broadcast Link */}
-                  <div className="p-4 bg-[#070b14] border border-[#17233f] rounded-2xl space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Video URL / Web Broadcast Link</span>
-                      </label>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        YouTube, Vimeo, MP4 direct stream, or News video URL
-                      </span>
-                    </div>
-
-                    <div className="relative">
-                      <Film className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="url"
-                        placeholder="https://www.youtube.com/watch?v=... or https://news.com/video.mp4"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                        className="w-full pl-10 pr-20 py-2.5 bg-[#0c1427] border border-[#17233f] rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
-                      />
-                      {urlInput && (
-                        <button
-                          type="button"
-                          onClick={() => setUrlInput('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-mono"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Visual Divider */}
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-800"></div>
-                    <span className="flex-shrink mx-4 text-[10px] font-mono uppercase text-slate-500 font-bold tracking-wider">
-                      OR UPLOAD LOCAL VIDEO FILE
-                    </span>
-                    <div className="flex-grow border-t border-slate-800"></div>
-                  </div>
-
-                  {/* Option 2: Upload Video File or View Attached Preview */}
+                  {/* Upload Video File or View Attached Preview */}
                   {uploadedFile && videoPreviewUrl ? (
                     <div className="p-5 bg-[#070b14] border border-indigo-500/40 rounded-2xl space-y-4 shadow-lg">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
