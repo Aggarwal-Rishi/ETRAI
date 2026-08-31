@@ -161,8 +161,10 @@ export default function Navbar() {
               {/* Mobile Hamburger Trigger */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="md:hidden w-11 h-11 inline-flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
                 aria-label="Toggle navigation drawer"
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="app-mobile-navigation"
               >
                 {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
@@ -218,7 +220,7 @@ export default function Navbar() {
               {/* Search Command Palette Trigger */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[#0c1427] hover:bg-[#101a33] border border-[#17233f] text-slate-300 hover:text-white transition text-xs"
+                className="flex min-w-11 min-h-11 items-center justify-center gap-2 px-2.5 py-1.5 rounded-xl bg-[#0c1427] hover:bg-[#101a33] border border-[#17233f] text-slate-300 hover:text-white transition text-xs"
                 title={`Search (${shortcutKey})`}
               >
                 <Search className="w-3.5 h-3.5 text-slate-400" />
@@ -254,7 +256,7 @@ export default function Navbar() {
                     setIsNotifOpen(!isNotifOpen);
                     setIsUserMenuOpen(false);
                   }}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition relative"
+                  className="w-11 h-11 inline-flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition relative"
                   title="Notifications & Activity"
                 >
                   <Bell className="w-4 h-4" />
@@ -265,7 +267,7 @@ export default function Navbar() {
 
                 {/* Notifications Flyout */}
                 {isNotifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-3 z-50 animate-scaleUp text-xs text-slate-200">
+                  <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-3 z-50 animate-scaleUp text-xs text-slate-200">
                     <div className="flex items-center justify-between px-4 pb-2 border-b border-[#17233f]">
                       <span className="font-bold text-white uppercase font-mono text-[11px]">Recent Activity</span>
                       <span className="text-[10px] text-slate-400 font-mono">Live Database</span>
@@ -307,7 +309,7 @@ export default function Navbar() {
                     setIsUserMenuOpen(!isUserMenuOpen);
                     setIsNotifOpen(false);
                   }}
-                  className="flex items-center gap-2 p-1 pl-2 rounded-xl hover:bg-slate-800/50 transition border border-transparent hover:border-[#17233f]"
+                  className="min-h-11 flex items-center gap-2 p-1 pl-2 rounded-xl hover:bg-slate-800/50 transition border border-transparent hover:border-[#17233f]"
                   aria-label="User account menu"
                 >
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
@@ -317,7 +319,7 @@ export default function Navbar() {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-72 bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
+                  <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
                     
                     {/* User Profile Header */}
                     <div className="px-4 py-2.5 border-b border-[#17233f] flex items-center gap-3">
@@ -421,7 +423,7 @@ export default function Navbar() {
 
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-[#17233f] bg-[#070b14] px-4 py-4 space-y-2 animate-fadeIn">
+          <div id="app-mobile-navigation" className="md:hidden max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[#17233f] bg-[#070b14] px-4 py-4 space-y-2 animate-fadeIn">
             {navLinks.map((item) => {
               const active = isActive(item.to);
               const Icon = item.icon;
@@ -430,7 +432,7 @@ export default function Navbar() {
                   key={item.to}
                   to={item.to}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition ${
+                  className={`min-h-11 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition ${
                     active ? 'bg-[#131f38] text-white font-bold border border-blue-900/50' : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -451,7 +453,7 @@ export default function Navbar() {
               <Link
                 to="/analysis"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
+                className="w-full min-h-11 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Analysis</span>
@@ -459,7 +461,7 @@ export default function Navbar() {
               <Link
                 to="/billing"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full py-2 bg-[#0c1427] border border-amber-500/40 text-amber-400 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
+                className="w-full min-h-11 py-2 bg-[#0c1427] border border-amber-500/40 text-amber-400 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
               >
                 <Gem className="w-3.5 h-3.5" />
                 <span>Upgrade Plan</span>

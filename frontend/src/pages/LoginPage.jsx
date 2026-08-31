@@ -200,7 +200,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
       {/* ========================================================================= */}
       {/* LEFT PANEL — BRAND ART & LIVE TRUST TICKER                                */}
       {/* ========================================================================= */}
-      <div className="w-full md:w-5/12 lg:w-1/2 bg-[#000D59] p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden border-b md:border-b-0 md:border-r border-slate-800">
+      <div className="hidden md:flex md:order-1 w-full md:w-5/12 lg:w-1/2 bg-[#000D59] p-8 sm:p-12 lg:p-16 flex-col justify-between relative overflow-hidden border-b md:border-b-0 md:border-r border-slate-800">
         
         {/* Background Ambient Glows */}
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -299,16 +299,26 @@ export default function LoginPage({ defaultTab = 'login' }) {
       {/* ========================================================================= */}
       {/* RIGHT PANEL — AUTH BOX (LOGIN / 3-STEP SIGNUP WIZARD)                     */}
       {/* ========================================================================= */}
-      <div className="w-full md:w-7/12 lg:w-1/2 p-6 sm:p-10 lg:p-14 flex flex-col justify-center max-w-xl mx-auto">
+      <div className="order-1 md:order-2 w-full md:w-7/12 lg:w-1/2 min-h-screen md:min-h-0 p-5 sm:p-10 lg:p-14 flex flex-col justify-center max-w-xl mx-auto">
+
+        <Link to="/" className="md:hidden inline-flex items-center gap-3 mb-8 self-start" aria-label="ETRAI home">
+          <span className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-[#D97757] flex items-center justify-center shadow-lg shadow-indigo-500/30">
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </span>
+          <span className="flex flex-col">
+            <span className="text-xl font-bold tracking-tight text-white leading-none">ETRAI</span>
+            <span className="text-[9px] font-mono tracking-widest text-[#E88F6B] uppercase font-semibold mt-1">DeepTrust OS</span>
+          </span>
+        </Link>
         
         {/* Tab Switcher */}
-        <div className="flex p-1 bg-slate-900 border border-slate-800 rounded-2xl mb-8">
+        <div className="flex p-1 bg-slate-900 border border-slate-800 rounded-2xl mb-7 sm:mb-8">
           <button
             onClick={() => {
               setActiveTab('login');
               navigate('/login', { replace: true });
             }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 min-h-11 px-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'login'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                 : 'text-slate-400 hover:text-white'
@@ -321,7 +331,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
               setActiveTab('signup');
               navigate('/signup', { replace: true });
             }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 min-h-11 px-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'signup'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                 : 'text-slate-400 hover:text-white'
@@ -361,7 +371,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                     placeholder="name@newsroom.com"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 transition placeholder-slate-500"
+                    className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 transition placeholder-slate-500"
                   />
                 </div>
               </div>
@@ -385,7 +395,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                     placeholder="••••••••••••"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 transition placeholder-slate-500"
+                    className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 transition placeholder-slate-500"
                   />
                 </div>
               </div>
@@ -405,7 +415,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3 bg-gradient-to-r from-indigo-600 to-[#D97757] hover:from-indigo-500 hover:to-[#B0512F] text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full min-h-12 py-3 bg-gradient-to-r from-indigo-600 to-[#D97757] hover:from-indigo-500 hover:to-[#B0512F] text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {loginLoading ? 'Authenticating...' : 'Sign In to Workspace'}
                 <ArrowRight className="w-4 h-4" />
@@ -467,7 +477,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="e.g. Gajendra Singh"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -482,7 +492,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="name@organization.com"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -496,7 +506,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="+91 98110 42207"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -511,14 +521,14 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="Minimum 6 characters"
                       value={signupPassword}
                       onChange={(e) => setSignupPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2"
+                  className="w-full min-h-12 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 transition flex items-center justify-center gap-2"
                 >
                   Continue to Phone Verification <ArrowRight className="w-4 h-4" />
                 </button>
@@ -536,7 +546,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                 </div>
 
                 {/* 6-digit OTP Grid */}
-                <div className="flex justify-between gap-2 on-paste" onPaste={handleOtpPaste}>
+                <div className="grid grid-cols-6 gap-1.5 sm:gap-2 on-paste" onPaste={handleOtpPaste}>
                   {otpValues.map((val, idx) => (
                     <input
                       key={idx}
@@ -547,7 +557,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       value={val}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e.target.value ? e : e)}
-                      className="w-11 h-12 text-center text-lg font-mono font-bold bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                      className="w-full min-w-0 h-12 text-center text-lg font-mono font-bold bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                     />
                   ))}
                 </div>
@@ -565,7 +575,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                     <button
                       type="button"
                       onClick={() => setOtpValues(['1', '2', '3', '4', '5', '6'])}
-                      className="px-2.5 py-1 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 rounded-lg text-[11px] font-mono font-bold"
+                      className="min-h-11 px-2.5 py-1 bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 rounded-lg text-[11px] font-mono font-bold"
                     >
                       Autofill 123456
                     </button>
@@ -576,14 +586,14 @@ export default function LoginPage({ defaultTab = 'login' }) {
                   <button
                     type="button"
                     onClick={() => setSignupStep(1)}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5"
+                    className="min-h-11 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Back
                   </button>
                   <button
                     type="button"
                     onClick={handleStep2Next}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 flex items-center gap-1.5"
+                    className="min-h-11 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-indigo-500/20 flex items-center gap-1.5"
                   >
                     Verify Code <ArrowRight className="w-4 h-4" />
                   </button>
@@ -609,7 +619,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="e.g. Caasaa AI Innovations"
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -623,7 +633,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                       placeholder="caasaa.ai"
                       value={website}
                       onChange={(e) => setWebsite(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -634,7 +644,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                     <select
                       value={primaryBeat}
                       onChange={(e) => setPrimaryBeat(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     >
                       <option>Policy & Governance</option>
                       <option>Financial Markets & Banking</option>
@@ -649,7 +659,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
                     <select
                       value={regionFocus}
                       onChange={(e) => setRegionFocus(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full min-h-11 px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                     >
                       <option>India</option>
                       <option>South Asia</option>
@@ -662,14 +672,14 @@ export default function LoginPage({ defaultTab = 'login' }) {
                   <button
                     type="button"
                     onClick={() => setSignupStep(2)}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5"
+                    className="min-h-11 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" /> Back
                   </button>
                   <button
                     type="submit"
                     disabled={signupLoading}
-                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+                    className="min-h-11 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
                   >
                     {signupLoading ? 'Creating Workspace...' : 'Create Account & Launch'}
                     <CheckCircle2 className="w-4 h-4" />
@@ -692,7 +702,8 @@ export default function LoginPage({ defaultTab = 'login' }) {
               </h3>
               <button
                 onClick={() => setShowForgotModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                className="w-11 h-11 inline-flex items-center justify-center text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+                aria-label="Close password reset help"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -710,7 +721,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
 
             <button
               onClick={() => setShowForgotModal(false)}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition"
+              className="w-full min-h-11 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition"
             >
               Understood
             </button>

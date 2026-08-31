@@ -302,6 +302,12 @@
   }
 }
 
+@media (max-width: 640px) {
+  .etrai-route-stage--app :is(input, textarea, select) {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .etrai-route-stage--app > *,
   .etrai-route-stage--app :is(a, button, .rounded-2xl, .rounded-3xl) {
