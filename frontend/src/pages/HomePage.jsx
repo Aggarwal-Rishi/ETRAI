@@ -13,11 +13,13 @@ import {
   Home,
   LayoutDashboard,
   Link2,
+  Menu,
   Plus,
   Radio,
   Search,
   ShieldAlert,
   ShieldCheck,
+  X,
   XCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -386,6 +388,7 @@ export default function HomePage() {
   const { user } = useAuth();
   const [telemetry, setTelemetry] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Platform detection for shortcut key
   const isMac = typeof window !== 'undefined' && /(Mac|iPhone|iPod|iPad)/i.test(navigator?.userAgent || '');
@@ -394,6 +397,10 @@ export default function HomePage() {
   // Global shortcut listener (Ctrl+K / Cmd+K)
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsMobileNavOpen(false);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
@@ -458,6 +465,17 @@ export default function HomePage() {
                 <span className="home3d-brand-sub">AI VERIFICATION</span>
               </span>
             </Link>
+
+            <button
+              type="button"
+              className="home3d-mobile-menu-toggle"
+              aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isMobileNavOpen}
+              aria-controls="home3d-mobile-menu"
+              onClick={() => setIsMobileNavOpen(open => !open)}
+            >
+              {isMobileNavOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
             
             <div className="home3d-nav-links">
               <Link to="/" className="home3d-nav-item active"><Home size={15} /> <span>Home</span></Link>
@@ -494,6 +512,31 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+
+          {isMobileNavOpen && (
+            <div id="home3d-mobile-menu" className="home3d-mobile-menu">
+              <Link to="/" className="active" aria-current="page" onClick={() => setIsMobileNavOpen(false)}><Home size={17} />Home</Link>
+              <Link to="/dashboard" onClick={() => setIsMobileNavOpen(false)}><LayoutDashboard size={17} />Dashboard</Link>
+              <Link to="/news" onClick={() => setIsMobileNavOpen(false)}><Radio size={17} />Latest News</Link>
+              {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION && (
+                <Link to="/fake-news" onClick={() => setIsMobileNavOpen(false)}><ShieldAlert size={17} />Fake News</Link>
+              )}
+              <Link to="/history" onClick={() => setIsMobileNavOpen(false)}><History size={17} />History</Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileNavOpen(false);
+                  setIsSearchOpen(true);
+                }}
+              >
+                <Search size={17} />Search
+              </button>
+              <div className="home3d-mobile-menu-actions">
+                <Link to="/billing" onClick={() => setIsMobileNavOpen(false)}><Gem size={17} />Upgrade</Link>
+                <Link to="/analysis" className="primary" onClick={() => setIsMobileNavOpen(false)}><Plus size={17} />New Analysis</Link>
+              </div>
+            </div>
+          )}
         </nav>
 
         <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

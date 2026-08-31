@@ -32,7 +32,7 @@ async function createFrameDifferenceHash(buffer) {
  */
 function isFfmpegAvailable() {
   try {
-    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-version'], { stdio: 'ignore' });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-version'], { stdio: 'ignore', timeout: 5000 });
     return true;
   } catch (e) {
     return false;
@@ -82,7 +82,7 @@ function detectTemporalBoundaries(fileInfo, buffer = null, options = {}) {
       '-hide_banner', '-i', inputPath,
       '-vf', `select=gt(scene\\,${sceneThreshold}),metadata=print`,
       '-an', '-vsync', 'vfr', '-f', 'null', '-'
-    ], { encoding: 'utf8', maxBuffer: 12 * 1024 * 1024 });
+    ], { encoding: 'utf8', maxBuffer: 12 * 1024 * 1024, timeout: 15000 });
     const diagnosticText = `${result.stderr || ''}\n${result.stdout || ''}`;
     const detected = [];
     const metadataRegex = /frame:\d+\s+pts:[^\s]+\s+pts_time:([0-9]+(?:\.[0-9]+)?)[\s\S]{0,500}?lavfi\.scene_score=([0-9]+(?:\.[0-9]+)?)/g;
@@ -183,7 +183,7 @@ async function getVideoMetadata(fileInfo, buffer = null, options = {}) {
  * Uses temporary directory and CLEANS UP temporary files immediately after reading.
  */
 async function extractKeyframes(fileInfo, buffer = null, url = null, options = {}) {
-  const sampleCount = options.sampleCount || 5;
+  const sampleCount = options.sampleCount || 3;
   const keyframes = [];
   const limitations = [];
 
@@ -230,7 +230,7 @@ async function extractKeyframes(fileInfo, buffer = null, url = null, options = {
       execFileSync(bundledFfmpegPath || 'ffmpeg', [
         '-y', '-ss', String(calcTimestamp), '-i', inputPath,
         '-frames:v', '1', '-q:v', '3', fPath
-      ], { stdio: 'ignore' });
+      ], { stdio: 'ignore', timeout: 10000 });
       if (!fs.existsSync(fPath)) continue;
       const fBuffer = fs.readFileSync(fPath);
       keyframes.push({
@@ -298,8 +298,8 @@ async function extractAudio(fileInfo, buffer = null, options = {}) {
 
   try {
     fs.writeFileSync(inputPath, buffer);
-    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', outputPath], { stdio: 'ignore' });
-    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-ac', '1', '-ar', '16000', '-f', 's16le', pcmPath], { stdio: 'ignore' });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', outputPath], { stdio: 'ignore', timeout: 15000 });
+    execFileSync(bundledFfmpegPath || 'ffmpeg', ['-y', '-i', inputPath, '-vn', '-ac', '1', '-ar', '16000', '-f', 's16le', pcmPath], { stdio: 'ignore', timeout: 15000 });
 
     if (fs.existsSync(outputPath)) {
       const audioBuffer = fs.readFileSync(outputPath);
@@ -499,44 +499,78 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     allLimitations.push('Video container indicates no audio track present');
   }
 
-  // 4. Frame Visual Analysis & Separate Frame OCR
-  const frameAnalyses = [];
+  // 4. Frame Visual Analysis & Separate Frame OCR (Executed in parallel for performance)
   const allObservedEntities = [];
   const ocrTexts = [];
 
-  for (const frame of keyframes) {
-    const imgRes = await analyzeImage({ filename: `frame_${frame.frameIndex}.jpg`, mimeType: 'image/jpeg' }, frame.buffer, null, options);
-    const ocrRes = await extractOcrText({ filename: `frame_${frame.frameIndex}.jpg` }, frame.buffer, {
-      ...options,
-      visionExtractedText: (imgRes.observed && imgRes.observed.visibleText) ? imgRes.observed.visibleText : options.visionExtractedText
-    });
+  const frameAnalyses = await Promise.all(
+    keyframes.map(async (frame) => {
+      try {
+        const imgRes = await analyzeImage(
+          { filename: `frame_${frame.frameIndex}.jpg`, mimeType: 'image/jpeg' },
+          frame.buffer,
+          null,
+          options
+        );
+        const ocrRes = await extractOcrText(
+          { filename: `frame_${frame.frameIndex}.jpg` },
+          frame.buffer,
+          {
+            ...options,
+            visionExtractedText: (imgRes.observed && imgRes.observed.visibleText) ? imgRes.observed.visibleText : options.visionExtractedText
+          }
+        );
 
-    if (ocrRes.ocrText) ocrTexts.push(`[Timestamp ${frame.timestamp}s]: ${ocrRes.ocrText}`);
-    if (Array.isArray(imgRes.observed?.entities)) allObservedEntities.push(...imgRes.observed.entities);
-    if (Array.isArray(imgRes.observed?.landmarks)) allObservedEntities.push(...imgRes.observed.landmarks);
+        if (ocrRes.ocrText) ocrTexts.push(`[Timestamp ${frame.timestamp}s]: ${ocrRes.ocrText}`);
+        if (Array.isArray(imgRes.observed?.entities)) allObservedEntities.push(...imgRes.observed.entities);
+        if (Array.isArray(imgRes.observed?.landmarks)) allObservedEntities.push(...imgRes.observed.landmarks);
 
-    frameAnalyses.push({
-      timestamp: frame.timestamp,
-      description: imgRes.visualDescription || frame.description || `Frame at ${frame.timestamp}s`,
-      visibleText: ocrRes.ocrText || '',
-      entities: (imgRes.observed?.entities?.length > 0 ? imgRes.observed.entities : (frame.entities || [])),
-      publicFigures: imgRes.observed?.publicFigures || [],
-      logos: imgRes.observed?.logos || [],
-      signs: imgRes.observed?.signs || [],
-      landmarks: imgRes.observed?.landmarks || [],
-      flags: imgRes.observed?.flags || [],
-      objects: imgRes.observed?.objects || [],
-      vehicleMarkings: imgRes.observed?.vehicleMarkings || [],
-      badges: imgRes.observed?.badges || [],
-      uniforms: imgRes.observed?.uniforms || [],
-      attire: imgRes.observed?.attire || [],
-      securityDetails: imgRes.observed?.securityDetails || [],
-      locationClues: imgRes.observed?.visibleLocationClues || [],
-      dateClues: imgRes.observed?.visibleDates || [],
-      visualSignals: imgRes.manipulationSignals || [],
-      dHash: frame.dHash || null
-    });
-  }
+        return {
+          timestamp: frame.timestamp,
+          description: imgRes.visualDescription || frame.description || `Frame at ${frame.timestamp}s`,
+          visibleText: ocrRes.ocrText || '',
+          entities: (imgRes.observed?.entities?.length > 0 ? imgRes.observed.entities : (frame.entities || [])),
+          publicFigures: imgRes.observed?.publicFigures || [],
+          logos: imgRes.observed?.logos || [],
+          signs: imgRes.observed?.signs || [],
+          landmarks: imgRes.observed?.landmarks || [],
+          flags: imgRes.observed?.flags || [],
+          objects: imgRes.observed?.objects || [],
+          vehicleMarkings: imgRes.observed?.vehicleMarkings || [],
+          badges: imgRes.observed?.badges || [],
+          uniforms: imgRes.observed?.uniforms || [],
+          attire: imgRes.observed?.attire || [],
+          securityDetails: imgRes.observed?.securityDetails || [],
+          locationClues: imgRes.observed?.visibleLocationClues || [],
+          dateClues: imgRes.observed?.visibleDates || [],
+          visualSignals: imgRes.manipulationSignals || [],
+          dHash: frame.dHash || null
+        };
+      } catch (_) {
+        return {
+          timestamp: frame.timestamp,
+          description: `Frame at ${frame.timestamp}s`,
+          visibleText: '',
+          entities: [],
+          publicFigures: [],
+          logos: [],
+          signs: [],
+          landmarks: [],
+          flags: [],
+          objects: [],
+          vehicleMarkings: [],
+          badges: [],
+          uniforms: [],
+          attire: [],
+          securityDetails: [],
+          locationClues: [],
+          dateClues: [],
+          visualSignals: [],
+          dHash: frame.dHash || null
+        };
+      }
+    })
+  );
 
   // 5. Temporal Consistency Analysis Across Keyframes
   const manipulationSignals = [];
