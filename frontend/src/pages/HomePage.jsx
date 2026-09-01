@@ -74,9 +74,9 @@ function VerificationGlobe() {
     const pointCount = reducedMotion ? 700 : 1400;
     const positions = new Float32Array(pointCount * 3);
     const colors = new Float32Array(pointCount * 3);
-    const indigo = new THREE.Color(0x6366f1);
-    const cyan = new THREE.Color(0x22d3ee);
-    const violet = new THREE.Color(0x8b5cf6);
+    const ink = new THREE.Color(0x0B5CD5);
+    const clay = new THREE.Color(0xD97757);
+    const slab = new THREE.Color(0x0E2E63);
     const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
     for (let index = 0; index < pointCount; index += 1) {
@@ -86,7 +86,7 @@ function VerificationGlobe() {
       positions[index * 3] = Math.cos(angle) * radial * radius;
       positions[index * 3 + 1] = y * radius;
       positions[index * 3 + 2] = Math.sin(angle) * radial * radius;
-      const color = Math.random() < 0.12 ? cyan : (Math.random() < 0.5 ? indigo : violet);
+      const color = Math.random() < 0.25 ? clay : (Math.random() < 0.5 ? ink : slab);
       colors[index * 3] = color.r;
       colors[index * 3 + 1] = color.g;
       colors[index * 3 + 2] = color.b;
@@ -110,7 +110,7 @@ function VerificationGlobe() {
     group.add(globe);
 
     const wireGeometry = new THREE.IcosahedronGeometry(radius * 0.62, 1);
-    const wireMaterial = new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true, transparent: true, opacity: 0.1 });
+    const wireMaterial = new THREE.MeshBasicMaterial({ color: 0x0B5CD5, wireframe: true, transparent: true, opacity: 0.12 });
     const wire = new THREE.Mesh(wireGeometry, wireMaterial);
     group.add(wire);
 
@@ -129,12 +129,12 @@ function VerificationGlobe() {
       group.add(line);
       rings.push(line);
     };
-    createRing(radius * 1.35, { x: Math.PI / 2.15, z: 0.2 }, 0x8b5cf6, 0.35);
-    createRing(radius * 1.6, { x: Math.PI / 2.6, z: -0.35 }, 0x22d3ee, 0.22);
-    createRing(radius * 1.9, { x: Math.PI / 1.8, z: 0.55 }, 0x6366f1, 0.14);
+    createRing(radius * 1.35, { x: Math.PI / 2.15, z: 0.2 }, 0xD97757, 0.35);
+    createRing(radius * 1.6, { x: Math.PI / 2.6, z: -0.35 }, 0x0B5CD5, 0.22);
+    createRing(radius * 1.9, { x: Math.PI / 1.8, z: 0.55 }, 0x0E2E63, 0.18);
 
     const satellites = [];
-    const satelliteColors = [0x34d399, 0xfbbf24, 0xfb7185, 0x22d3ee, 0xa5b4fc, 0x8b5cf6];
+    const satelliteColors = [0x3E7A55, 0xB98520, 0xB23F35, 0x0B5CD5, 0xD97757, 0x0E2E63];
     for (let index = 0; index < 26; index += 1) {
       const geometry = new THREE.SphereGeometry(1.4 + Math.random() * 1.6, 10, 10);
       const material = new THREE.MeshBasicMaterial({ color: satelliteColors[index % satelliteColors.length], transparent: true, opacity: 0.95 });

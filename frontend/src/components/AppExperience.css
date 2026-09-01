@@ -12,9 +12,9 @@
   z-index: 3;
   width: 100%;
   height: 100%;
-  opacity: 0.58;
-  filter: saturate(1.4) contrast(1.12) drop-shadow(0 0 10px rgba(99, 102, 241, 0.18));
-  mix-blend-mode: screen;
+  opacity: 0.65;
+  filter: saturate(1.2) contrast(1.05) drop-shadow(0 0 10px rgba(11, 92, 213, 0.15));
+  mix-blend-mode: multiply;
   -webkit-mask-image: radial-gradient(circle at 68% 28%, #000 0%, rgba(0, 0, 0, 0.96) 43%, transparent 82%);
   mask-image: radial-gradient(circle at 68% 28%, #000 0%, rgba(0, 0, 0, 0.96) 43%, transparent 82%);
   pointer-events: none;
@@ -25,7 +25,7 @@
   z-index: 0;
   border-radius: 999px;
   filter: blur(110px);
-  opacity: 0.24;
+  opacity: 0.18;
 }
 
 .etrai-global-glow-a {
@@ -33,7 +33,7 @@
   right: -120px;
   width: 520px;
   height: 520px;
-  background: #312e81;
+  background: #E88F6B;
 }
 
 .etrai-global-glow-b {
@@ -41,7 +41,7 @@
   left: -170px;
   width: 480px;
   height: 480px;
-  background: #164e63;
+  background: #0B5CD5;
 }
 
 .etrai-global-cursor-dot,
@@ -59,34 +59,34 @@
 .etrai-global-cursor-dot {
   width: 9px;
   height: 9px;
-  background: #fff;
-  box-shadow: 0 0 5px 1px #fff, 0 0 16px 5px rgba(139, 92, 246, 0.95);
+  background: #D97757;
+  box-shadow: 0 0 5px 1px #D97757, 0 0 16px 5px rgba(217, 119, 87, 0.7);
 }
 
 .etrai-global-cursor-ring {
   width: 38px;
   height: 38px;
-  border: 2px solid rgba(165, 180, 252, 0.95);
-  background: rgba(99, 102, 241, 0.1);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.7), inset 0 0 9px rgba(99, 102, 241, 0.18);
+  border: 2px solid rgba(217, 119, 87, 0.85);
+  background: rgba(217, 119, 87, 0.08);
+  box-shadow: 0 0 10px rgba(217, 119, 87, 0.5), inset 0 0 9px rgba(217, 119, 87, 0.12);
   transition: width 0.22s ease, height 0.22s ease, border-color 0.22s ease, background 0.22s ease, border-radius 0.22s ease;
 }
 
 .etrai-global-cursor-ring.is-interactive {
   width: 62px;
   height: 62px;
-  border-color: #67e8f9;
-  background: rgba(34, 211, 238, 0.12);
-  box-shadow: 0 0 12px rgba(103, 232, 249, 0.9), 0 0 30px rgba(34, 211, 238, 0.28);
+  border-color: #0B5CD5;
+  background: rgba(11, 92, 213, 0.1);
+  box-shadow: 0 0 12px rgba(11, 92, 213, 0.6), 0 0 24px rgba(217, 119, 87, 0.2);
 }
 
 .etrai-global-cursor-ring.is-text {
   width: 5px;
   height: 32px;
   border-radius: 3px;
-  border-color: #a5f3fc;
-  background: rgba(34, 211, 238, 0.65);
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.8);
+  border-color: #D97757;
+  background: rgba(217, 119, 87, 0.65);
+  box-shadow: 0 0 12px rgba(217, 119, 87, 0.6);
 }
 
 @media (hover: none), (pointer: coarse) {

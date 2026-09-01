@@ -105,7 +105,7 @@ function AmbientVerificationNetwork() {
       const pointCount = reducedMotion ? 220 : 520;
       const positions = new Float32Array(pointCount * 3);
       const colors = new Float32Array(pointCount * 3);
-      const palette = [new THREE.Color(0x6366f1), new THREE.Color(0x8b5cf6), new THREE.Color(0x22d3ee)];
+      const palette = [new THREE.Color(0x0B5CD5), new THREE.Color(0xD97757), new THREE.Color(0x0E2E63), new THREE.Color(0xE88F6B)];
       const radius = 112;
       const goldenAngle = Math.PI * (3 - Math.sqrt(5));
       for (let index = 0; index < pointCount; index += 1) {
@@ -135,13 +135,13 @@ function AmbientVerificationNetwork() {
       group.add(new THREE.Points(pointsGeometry, pointsMaterial));
 
       const shellGeometry = new THREE.IcosahedronGeometry(radius * 0.93, 2);
-      const shellMaterial = new THREE.MeshBasicMaterial({ color: 0x818cf8, wireframe: true, transparent: true, opacity: 0.16 });
+      const shellMaterial = new THREE.MeshBasicMaterial({ color: 0x0B5CD5, wireframe: true, transparent: true, opacity: 0.16 });
       const shell = new THREE.Mesh(shellGeometry, shellMaterial);
       group.add(shell);
 
       const ringObjects = [
-        { scale: 1.28, color: 0xa78bfa, opacity: 0.3, x: 1.28, z: 0.2 },
-        { scale: 1.55, color: 0x22d3ee, opacity: 0.22, x: 1.05, z: -0.45 }
+        { scale: 1.28, color: 0xD97757, opacity: 0.3, x: 1.28, z: 0.2 },
+        { scale: 1.55, color: 0x0B5CD5, opacity: 0.22, x: 1.05, z: -0.45 }
       ].map(config => {
         const curve = new THREE.EllipseCurve(0, 0, radius * config.scale, radius * config.scale, 0, Math.PI * 2);
         const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(96));
