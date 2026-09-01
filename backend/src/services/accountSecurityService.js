@@ -129,7 +129,7 @@ async function changePassword(userId, { currentPassword, newPassword }) {
  */
 function setup2fa(userId, email) {
   const secret = crypto.randomBytes(20).toString('hex');
-  const otpauthUrl = `otpauth://totp/ETRAI:${email || 'analyst'}?secret=${secret}&issuer=ETRAI`;
+  const otpauthUrl = `otpauth://totp/DeepTrust:${email || 'analyst'}?secret=${secret}&issuer=DeepTrust`;
 
   // Generate 8 backup recovery codes
   const recoveryCodes = Array.from({ length: 8 }, () =>

@@ -21,7 +21,7 @@ const getHealthStatus = (req, res) => {
 
   return res.status(200).json({
     status: 'ok',
-    service: 'ETRAI API Backend',
+    service: 'DeepTrust API Backend',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     uptimeSeconds,

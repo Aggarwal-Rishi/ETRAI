@@ -281,7 +281,7 @@ export default function HistoryPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `etrai-verification-ledger-${Date.now()}.csv`;
+    link.download = `deeptrust-verification-ledger-${Date.now()}.csv`;
     link.click();
     showToast(`Exported ${filteredRuns.length} verification records to CSV`);
   };

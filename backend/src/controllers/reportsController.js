@@ -99,7 +99,7 @@ const reverifyReport = async (req, res) => {
  */
 const getReportById = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user ? req.user.id : null;
     const { id } = req.params;
 
     const report = await dbService.findAnalysisById(id, userId);

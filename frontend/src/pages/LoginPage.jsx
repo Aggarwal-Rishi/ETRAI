@@ -213,8 +213,8 @@ export default function LoginPage({ defaultTab = 'login' }) {
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold tracking-tight text-white font-sans">ETRAI</span>
-              <span className="text-[10px] font-mono tracking-widest text-[#E88F6B] uppercase font-semibold">DeepTrust OS</span>
+              <span className="text-xl font-bold tracking-tight text-white font-sans">DeepTrust</span>
+              <span className="text-[10px] font-mono tracking-widest text-[#E88F6B] uppercase font-semibold">AI Verification OS</span>
             </div>
           </Link>
 
@@ -291,7 +291,7 @@ export default function LoginPage({ defaultTab = 'login' }) {
 
         {/* Footer info */}
         <div className="relative z-10 text-[11px] font-mono text-slate-400 flex items-center justify-between border-t border-slate-800/60 pt-4">
-          <span>ETRAI Platform · Neon DB</span>
+          <span>DeepTrust Platform · Neon DB</span>
           <span className="text-[#E88F6B]">SOC-2 & Cryptographic Audit Trails</span>
         </div>
       </div>
@@ -301,13 +301,13 @@ export default function LoginPage({ defaultTab = 'login' }) {
       {/* ========================================================================= */}
       <div className="order-1 md:order-2 w-full md:w-7/12 lg:w-1/2 min-h-screen md:min-h-0 p-5 sm:p-10 lg:p-14 flex flex-col justify-center max-w-xl mx-auto">
 
-        <Link to="/" className="md:hidden inline-flex items-center gap-3 mb-8 self-start" aria-label="ETRAI home">
+        <Link to="/" className="md:hidden inline-flex items-center gap-3 mb-8 self-start" aria-label="DeepTrust home">
           <span className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-[#D97757] flex items-center justify-center shadow-lg shadow-indigo-500/30">
             <ShieldCheck className="w-6 h-6 text-white" />
           </span>
           <span className="flex flex-col">
-            <span className="text-xl font-bold tracking-tight text-white leading-none">ETRAI</span>
-            <span className="text-[9px] font-mono tracking-widest text-[#E88F6B] uppercase font-semibold mt-1">DeepTrust OS</span>
+            <span className="text-xl font-bold tracking-tight text-white leading-none">DeepTrust</span>
+            <span className="text-[9px] font-mono tracking-widest text-[#E88F6B] uppercase font-semibold mt-1">AI Verification OS</span>
           </span>
         </Link>
         

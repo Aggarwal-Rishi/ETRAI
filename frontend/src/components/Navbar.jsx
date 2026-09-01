@@ -169,14 +169,14 @@ export default function Navbar() {
                 {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
-              {/* ETRAI Blue Shield Logo */}
-              <Link to="/" className="flex items-center gap-3 group" aria-label="ETRAI homepage">
+              {/* DeepTrust Blue Shield Logo */}
+              <Link to="/" className="flex items-center gap-3 group" aria-label="DeepTrust homepage">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-indigo-500/20 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-lg font-bold tracking-tight text-white font-sans leading-none">
-                    ETRAI
+                    DeepTrust
                   </span>
                   <span className="text-[10px] text-blue-400 font-semibold tracking-wider uppercase leading-none mt-1">
                     AI VERIFICATION

@@ -458,10 +458,10 @@ export default function HomePage() {
       <div className="home3d-content">
         <nav className="home3d-nav" aria-label="Primary navigation">
           <div className="home3d-nav-inner">
-            <Link className="home3d-brand" to="/" aria-label="ETRAI home">
+            <Link className="home3d-brand" to="/" aria-label="DeepTrust home">
               <span className="home3d-brand-logo"><ShieldCheck aria-hidden="true" /></span>
               <span>
-                <span className="home3d-brand-name">ETRAI</span>
+                <span className="home3d-brand-name">DeepTrust</span>
                 <span className="home3d-brand-sub">AI VERIFICATION</span>
               </span>
             </Link>
@@ -582,7 +582,7 @@ export default function HomePage() {
           <div className="home3d-container">
             <div className="home3d-section-heading" data-reveal>
               <span className="home3d-kicker">Multi-Agent Pipeline</span>
-              <h2>How ETRAI verifies content</h2>
+              <h2>How DeepTrust verifies content</h2>
               <p>A chain of specialized agents that ingest, search, cross-examine, and score every checkable claim.</p>
             </div>
             <div className="home3d-pipeline-grid">
@@ -604,12 +604,12 @@ export default function HomePage() {
         <div className="home3d-container" id="cta">
           <TiltCard className="home3d-cta" data-reveal>
             <h2>Stop misinformation before it spreads</h2>
-            <p>Paste a claim, upload a file, or submit a link. ETRAI turns it into a transparent evidence report.</p>
+            <p>Paste a claim, upload a file, or submit a link. DeepTrust turns it into a transparent evidence report.</p>
             <MagneticLink to="/analysis" className="home3d-btn-primary"><Plus size={19} />Start New Analysis<ArrowRight size={18} /></MagneticLink>
           </TiltCard>
         </div>
 
-        <footer className="home3d-footer">ETRAI — AI Verification · Fact-Checking &amp; Content Verification Platform</footer>
+        <footer className="home3d-footer">DeepTrust — AI Verification · Fact-Checking &amp; Content Verification Platform</footer>
       </div>
     </div>
   );

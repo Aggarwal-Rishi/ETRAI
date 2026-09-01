@@ -34,6 +34,17 @@ function classifyTransitionCard(frames = []) {
   return /\b(a few moments later|moments later|hours later|days later|meanwhile|to be continued|breaking news|flashback)\b/i.test(combined);
 }
 
+function searchablePublicFigureNames(publicFigures = []) {
+  return Array.from(new Set(publicFigures.map(figure => {
+    if (!figure || typeof figure === 'string') return null;
+    const confidence = Number(figure.confidence);
+    const normalizedConfidence = Number.isFinite(confidence) && confidence <= 1 ? confidence * 100 : confidence;
+    return figure.name && Number.isFinite(normalizedConfidence) && normalizedConfidence >= 75 && figure.basis
+      ? String(figure.name).trim()
+      : null;
+  }).filter(Boolean)));
+}
+
 function buildVideoSegments({ durationSeconds = 0, temporalBoundaries = [], shotCuts = {}, frames = [], transcriptSegments = [], forensics = {} }) {
   const duration = Math.max(0.1, Number(durationSeconds) || Math.max(0, ...frames.map(frame => Number(frame.timestamp || 0))) || 10);
   const values = [
@@ -114,6 +125,7 @@ function buildVideoSegments({ durationSeconds = 0, temporalBoundaries = [], shot
         : (acousticOverlaySignal
           ? `Acoustic transcription identified ${audioComponents.join(', ')}; visual correlation is still required to prove non-diegetic audio.`
           : 'No calibrated audio-to-scene provenance model established whether speech is native or overlaid.'),
+      reverse_searches: segmentFrames.map(frame => frame.reverseSearch).filter(Boolean),
       source_evidence: null
     });
   }
@@ -135,31 +147,150 @@ function buildSegmentSearchQuery(segment) {
   const cleanOcr = String(segment.visible_text || '').replace(/\[model-extracted text\]\s*:\s*/gi, '').trim();
   const parts = [
     isUsefulOcrText(cleanOcr) ? `"${cleanOcr.slice(0, 100)}"` : '',
+    ...searchablePublicFigureNames(segment.public_figures).slice(0, 2).map(name => `"${name}"`),
     ...(segment.entities || []).slice(0, 3),
+    ...(segment.logos || []).slice(0, 2),
+    ...(segment.landmarks || []).slice(0, 2),
     ...(segment.location_clues || []).slice(0, 2),
     ...(segment.date_clues || []).slice(0, 2),
     segment.transcript_original ? `"${segment.transcript_original.slice(0, 100)}"` : ''
   ].filter(Boolean);
-  return parts.join(' ').slice(0, 320);
+  return [...parts, 'original full video'].join(' ').slice(0, 360);
+}
+
+function buildTranscriptContextWindow(sourceText = '', clipText = '') {
+  const full = String(sourceText || '').replace(/\s+/g, ' ').trim();
+  const clip = String(clipText || '').replace(/\s+/g, ' ').trim();
+  if (full.length < 20 || clip.length < 8) return null;
+  const directIndex = full.toLocaleLowerCase().indexOf(clip.toLocaleLowerCase());
+  if (directIndex >= 0) {
+    return {
+      before: full.slice(Math.max(0, directIndex - 500), directIndex).trim() || null,
+      matched: full.slice(directIndex, directIndex + clip.length).trim(),
+      after: full.slice(directIndex + clip.length, directIndex + clip.length + 500).trim() || null
+    };
+  }
+  const sentences = full.split(/(?<=[.!?।])\s+/).filter(Boolean);
+  const ranked = sentences.map((sentence, index) => ({ index, sentence, similarity: tokenSimilarity(sentence, clip) }))
+    .sort((left, right) => right.similarity - left.similarity);
+  const best = ranked[0];
+  if (!best || best.similarity < 0.28) return null;
+  return {
+    before: sentences.slice(Math.max(0, best.index - 2), best.index).join(' ') || null,
+    matched: best.sentence,
+    after: sentences.slice(best.index + 1, best.index + 3).join(' ') || null
+  };
+}
+
+async function fetchSourceContextCached(url, options = {}) {
+  const cache = options.sourceContextCache;
+  if (!(cache instanceof Map)) return fetchImageSourceContext(url, options);
+  if (!cache.has(url)) {
+    cache.set(url, fetchImageSourceContext(url, options).catch(() => ({ status: 'UNAVAILABLE' })));
+  }
+  return cache.get(url);
 }
 
 async function collectSegmentSourceEvidence(segment, options = {}) {
   if (Array.isArray(options.mockSegmentEvidence)) {
     return options.mockSegmentEvidence.find(item => Number(item.segment_index) === Number(segment.segment_index)) || null;
   }
+  const exactFrameSearch = options.enableReverseSearch === false
+    ? null
+    : (segment.reverse_searches || []).find(search => search.exactMatch === true && Array.isArray(search.matches) && search.matches.length > 0);
+  if (exactFrameSearch) {
+    const match = exactFrameSearch.matches[0];
+    let contextWindow = match.contextWindow && typeof match.contextWindow === 'object' ? match.contextWindow : null;
+    let page = { status: 'UNAVAILABLE' };
+    try { page = await fetchSourceContextCached(match.sourceUrl, options); } catch (_) {}
+    if (!contextWindow) contextWindow = buildTranscriptContextWindow(page.videoTranscript || page.articleText || '', segment.transcript_original || segment.transcript_translation || '');
+    const sourceText = [
+      page.title,
+      page.description,
+      page.videoTranscript,
+      page.articleText,
+      contextWindow?.before,
+      contextWindow?.matched,
+      contextWindow?.after
+    ].filter(Boolean).join(' ').slice(0, 12000);
+    return {
+      status: 'EXACT_KEYFRAME_MATCH',
+      decisive: true,
+      corroborative: true,
+      provider: exactFrameSearch.provider,
+      query: exactFrameSearch.query || buildSegmentSearchQuery(segment),
+      relevance: Number.isFinite(Number(match.similarity)) ? Number(match.similarity) : 1,
+      visual_match: {
+        frame_timestamp: exactFrameSearch.timestamp,
+        similarity: match.similarity ?? null,
+        match_type: match.matchType || 'LOCALLY_VERIFIED_KEYFRAME_MATCH'
+      },
+      source: {
+        url: page.url || match.sourceUrl,
+        domain: page.domain || match.domain,
+        title: page.title || match.title,
+        description: page.description || null,
+        publisher: page.publisher || match.publisher || null,
+        publishedAt: page.publishedAt || match.publishedAt || null,
+        durationSeconds: match.sourceDurationSeconds || page.videoDurationSeconds || null,
+        sourceStartSec: match.sourceStartSec ?? null,
+        sourceEndSec: match.sourceEndSec ?? null,
+        contextWindow,
+        contextualVerdict: match.contextualVerdict || null
+      },
+      source_text: sourceText,
+      limitation: match.resolverVerified
+        ? 'An original-video resolver verified this source and the keyframe was also matched visually.'
+        : 'The frame is a locally verified visual match to this source; a matched frame alone does not prove that the page hosts the earliest or complete original video.'
+    };
+  }
+  const transcriptCandidate = options.provenanceEvidence?.originalCandidate;
+  if (transcriptCandidate?.sourceUrl && Number(transcriptCandidate.transcriptEvidenceScore || 0) >= 45) {
+    let page = { status: 'UNAVAILABLE' };
+    try { page = await fetchSourceContextCached(transcriptCandidate.sourceUrl, options); } catch (_) {}
+    const clipText = segment.transcript_original || segment.transcript_translation || '';
+    const sourceText = [page.videoTranscript, page.articleText, page.title, page.description, transcriptCandidate.snippet].filter(Boolean).join(' ').slice(0, 12000);
+    const contextWindow = buildTranscriptContextWindow(page.videoTranscript || page.articleText || '', clipText) || transcriptCandidate.contextWindow || null;
+    const relevance = tokenSimilarity(clipText, sourceText);
+    return {
+      status: 'TRANSCRIPT_SOURCE_MATCH',
+      decisive: false,
+      corroborative: Boolean(sourceText && (contextWindow || relevance >= 0.38)),
+      provider: (transcriptCandidate.providers || []).join('+') || transcriptCandidate.provider || 'TRANSCRIPT_SEARCH',
+      query: transcriptCandidate.searchQueries?.[0] || buildSegmentSearchQuery(segment),
+      relevance: Number(Math.max(relevance, Number(transcriptCandidate.transcriptClipCoverage || 0)).toFixed(3)),
+      source: {
+        url: page.url || transcriptCandidate.sourceUrl,
+        domain: page.domain || transcriptCandidate.domain,
+        title: page.title || transcriptCandidate.title,
+        description: page.description || transcriptCandidate.snippet || null,
+        publisher: page.publisher || transcriptCandidate.publisher || null,
+        publishedAt: page.publishedAt || transcriptCandidate.publishedAt || null,
+        durationSeconds: transcriptCandidate.sourceDurationSeconds || page.videoDurationSeconds || null,
+        sourceStartSec: transcriptCandidate.sourceStartSec ?? null,
+        sourceEndSec: transcriptCandidate.sourceEndSec ?? null,
+        contextWindow,
+        contextualVerdict: transcriptCandidate.contextualVerdict || (contextWindow ? 'CONTEXT_REVIEW_REQUIRED' : null)
+      },
+      source_text: sourceText,
+      limitation: transcriptCandidate.sourceTranscriptAvailable
+        ? 'The source exposes matching transcript text and adjacent context. Transcript identity alone does not prove that every pictured frame comes from this source.'
+        : 'A news report contains matching spoken phrases, but no source-hosted full transcript was available to prove exact video identity.'
+    };
+  }
   if (options.enableReverseSearch === false) return null;
   const apiKey = options.serperKey || process.env.SERPER_API_KEY;
   const query = buildSegmentSearchQuery(segment);
   if (!isKeyValid(apiKey) || query.length < 8) return null;
-  const search = await querySerperSearch(query, apiKey);
-  const segmentText = [segment.visible_text, segment.transcript_original, ...(segment.entities || []), ...(segment.location_clues || [])].join(' ');
+  const search = await querySerperSearch(query, apiKey, { intent: 'VIDEO_ORIGINAL' });
+  const segmentText = [segment.visible_text, segment.transcript_original, ...searchablePublicFigureNames(segment.public_figures), ...(segment.entities || []), ...(segment.location_clues || [])].join(' ');
   const candidates = (search.matches || []).map(match => ({
     ...match,
     relevance: tokenSimilarity(segmentText, `${match.title || ''} ${match.snippet || ''}`)
   })).filter(match => match.relevance >= 0.28).sort((a, b) => b.relevance - a.relevance);
   const match = candidates[0];
   if (!match) return null;
-  const page = await fetchImageSourceContext(match.sourceUrl, options);
+  const page = await fetchSourceContextCached(match.sourceUrl, options);
   return {
     status: 'TEXT_CONTEXT_MATCH',
     decisive: false,
@@ -299,6 +430,12 @@ function deterministicVideoReport(segments, forensics = {}, options = {}) {
         domain: segment.source_evidence.source?.domain,
         title: segment.source_evidence.source?.title,
         publishedAt: segment.source_evidence.source?.publishedAt || null,
+        durationSeconds: segment.source_evidence.source?.durationSeconds || null,
+        sourceStartSec: segment.source_evidence.source?.sourceStartSec ?? null,
+        sourceEndSec: segment.source_evidence.source?.sourceEndSec ?? null,
+        contextWindow: segment.source_evidence.source?.contextWindow || null,
+        contextualVerdict: segment.source_evidence.source?.contextualVerdict || null,
+        visualMatch: segment.source_evidence.visual_match || null,
         limitation: segment.source_evidence.limitation
       } : null
     })),
@@ -326,9 +463,163 @@ function normalizeScore(value, fallback) {
   return Math.max(0, Math.min(1, number > 1 ? number / 100 : number));
 }
 
+function sanitizeContextWindow(value) {
+  if (!value || typeof value !== 'object') return null;
+  const clean = field => value[field] ? String(value[field]).trim().slice(0, 5000) : null;
+  const window = {
+    before: clean('before'),
+    matched: clean('matched'),
+    after: clean('after'),
+    beforeStartSec: Number.isFinite(Number(value.beforeStartSec)) ? Number(value.beforeStartSec) : null,
+    matchStartSec: Number.isFinite(Number(value.matchStartSec)) ? Number(value.matchStartSec) : null,
+    matchEndSec: Number.isFinite(Number(value.matchEndSec)) ? Number(value.matchEndSec) : null,
+    afterEndSec: Number.isFinite(Number(value.afterEndSec)) ? Number(value.afterEndSec) : null
+  };
+  return window.before || window.matched || window.after ? window : null;
+}
+
+function buildVideoCompletenessAssessment({ durationSeconds = 0, report = {}, provenanceEvidence = {} }) {
+  const segmentEvidence = (report.segments || []).map(segment => segment.source_evidence).find(evidence => evidence?.decisive && evidence?.url) || null;
+  const provenanceCandidate = provenanceEvidence.originalCandidate || null;
+  const candidate = provenanceCandidate || segmentEvidence ? {
+    ...(segmentEvidence ? {
+      sourceUrl: segmentEvidence.url,
+      title: segmentEvidence.title,
+      domain: segmentEvidence.domain,
+      publishedAt: segmentEvidence.publishedAt,
+      sourceDurationSeconds: segmentEvidence.durationSeconds,
+      sourceStartSec: segmentEvidence.sourceStartSec,
+      sourceEndSec: segmentEvidence.sourceEndSec,
+      contextWindow: segmentEvidence.contextWindow,
+      contextualVerdict: segmentEvidence.contextualVerdict,
+      exactFrameMatches: segmentEvidence.decisive ? 1 : 0,
+      providers: segmentEvidence.visualMatch ? ['LOCALLY_VERIFIED_KEYFRAME_MATCH'] : [],
+      confidence: 'VISUALLY_MATCHED_SOURCE_PAGE'
+    } : {}),
+    ...(provenanceCandidate || {}),
+    sourceDurationSeconds: provenanceCandidate?.sourceDurationSeconds || segmentEvidence?.durationSeconds || null,
+    sourceStartSec: provenanceCandidate?.sourceStartSec ?? segmentEvidence?.sourceStartSec ?? null,
+    sourceEndSec: provenanceCandidate?.sourceEndSec ?? segmentEvidence?.sourceEndSec ?? null,
+    contextWindow: provenanceCandidate?.contextWindow || segmentEvidence?.contextWindow || null,
+    contextualVerdict: provenanceCandidate?.contextualVerdict || segmentEvidence?.contextualVerdict || null
+  } : null;
+  const uploadedDuration = Math.max(0, Number(durationSeconds) || 0);
+  const originalDuration = Math.max(0, Number(candidate?.sourceDurationSeconds || 0) || 0);
+  const sourceStartSec = Number.isFinite(Number(candidate?.sourceStartSec)) ? Number(candidate.sourceStartSec) : null;
+  const sourceEndSec = Number.isFinite(Number(candidate?.sourceEndSec))
+    ? Number(candidate.sourceEndSec)
+    : (sourceStartSec !== null && uploadedDuration > 0 ? sourceStartSec + uploadedDuration : null);
+  const durationRatio = originalDuration > 0 && uploadedDuration > 0 ? Math.min(1, uploadedDuration / originalDuration) : null;
+  const contextWindow = sanitizeContextWindow(candidate?.contextWindow);
+  const exactVisualEvidence = Boolean(candidate && (candidate.resolverVerified || Number(candidate.exactFrameMatches || 0) > 0));
+  const originalVerified = candidate?.confidence === 'VERIFIED_ORIGINAL' || candidate?.resolverVerified === true;
+  const strongTranscriptEvidence = Boolean(candidate && (
+    candidate.confidence === 'STRONG_TRANSCRIPT_ORIGINAL_CANDIDATE' ||
+    (candidate.strongTranscriptMatch === true && candidate.sourceTranscriptAvailable === true && Number(candidate.transcriptEvidenceScore || 0) >= 78)
+  ));
+  const sourceIdentitySupported = exactVisualEvidence || strongTranscriptEvidence;
+  const strongOriginalCandidate = originalVerified || candidate?.confidence === 'STRONG_ORIGINAL_CANDIDATE' || strongTranscriptEvidence;
+  const reportProvesMisrepresentation = report.verdict === 'Deceptive Context' || (report.segments || []).some(segment => segment.is_truncated === true);
+  const sourceContextVerdict = String(candidate?.contextualVerdict || '').toUpperCase();
+  const contextMisrepresented = reportProvesMisrepresentation || ['CONTEXT_MISREPRESENTED', 'MISLEADING_OUT_OF_CONTEXT'].includes(sourceContextVerdict);
+  const contextSupported = ['CONTEXT_SUPPORTED', 'FAITHFUL_EXCERPT'].includes(sourceContextVerdict);
+  const startsAtBeginning = sourceStartSec === null ? null : sourceStartSec <= Math.max(3, originalDuration * 0.02);
+  const endsAtEnd = sourceEndSec === null || originalDuration <= 0 ? null : sourceEndSec >= originalDuration - Math.max(3, originalDuration * 0.02);
+  const completeByTimeline = Boolean(strongOriginalCandidate && sourceStartSec !== null && sourceEndSec !== null && durationRatio !== null && durationRatio >= 0.95 && startsAtBeginning !== false && endsAtEnd !== false);
+
+  let verdict = 'ORIGINAL_NOT_FOUND';
+  let label = 'Original source not found';
+  let explanation = 'No locally verified keyframe match or resolver-confirmed original video was recovered.';
+  if (candidate && !sourceIdentitySupported) {
+    verdict = 'POSSIBLE_SOURCE_CANDIDATE';
+    label = 'Possible source candidate';
+    explanation = 'Search results contain a related news or video candidate, but neither a locally verified frame match nor a strong source-hosted transcript match proves it contains this footage.';
+  } else if (candidate && exactVisualEvidence && !strongOriginalCandidate) {
+    verdict = 'VISUAL_SOURCE_MATCH_FOUND';
+    label = 'Matching source found; original not yet confirmed';
+    explanation = 'At least one keyframe matches this source, but the evidence does not establish that it is the complete or earliest original video.';
+  } else if (completeByTimeline) {
+    verdict = 'COMPLETE_ORIGINAL_VIDEO';
+    label = 'Complete original video';
+    explanation = 'The resolver-confirmed source timeline and duration align with the submitted video from beginning to end.';
+  } else if (strongOriginalCandidate && contextMisrepresented) {
+    verdict = 'MISLEADING_OUT_OF_CONTEXT';
+    label = 'Partial clip with misleading context';
+    explanation = 'Source-backed adjacent context or timeline evidence materially changes the meaning presented by the submitted clip.';
+  } else if (strongOriginalCandidate && contextSupported) {
+    verdict = 'FAITHFUL_EXCERPT';
+    label = 'Short but contextually faithful excerpt';
+    explanation = 'The submitted video is shorter than the matched source, while the available full-context comparison supports the same meaning.';
+  } else if (strongOriginalCandidate && originalDuration > 0 && uploadedDuration < originalDuration * 0.95) {
+    verdict = 'PARTIAL_CLIP_CONTEXT_UNVERIFIED';
+    label = 'Partial clip; context not fully resolved';
+    explanation = 'A longer source was identified, but the available before/after evidence is insufficient to determine whether the excerpt preserves its meaning.';
+  } else if (strongOriginalCandidate) {
+    verdict = 'ORIGINAL_FOUND_COMPLETENESS_UNKNOWN';
+    label = 'Original candidate found; completeness unknown';
+    explanation = 'The source is strongly matched, but its full duration or the clip position within it could not be established.';
+  }
+
+  const integrityVerdict = contextMisrepresented
+    ? 'CONTEXT_MISREPRESENTED'
+    : contextSupported
+      ? 'CONTEXT_SUPPORTED'
+      : contextWindow
+        ? 'CONTEXT_REVIEW_REQUIRED'
+        : 'INCONCLUSIVE';
+  const confidence = originalVerified ? 95
+    : candidate?.confidence === 'STRONG_ORIGINAL_CANDIDATE' ? 86
+      : strongTranscriptEvidence ? 82
+      : exactVisualEvidence ? 72
+        : candidate ? 35 : 0;
+
+  return {
+    verdict,
+    label,
+    explanation,
+    confidence,
+    isComplete: verdict === 'COMPLETE_ORIGINAL_VIDEO',
+    isExcerpt: ['FAITHFUL_EXCERPT', 'MISLEADING_OUT_OF_CONTEXT', 'PARTIAL_CLIP_CONTEXT_UNVERIFIED'].includes(verdict),
+    contextIntegrity: {
+      verdict: integrityVerdict,
+      sourceGrounded: Boolean(contextWindow || reportProvesMisrepresentation),
+      rationale: report.summary || explanation
+    },
+    uploadedDurationSeconds: uploadedDuration || null,
+    originalDurationSeconds: originalDuration || null,
+    durationRatio: durationRatio === null ? null : Number(durationRatio.toFixed(3)),
+    matchTimeline: {
+      sourceStartSec,
+      sourceEndSec
+    },
+    contextWindow,
+    source: candidate ? {
+      url: candidate.sourceUrl || null,
+      title: candidate.title || null,
+      domain: candidate.domain || null,
+      publisher: candidate.publisher || null,
+      publishedAt: candidate.publishedAt || null,
+      confidence: candidate.confidence || null,
+      exactFrameMatches: Number(candidate.exactFrameMatches || 0),
+      matchedFrameTimestamps: candidate.matchedFrameTimestamps || [],
+      providers: candidate.providers || [],
+      transcriptEvidenceScore: Number(candidate.transcriptEvidenceScore || 0) || null,
+      transcriptMatchType: candidate.transcriptMatchType || null,
+      matchedTranscriptPhrases: candidate.matchedTranscriptPhrases || []
+    } : null,
+    limitations: [
+      ...(!candidate ? ['The original video could not be identified from the configured search providers.'] : []),
+      ...(candidate && !originalDuration ? ['The matched source did not expose a reliable full-video duration.'] : []),
+      ...(candidate && !contextWindow ? ['No source-backed before/after transcript window was recovered.'] : []),
+      ...(strongTranscriptEvidence && !exactVisualEvidence ? ['The likely source is supported by source-hosted transcript overlap, but no keyframe match independently proves visual identity.'] : []),
+      ...(candidate && !strongOriginalCandidate ? ['A related page or weak transcript clue is not by itself proof of the earliest complete original video.'] : [])
+    ]
+  };
+}
+
 function buildReproducibilityMetadata({ fileInfo = {}, durationSeconds = 0, temporalBoundaries = [], temporalBoundaryDetection = {}, transcriptMetadata = {}, segments = [], forensics = {} }, options = {}) {
   return {
-    methodology_version: 'ETRAI_SEGMENT_CONTEXT_V2',
+    methodology_version: 'ETRAI_SEGMENT_CONTEXT_V3',
     input: {
       filename: fileInfo.filename || null,
       mime_type: fileInfo.mimeType || null,
@@ -361,7 +652,13 @@ function buildReproducibilityMetadata({ fileInfo = {}, durationSeconds = 0, temp
     },
     context_retrieval: {
       providers_used: Array.from(new Set(segments.map(segment => segment.source_evidence?.provider).filter(Boolean))),
-      exact_media_match_required_for_misattribution_verdict: true
+      exact_media_match_required_for_misattribution_verdict: true,
+      external_visual_search_consent: options.allowExternalVisualSearch === true,
+      external_transcript_search_consent: options.allowExternalTranscriptSearch === true,
+      public_figure_search_confidence_threshold: 75,
+      reverse_searched_frames: Number(options.provenanceEvidence?.reverseSearchedFrameCount || 0),
+      transcript_search_queries: Number(options.provenanceEvidence?.transcriptSearch?.executedQueryCount || 0),
+      transcript_matched_sources: Number(options.provenanceEvidence?.transcriptSearch?.matchedSourceCount || 0)
     },
     configured_models: {
       report_synthesis: options.disableAi === true ? null : ((process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim()),
@@ -458,20 +755,47 @@ Return JSON only with verdict (Manipulated / Deceptive Context / Authentic / Dee
   }
 }
 
-async function generateVideoContextReport({ fileInfo = {}, durationSeconds, temporalBoundaries, temporalBoundaryDetection = {}, frames, transcriptSegments, transcriptMetadata = {}, forensics }, options = {}) {
+async function generateVideoContextReport({ fileInfo = {}, durationSeconds, temporalBoundaries, temporalBoundaryDetection = {}, frames, transcriptSegments, transcriptMetadata = {}, forensics, provenanceEvidence = {} }, options = {}) {
   const injectedMedia = Array.isArray(options.mockFrames) || Boolean(options.mockTranscript);
   const effectiveOptions = injectedMedia && !Array.isArray(options.mockSegmentEvidence) && !options.geminiClient
-    ? { ...options, enableReverseSearch: false, disableAi: true }
-    : options;
+    ? { ...options, provenanceEvidence, enableReverseSearch: false, disableAi: true }
+    : { ...options, provenanceEvidence };
+  const evidenceOptions = { ...effectiveOptions, sourceContextCache: new Map() };
   const segments = buildVideoSegments({ durationSeconds, temporalBoundaries, shotCuts: forensics?.shotCuts, frames, transcriptSegments, forensics });
-  const maxSearchSegments = Math.min(Number(effectiveOptions.maxVideoContextSegments || 6), segments.length);
-  for (let index = 0; index < maxSearchSegments; index += 1) {
-    try { segments[index].source_evidence = await collectSegmentSourceEvidence(segments[index], effectiveOptions); }
-    catch (error) { segments[index].source_evidence = { status: 'UNAVAILABLE', decisive: false, limitation: error.message, source: null }; }
+  const configuredSegmentLimit = Number(effectiveOptions.maxVideoContextSegments);
+  const segmentLimit = Number.isFinite(configuredSegmentLimit) && configuredSegmentLimit > 0 ? Math.floor(configuredSegmentLimit) : 6;
+  const maxSearchSegments = Math.min(segmentLimit, segments.length);
+  const configuredConcurrency = Number(effectiveOptions.videoContextSearchConcurrency);
+  const searchBatchSize = Number.isFinite(configuredConcurrency) && configuredConcurrency > 0
+    ? Math.max(1, Math.min(Math.floor(configuredConcurrency), 3))
+    : 3;
+  for (let start = 0; start < maxSearchSegments; start += searchBatchSize) {
+    const indexes = Array.from(
+      { length: Math.min(searchBatchSize, maxSearchSegments - start) },
+      (_, offset) => start + offset
+    );
+    const evidenceResults = await Promise.all(indexes.map(async index => {
+      try {
+        return await collectSegmentSourceEvidence(segments[index], evidenceOptions);
+      } catch (error) {
+        return { status: 'UNAVAILABLE', decisive: false, limitation: error.message, source: null };
+      }
+    }));
+    indexes.forEach((index, offset) => {
+      segments[index].source_evidence = evidenceResults[offset];
+    });
   }
   const report = await synthesizeVideoReport(segments, forensics || {}, effectiveOptions);
+  const completeness = buildVideoCompletenessAssessment({ durationSeconds, report, provenanceEvidence });
   const reproducibility = buildReproducibilityMetadata({ fileInfo, durationSeconds, temporalBoundaries, temporalBoundaryDetection, transcriptMetadata, segments, forensics: forensics || {} }, effectiveOptions);
-  return { ...report, methodology: 'ETRAI_SEGMENT_CONTEXT_V2', reproducibility, generated_at: new Date().toISOString() };
+  return {
+    ...report,
+    methodology: 'ETRAI_SEGMENT_CONTEXT_V3',
+    completeness,
+    provenance: { ...provenanceEvidence, completeness },
+    reproducibility,
+    generated_at: new Date().toISOString()
+  };
 }
 
 module.exports = {
@@ -479,9 +803,11 @@ module.exports = {
   tokenSimilarity,
   buildVideoSegments,
   buildSegmentSearchQuery,
+  buildTranscriptContextWindow,
   collectSegmentSourceEvidence,
   analyzeCrossSegmentContext,
   deterministicVideoReport,
+  buildVideoCompletenessAssessment,
   synthesizeVideoReport,
   buildReproducibilityMetadata,
   generateVideoContextReport

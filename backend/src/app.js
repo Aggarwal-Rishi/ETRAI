@@ -84,7 +84,7 @@ if (fs.existsSync(frontendDistPath)) {
   // Root Fallback Route when frontend dist is not built
   app.get('/', (req, res) => {
     res.json({
-      message: 'ETRAI Fact-Checking & AI Verification API',
+      message: 'DeepTrust Fact-Checking & AI Verification API',
       healthCheck: '/api/v1/health',
       readinessCheck: '/api/v1/health/ready'
     });
@@ -112,7 +112,7 @@ app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
   
   if (statusCode >= 500) {
-    console.error('[ETRAI Server Error]:', err.stack || err.message || err);
+    console.error('[DeepTrust Server Error]:', err.stack || err.message || err);
   }
 
   res.status(statusCode).json({

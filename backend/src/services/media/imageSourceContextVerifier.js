@@ -132,7 +132,7 @@ function extractSourcePageContext(html = '', url = '') {
   const extracted = extractHtmlAssetsAndMetadata(html, url);
   const metadata = extracted.metadata || {};
   const articleText = cleanHtml(html).slice(0, MAX_SOURCE_TEXT_CHARS);
-  const evidenceText = [metadata.title, metadata.description, articleText].filter(Boolean).join(' ').trim();
+  const evidenceText = [metadata.title, metadata.description, metadata.videoTranscript, articleText].filter(Boolean).join(' ').trim();
 
   if (!evidenceText) {
     return {
@@ -153,6 +153,10 @@ function extractSourcePageContext(html = '', url = '') {
     publisher: metadata.publisher || null,
     author: metadata.author || null,
     publishedAt: metadata.publishedAt || null,
+    videoDurationSeconds: metadata.videoDurationSeconds || null,
+    videoTranscript: metadata.videoTranscript || null,
+    videoContentUrl: metadata.videoContentUrl || null,
+    videoEmbedUrl: metadata.videoEmbedUrl || null,
     articleText,
     evidenceText
   };

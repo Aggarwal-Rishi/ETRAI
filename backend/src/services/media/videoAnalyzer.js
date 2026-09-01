@@ -469,10 +469,19 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   let extractedAudio = null;
   let extractedPcmAudio = null;
   let pcmSampleFormat = null;
+  const emitProgress = (progress, step, stage) => {
+    if (typeof options.onVideoProgress !== 'function') return;
+    try {
+      options.onVideoProgress({ progress, step, stage });
+    } catch (_) {
+      // Progress reporting must never interrupt the forensic pipeline.
+    }
+  };
 
   // 1. Container Metadata & FFmpeg Diagnostics
   const metaRes = await getVideoMetadata(fileInfo, buffer, options);
   allLimitations.push(...metaRes.limitations);
+  emitProgress(31, 'Agent 1: Video metadata parsed successfully...', 'MEDIA_METADATA');
 
   // 2. Keyframe Extraction
   const boundaryRes = detectTemporalBoundaries(fileInfo, buffer, options);
@@ -483,6 +492,7 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   });
   allLimitations.push(...frameRes.limitations);
   const keyframes = frameRes.keyframes || [];
+  emitProgress(36, `Agent 1: Extracted ${keyframes.length} representative keyframe${keyframes.length === 1 ? '' : 's'}...`, 'KEYFRAME_EXTRACTION');
 
   // 3. Audio Extraction & Speech-to-Text Transcription
   let transcriptRes = { status: 'UNAVAILABLE', text: '', segments: [], limitations: [] };
@@ -498,11 +508,15 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   } else {
     allLimitations.push('Video container indicates no audio track present');
   }
+  emitProgress(43, transcriptRes.text
+    ? 'Agent 1: Speech transcript extracted for source and context matching...'
+    : 'Agent 1: Audio inspection completed; no usable speech transcript was recovered...', 'AUDIO_TRANSCRIPTION');
 
   // 4. Frame Visual Analysis & Separate Frame OCR (Executed in parallel for performance)
   const allObservedEntities = [];
   const ocrTexts = [];
 
+  let analyzedFrameCount = 0;
   const frameAnalyses = await Promise.all(
     keyframes.map(async (frame) => {
       try {
@@ -522,15 +536,16 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
         );
 
         if (ocrRes.ocrText) ocrTexts.push(`[Timestamp ${frame.timestamp}s]: ${ocrRes.ocrText}`);
-        if (Array.isArray(imgRes.observed?.entities)) allObservedEntities.push(...imgRes.observed.entities);
-        if (Array.isArray(imgRes.observed?.landmarks)) allObservedEntities.push(...imgRes.observed.landmarks);
+        if (options.detectEntities !== false && Array.isArray(imgRes.observed?.entities)) allObservedEntities.push(...imgRes.observed.entities);
+        if (options.detectEntities !== false && Array.isArray(imgRes.observed?.landmarks)) allObservedEntities.push(...imgRes.observed.landmarks);
 
-        return {
+        const analysis = {
+          frameIndex: frame.frameIndex,
           timestamp: frame.timestamp,
           description: imgRes.visualDescription || frame.description || `Frame at ${frame.timestamp}s`,
           visibleText: ocrRes.ocrText || '',
-          entities: (imgRes.observed?.entities?.length > 0 ? imgRes.observed.entities : (frame.entities || [])),
-          publicFigures: imgRes.observed?.publicFigures || [],
+          entities: options.detectEntities === false ? [] : (imgRes.observed?.entities?.length > 0 ? imgRes.observed.entities : (frame.entities || [])),
+          publicFigures: options.detectEntities === false ? [] : (imgRes.observed?.publicFigures || []),
           logos: imgRes.observed?.logos || [],
           signs: imgRes.observed?.signs || [],
           landmarks: imgRes.observed?.landmarks || [],
@@ -546,8 +561,16 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
           visualSignals: imgRes.manipulationSignals || [],
           dHash: frame.dHash || null
         };
+        analyzedFrameCount += 1;
+        emitProgress(
+          44 + Math.round((analyzedFrameCount / Math.max(keyframes.length, 1)) * 8),
+          `Agent 1: Analyzed keyframe ${analyzedFrameCount} of ${keyframes.length}...`,
+          'FRAME_ANALYSIS'
+        );
+        return analysis;
       } catch (_) {
-        return {
+        const analysis = {
+          frameIndex: frame.frameIndex,
           timestamp: frame.timestamp,
           description: `Frame at ${frame.timestamp}s`,
           visibleText: '',
@@ -568,11 +591,60 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
           visualSignals: [],
           dHash: frame.dHash || null
         };
+        analyzedFrameCount += 1;
+        emitProgress(
+          44 + Math.round((analyzedFrameCount / Math.max(keyframes.length, 1)) * 8),
+          `Agent 1: Analyzed keyframe ${analyzedFrameCount} of ${keyframes.length}...`,
+          'FRAME_ANALYSIS'
+        );
+        return analysis;
       }
     })
   );
+  emitProgress(52, 'Agent 1: Keyframe vision and OCR analysis complete...', 'FRAME_ANALYSIS');
 
-  // 5. Temporal Consistency Analysis Across Keyframes
+  // 5. Reverse-search only a small set of high-value keyframes when the user
+  // explicitly opted in to external visual search. Raw frame buffers are used
+  // transiently by the configured provider and are never returned or persisted.
+  const { collectVideoProvenanceEvidence } = require('./videoProvenanceVerifier');
+  const injectedFramesWithoutSearchEvidence = Array.isArray(options.mockFrames) &&
+    !Array.isArray(options.mockVideoFrameSearches) &&
+    !Array.isArray(options.mockTranscriptSearches) &&
+    !Array.isArray(options.mockOriginalVideoCandidates) &&
+    !options.originalVideoResolver;
+  let videoProvenanceEvidence;
+  try {
+    emitProgress(54, options.allowExternalVisualSearch || options.allowExternalTranscriptSearch
+      ? 'Agent 1: Searching authorized visual and transcript clues for original sources...'
+      : 'Agent 1: Assessing provenance without external source searches...', 'VIDEO_PROVENANCE');
+    videoProvenanceEvidence = await collectVideoProvenanceEvidence(
+      frameAnalyses.map((analysis, index) => ({ ...analysis, buffer: keyframes[index]?.buffer || null })),
+      transcriptRes.segments || [],
+      injectedFramesWithoutSearchEvidence ? { ...options, enableReverseSearch: false } : options
+    );
+    allLimitations.push(...(videoProvenanceEvidence.limitations || []));
+    const searchByFrame = new Map((videoProvenanceEvidence.frameSearches || []).map(search => [Number(search.frameIndex), search]));
+    frameAnalyses.forEach(frame => {
+      const search = searchByFrame.get(Number(frame.frameIndex));
+      if (search) frame.reverseSearch = search;
+    });
+  } catch (error) {
+    videoProvenanceEvidence = {
+      status: 'ERROR',
+      methodology: 'ETRAI_VIDEO_PROVENANCE_V1',
+      recognizedFigures: [],
+      searchFigures: [],
+      frameSearches: [],
+      sourceCandidates: [],
+      transcriptSearch: { status: 'ERROR', queryCount: 0, executedQueryCount: 0, queries: [], matches: [], limitations: [`Video provenance analysis failed: ${error.message}`] },
+      originalCandidate: null,
+      limitations: [`Video provenance analysis failed: ${error.message}`]
+    };
+    allLimitations.push(...videoProvenanceEvidence.limitations);
+  }
+  emitProgress(61, 'Agent 1: Video provenance and original-source candidates assessed...', 'VIDEO_PROVENANCE');
+
+  // 6. Temporal Consistency Analysis Across Keyframes
   const manipulationSignals = [];
 
   for (let i = 1; i < frameAnalyses.length; i++) {
@@ -605,8 +677,9 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     }
   }
 
-  // 6. Real Video & Audio Forensics Pipeline
+  // 7. Real Video & Audio Forensics Pipeline
   const { performVideoAudioForensics } = require('./videoAudioForensics');
+  emitProgress(63, 'Agent 1: Running video, audio, splice, and synthetic-media checks...', 'VIDEO_FORENSICS');
   const forensicsRes = await performVideoAudioForensics(fileInfo, buffer, {
     ...options,
     metadata: metaRes.metadata,
@@ -617,11 +690,12 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     audioSampleFormat: pcmSampleFormat,
     temporalBoundaries: boundaryRes.boundaries || []
   });
+  emitProgress(65, 'Agent 1: Video and audio forensic checks complete...', 'VIDEO_FORENSICS');
 
-  // 7. Segment-level context report. This reuses already extracted text and
-  // frame observations; raw video frames are not sent to an additional search
-  // provider.
+  // 8. Segment-level context and completeness report. It consumes only the
+  // sanitized reverse-search evidence above, never the raw keyframe buffers.
   const { generateVideoContextReport } = require('./videoContextVerifier');
+  emitProgress(66, 'Agent 1: Comparing clip segments with recovered source context...', 'VIDEO_CONTEXT');
   const videoContextReport = await generateVideoContextReport({
     fileInfo,
     durationSeconds: metaRes.metadata?.durationSeconds || options.duration || 10,
@@ -635,9 +709,11 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
       provider: transcriptRes.provider || null,
       model: transcriptRes.model || null
     },
-    forensics: forensicsRes
+    forensics: forensicsRes,
+    provenanceEvidence: videoProvenanceEvidence
   }, options);
   forensicsRes.contextReport = videoContextReport;
+  emitProgress(68, 'Agent 1: Clip completeness and full-context assessment complete...', 'VIDEO_CONTEXT');
 
   if (forensicsRes.suspiciousSegments?.length > 0) {
     forensicsRes.suspiciousSegments.forEach(seg => {
@@ -691,6 +767,7 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     manipulationSignals,
     forensics: forensicsRes,
     videoContextReport,
+    videoProvenance: videoContextReport?.provenance || videoProvenanceEvidence,
     limitations: uniqueLimitations
   };
 }

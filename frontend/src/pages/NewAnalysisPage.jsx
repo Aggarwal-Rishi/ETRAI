@@ -70,6 +70,8 @@ export default function NewAnalysisPage() {
 
   // Pipeline Toggles
   const [optReverseSearch, setOptReverseSearch] = useState(true);
+  const [optExternalVisualSearch, setOptExternalVisualSearch] = useState(false);
+  const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(false);
   const [optTraceProvenance, setOptTraceProvenance] = useState(true);
   const [optDetectEntities, setOptDetectEntities] = useState(true);
   const [optDeepArchive, setOptDeepArchive] = useState(false); // Coming soon
@@ -84,6 +86,19 @@ export default function NewAnalysisPage() {
   const [errorMessage, setErrorMessage] = useState(null);
 
   const timerRef = useRef(null);
+  const eventSourceRef = useRef(null);
+  const pollTimerRef = useRef(null);
+
+  const stopJobListeners = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -182,9 +197,15 @@ export default function NewAnalysisPage() {
     };
   }, [isRunning]);
 
+  useEffect(() => () => {
+    if (eventSourceRef.current) eventSourceRef.current.close();
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+  }, []);
+
   // Handle Form Submission
   const handleLaunchVerification = async (e) => {
     if (e) e.preventDefault();
+    stopJobListeners();
     setErrorMessage(null);
 
     // Validation
@@ -234,6 +255,8 @@ export default function NewAnalysisPage() {
         if (urlInput.trim()) formData.append('url', urlInput.trim());
         formData.append('selectedTypes', JSON.stringify(['FACT_CHECKING', 'FAKE_NEWS_DETECTION']));
         formData.append('enableReverseSearch', String(optReverseSearch));
+        formData.append('allowExternalVisualSearch', String(selectedCard === 'VIDEO' && optExternalVisualSearch));
+        formData.append('allowExternalTranscriptSearch', String(selectedCard === 'VIDEO' && optExternalTranscriptSearch));
         formData.append('traceProvenance', String(optTraceProvenance));
         formData.append('detectEntities', String(optDetectEntities));
         body = formData;
@@ -245,6 +268,8 @@ export default function NewAnalysisPage() {
           text: textInput.trim() || undefined,
           selectedTypes: ['FACT_CHECKING', 'FAKE_NEWS_DETECTION'],
           enableReverseSearch: optReverseSearch,
+          allowExternalVisualSearch: selectedCard === 'VIDEO' && optExternalVisualSearch,
+          allowExternalTranscriptSearch: selectedCard === 'VIDEO' && optExternalTranscriptSearch,
           traceProvenance: optTraceProvenance,
           detectEntities: optDetectEntities
         });
@@ -272,44 +297,69 @@ export default function NewAnalysisPage() {
       const eventSource = new EventSource(sseUrl, {
         withCredentials: true
       });
+      eventSourceRef.current = eventSource;
+
+      const applyJobState = (state) => {
+        if (state.progress !== undefined) setProgress(state.progress);
+        if (state.step) setCurrentStep(state.step);
+        if (state.stage) setCurrentStage(state.stage);
+
+        if (state.status === 'COMPLETED') {
+          stopJobListeners();
+          navigate(`/results/${activeJobId}`);
+          return true;
+        }
+        if (state.status === 'FAILED') {
+          stopJobListeners();
+          setIsRunning(false);
+          setErrorMessage(state.error || 'Verification pipeline encountered a failure.');
+          return true;
+        }
+        return false;
+      };
+
+      const pollJobState = async () => {
+        pollTimerRef.current = null;
+        try {
+          const pollRes = await fetch(apiUrl(`/api/v1/verify/job/${activeJobId}`), {
+            headers,
+            credentials: 'include'
+          });
+          if (pollRes.ok) {
+            const pollData = await pollRes.json();
+            if (pollData.job && applyJobState(pollData.job)) return;
+          }
+        } catch (_) {
+          // A temporary polling failure is retried below while the job remains active.
+        }
+        if (eventSourceRef.current && !pollTimerRef.current) {
+          pollTimerRef.current = setTimeout(pollJobState, 5000);
+        }
+      };
 
       eventSource.onmessage = (event) => {
         try {
           const streamData = JSON.parse(event.data);
-          if (streamData.progress !== undefined) setProgress(streamData.progress);
-          if (streamData.step) setCurrentStep(streamData.step);
-          if (streamData.stage) setCurrentStage(streamData.stage);
-
-          if (streamData.status === 'COMPLETED') {
-            eventSource.close();
-            navigate(`/results/${activeJobId}`);
-          } else if (streamData.status === 'FAILED') {
-            eventSource.close();
-            setIsRunning(false);
-            setErrorMessage(streamData.error || 'Verification pipeline encountered a failure.');
+          if (pollTimerRef.current) {
+            clearTimeout(pollTimerRef.current);
+            pollTimerRef.current = null;
           }
+          applyJobState(streamData);
         } catch (parseErr) {
           console.error('[SSE Parse Error]:', parseErr);
         }
       };
 
       eventSource.onerror = () => {
-        // Retry polling if stream disconnects
-        setTimeout(async () => {
-          try {
-            const pollRes = await fetch(apiUrl(`/api/v1/reports/${activeJobId}`), { headers, credentials: 'include' });
-            if (pollRes.ok) {
-              const pollData = await pollRes.json();
-              if (pollData.report) {
-                eventSource.close();
-                navigate(`/results/${activeJobId}`);
-              }
-            }
-          } catch (e) {}
-        }, 3000);
+        // EventSource reconnects automatically. Poll the authenticated job-state
+        // endpoint as a recovery path in case a proxy keeps the stream closed.
+        if (eventSourceRef.current === eventSource && !pollTimerRef.current) {
+          pollTimerRef.current = setTimeout(pollJobState, 3000);
+        }
       };
 
     } catch (err) {
+      stopJobListeners();
       setIsRunning(false);
       setErrorMessage(err.message || 'Pipeline initialization failed.');
     }
@@ -902,6 +952,40 @@ export default function NewAnalysisPage() {
                     <span className="text-slate-400 text-[11px]">Recovers first original frame from wire archives</span>
                   </div>
                 </label>
+
+                {/* Explicit consent for external video-keyframe lookup */}
+                {selectedCard === 'VIDEO' && (
+                  <>
+                    <label className="p-3.5 bg-indigo-500/5 border border-indigo-500/30 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-indigo-400/60 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={optExternalVisualSearch}
+                        onChange={(e) => setOptExternalVisualSearch(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                      />
+                      <div>
+                        <span className="font-semibold text-white block">Search selected video frames externally</span>
+                        <span className="text-slate-400 text-[11px] leading-relaxed block mt-0.5">
+                          With your permission, DeepTrust may upload up to three selected keyframes—not the full video—to the configured Google Lens, Google Vision, or Serper provider to locate matching original footage. Frame bytes are not stored in the report.
+                        </span>
+                      </div>
+                    </label>
+                    <label className="p-3.5 bg-cyan-500/5 border border-cyan-500/30 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-cyan-400/60 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={optExternalTranscriptSearch}
+                        onChange={(e) => setOptExternalTranscriptSearch(e.target.checked)}
+                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-0"
+                      />
+                      <div>
+                        <span className="font-semibold text-white block">Use transcript excerpts to find the original news</span>
+                        <span className="text-slate-400 text-[11px] leading-relaxed block mt-0.5">
+                          With your permission, DeepTrust may send up to three short, distinctive spoken phrases and high-confidence public-figure names—not the full transcript, audio, or video—to the configured Serper search provider. The phrases and returned source links are recorded in the report for transparency.
+                        </span>
+                      </div>
+                    </label>
+                  </>
+                )}
 
                 {/* Module 2: Provenance */}
                 <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">

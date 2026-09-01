@@ -84,6 +84,13 @@ function decodeHtmlEntities(str) {
     .replace(/&#x([0-9a-f]+);/gi, (m, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
+function parseIso8601DurationSeconds(value) {
+  const match = String(value || '').trim().match(/^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
+  if (!match) return null;
+  const seconds = Number(match[1] || 0) * 86400 + Number(match[2] || 0) * 3600 + Number(match[3] || 0) * 60 + Number(match[4] || 0);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
 /**
  * Extracts metadata and embedded assets from HTML without fabricating missing data
  */
@@ -97,6 +104,10 @@ function extractHtmlAssetsAndMetadata(html, url = '') {
   let description = null;
   let canonicalUrl = null;
   let favicon = null;
+  let videoDurationSeconds = null;
+  let videoTranscript = null;
+  let videoContentUrl = null;
+  let videoEmbedUrl = null;
 
   // Title
   const titleTagMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
@@ -134,6 +145,40 @@ function extractHtmlAssetsAndMetadata(html, url = '') {
   // Favicon
   const faviconMeta = html.match(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i);
   if (faviconMeta) favicon = faviconMeta[1];
+
+  // Structured VideoObject data can expose the full recording duration and
+  // a publisher-supplied transcript without downloading the source video.
+  const jsonLdScripts = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const scriptTag of jsonLdScripts) {
+    try {
+      const parsed = JSON.parse(scriptTag.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, ''));
+      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+      while (queue.length > 0) {
+        const object = queue.shift();
+        if (!object || typeof object !== 'object') continue;
+        if (Array.isArray(object['@graph'])) queue.push(...object['@graph']);
+        const types = Array.isArray(object['@type']) ? object['@type'] : [object['@type']];
+        if (!types.some(type => String(type || '').toLowerCase() === 'videoobject')) continue;
+        videoDurationSeconds = videoDurationSeconds || parseIso8601DurationSeconds(object.duration);
+        videoTranscript = videoTranscript || (typeof object.transcript === 'string' ? decodeHtmlEntities(object.transcript).replace(/\s+/g, ' ').trim().slice(0, 24000) : null);
+        videoContentUrl = videoContentUrl || object.contentUrl || null;
+        videoEmbedUrl = videoEmbedUrl || object.embedUrl || null;
+        title = title || object.name || object.headline || null;
+        description = description || object.description || null;
+        canonicalUrl = canonicalUrl || object.url || null;
+        publisher = publisher || object.publisher?.name || (typeof object.publisher === 'string' ? object.publisher : null);
+        if (!publishedAt && (object.uploadDate || object.datePublished)) {
+          const date = new Date(object.uploadDate || object.datePublished);
+          if (!Number.isNaN(date.getTime())) publishedAt = date.toISOString();
+        }
+      }
+    } catch (_) {}
+  }
+  if (!videoDurationSeconds) {
+    const durationMeta = html.match(/<meta[^>]+property=["']video:duration["'][^>]+content=["']([^"']+)["']/i);
+    const numericDuration = durationMeta ? Number(durationMeta[1]) : 0;
+    if (Number.isFinite(numericDuration) && numericDuration > 0) videoDurationSeconds = numericDuration;
+  }
 
   // Discovered Images
   const images = [];
@@ -194,7 +239,11 @@ function extractHtmlAssetsAndMetadata(html, url = '') {
       publishedAt,
       description,
       canonicalUrl: canonicalUrl || url,
-      favicon
+      favicon,
+      videoDurationSeconds,
+      videoTranscript,
+      videoContentUrl,
+      videoEmbedUrl
     },
     discoveredAssets: {
       images,

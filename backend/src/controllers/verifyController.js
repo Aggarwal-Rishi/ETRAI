@@ -43,6 +43,8 @@ const analyze = async (req, res) => {
     const { inputType, text, url } = req.body;
     const analysisOptions = {
       enableReverseSearch: parseOptionalBoolean(req.body.enableReverseSearch),
+      allowExternalVisualSearch: parseOptionalBoolean(req.body.allowExternalVisualSearch, false),
+      allowExternalTranscriptSearch: parseOptionalBoolean(req.body.allowExternalTranscriptSearch, false),
       traceProvenance: parseOptionalBoolean(req.body.traceProvenance),
       detectEntities: parseOptionalBoolean(req.body.detectEntities)
     };
@@ -130,33 +132,213 @@ const streamProgress = async (req, res) => {
 /**
  * POST /api/v1/verify/claim-deep-research
  */
+function mapResearchStatusToVerdict(status) {
+  if (status === 'TRUSTED') return 'VERIFIED';
+  if (status === 'FABRICATED') return 'FALSE';
+  if (status === 'PARTIALLY_VERIFIED') return 'PARTIALLY_VERIFIED';
+  return 'UNVERIFIED';
+}
+
+function mergeSourcesByUrl(existingSources = [], researchSources = []) {
+  const merged = new Map();
+  [...existingSources, ...researchSources].forEach((source, index) => {
+    if (!source) return;
+    const url = source.url || source.link || '';
+    const key = url || `${source.domain || 'source'}:${source.title || index}`;
+    merged.set(key, { ...(merged.get(key) || {}), ...source, url: url || source.url, link: url || source.link });
+  });
+  return Array.from(merged.values());
+}
+
+function buildClaimResearchUpdate(claim, deepRes, correctionData) {
+  const claimObject = typeof claim === 'string' ? { claimText: claim } : (claim || {});
+  const researchSources = Array.isArray(deepRes.evaluatedSources) ? deepRes.evaluatedSources : [];
+  const hasNewEvidence = researchSources.length > 0;
+  const nextStatus = hasNewEvidence ? deepRes.updatedStatus : (claimObject.status || deepRes.updatedStatus);
+  const nextVerdict = hasNewEvidence
+    ? mapResearchStatusToVerdict(deepRes.updatedStatus)
+    : (claimObject.verdict || mapResearchStatusToVerdict(nextStatus));
+  const nextConfidence = hasNewEvidence
+    ? deepRes.updatedConfidence
+    : (Number.isFinite(Number(claimObject.confidence)) ? Number(claimObject.confidence) : deepRes.updatedConfidence);
+  return {
+    ...claimObject,
+    status: nextStatus,
+    verdict: nextVerdict,
+    confidence: nextConfidence,
+    explanation: hasNewEvidence
+      ? deepRes.reasoning
+      : `${deepRes.reasoning} The previous claim verdict was preserved because no new evidence source was retrieved.`,
+    sources: mergeSourcesByUrl(claimObject.sources || [], researchSources),
+    evidenceEvaluations: researchSources,
+    deepResearch: deepRes,
+    hasCorrection: correctionData.hasCorrection,
+    correctedClaim: correctionData.correctedClaim,
+    correctionBasis: correctionData.correctionBasis,
+    partiallyAccurate: correctionData.partiallyAccurate,
+    lastResearchedAt: deepRes.searchedAt || new Date().toISOString()
+  };
+}
+
+async function loadOwnedClaimForResearch(analysisId, userId, claimIndex) {
+  if (!analysisId) return null;
+  if (!userId) {
+    const error = new Error('Authentication is required to update a report claim.');
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!Number.isInteger(claimIndex) || claimIndex < 0) {
+    const error = new Error('A valid claim index is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const analysis = await prisma.analysis.findFirst({
+    where: { id: analysisId, userId },
+    include: { claims: { include: { evidenceItems: true } } }
+  });
+  if (!analysis) {
+    const error = new Error('Report not found or access denied.');
+    error.statusCode = 404;
+    throw error;
+  }
+  let reportPayload = analysis.reportData;
+  if (typeof reportPayload === 'string') {
+    try { reportPayload = JSON.parse(reportPayload); } catch (_) { reportPayload = null; }
+  }
+  if (!reportPayload || !Array.isArray(reportPayload.claims) || !reportPayload.claims[claimIndex]) {
+    const error = new Error('The selected claim no longer exists in this report.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return { analysis, reportPayload, storedClaim: reportPayload.claims[claimIndex] };
+}
+
+async function persistClaimResearchResult(ownedClaim, claimIndex, updatedClaim) {
+  if (!ownedClaim) return false;
+  const { analysis, reportPayload, storedClaim } = ownedClaim;
+  const updatedClaims = [...reportPayload.claims];
+  updatedClaims[claimIndex] = updatedClaim;
+  const updatedReport = {
+    ...reportPayload,
+    claims: updatedClaims,
+    sources: mergeSourcesByUrl(reportPayload.sources || [], updatedClaim.sources || [])
+  };
+
+  const storedText = String(storedClaim.claimText || storedClaim.text || storedClaim.claim || '').trim();
+  const relationalClaim = analysis.claims.find(item => item.claimText.trim() === storedText) || analysis.claims[claimIndex] || null;
+  const operations = [
+    prisma.analysis.update({
+      where: { id: analysis.id },
+      data: { reportData: JSON.stringify(updatedReport) }
+    })
+  ];
+
+  if (relationalClaim) {
+    operations.push(prisma.claim.update({
+      where: { id: relationalClaim.id },
+      data: {
+        verdict: updatedClaim.verdict,
+        status: updatedClaim.status,
+        confidence: Number(updatedClaim.confidence || 0),
+        reasoning: updatedClaim.explanation || null,
+        hasCorrection: Boolean(updatedClaim.hasCorrection),
+        correctedClaim: updatedClaim.correctedClaim || null,
+        correctionBasis: updatedClaim.correctionBasis || null,
+        partiallyAccurate: Boolean(updatedClaim.partiallyAccurate),
+        rawJson: JSON.stringify(updatedClaim)
+      }
+    }));
+
+    const existingUrls = new Set((relationalClaim.evidenceItems || []).map(item => item.url).filter(Boolean));
+    (updatedClaim.deepResearch?.evaluatedSources || []).forEach((source, sourceIndex) => {
+      const sourceUrl = source.url || source.link;
+      if (!sourceUrl || existingUrls.has(sourceUrl)) return;
+      existingUrls.add(sourceUrl);
+      operations.push(prisma.evidenceItem.create({
+        data: {
+          claimId: relationalClaim.id,
+          sourceIndex,
+          url: sourceUrl,
+          domain: source.domain || 'unknown',
+          title: source.title || source.domain || 'Research source',
+          snippet: source.snippet || '',
+          content: source.fetchedPassage || null,
+          excerpt: source.snippet || null,
+          stance: source.stance || 'NEUTRAL',
+          relationship: source.stance === 'SUPPORTS' ? 'SUPPORTS' : (source.stance === 'REFUTES' ? 'CONTRADICTS' : 'NEUTRAL'),
+          evidenceType: 'PRIMARY_REPORTING',
+          relevanceScore: Number(source.relevanceScore || 0),
+          reliabilityContribution: Math.round(Number(source.domainTrust || 0.5) * 100),
+          independenceGroup: source.domain || 'unknown',
+          isIndependent: source.isIndependent !== false,
+          isSyndicatedDuplicate: source.isIndependent === false,
+          authorityRank: Number(source.domainTier ?? 4),
+          authorityScore: Math.round(Number(source.domainTrust || 0.5) * 100),
+          retrievalStatus: source.fetchedPassage ? 'SUCCESS' : 'PARTIAL',
+          reason: `Individual claim research: ${updatedClaim.deepResearch?.reasoning || ''}`.slice(0, 2000)
+        }
+      }));
+    });
+  }
+
+  await prisma.$transaction(operations);
+  return true;
+}
+
 const deepResearchClaim = async (req, res) => {
   try {
-    const { claim, articleResearchContext } = req.body;
-    if (!claim) {
+    const { claim, articleResearchContext, analysisId } = req.body;
+    const parsedClaimIndex = Number(req.body.claimIndex);
+    const ownedClaim = analysisId
+      ? await loadOwnedClaimForResearch(analysisId, req.user?.id, parsedClaimIndex)
+      : null;
+    const claimToResearch = ownedClaim?.storedClaim || claim;
+    if (!claimToResearch) {
       return res.status(400).json({ error: 'Claim payload is required.' });
     }
 
     const { performPerClaimDeepResearch } = require('../services/articleResearch');
     const { generateClaimCorrection } = require('../services/correctionsService');
 
-    const deepRes = await performPerClaimDeepResearch(claim, articleResearchContext, true);
+    const deepRes = await performPerClaimDeepResearch(claimToResearch, articleResearchContext, true);
+    const researchSources = Array.isArray(deepRes.evaluatedSources) ? deepRes.evaluatedSources : [];
+    const supportingSourceIndices = researchSources
+      .map((source, index) => source.stance === 'SUPPORTS' ? index : -1)
+      .filter(index => index >= 0);
+    const refutingSourceIndices = researchSources
+      .map((source, index) => source.stance === 'REFUTES' ? index : -1)
+      .filter(index => index >= 0);
     
     // Evaluate Part A AI Corrections post Deep Research
-    const correctionData = await generateClaimCorrection(claim, {
-      status: deepRes.updatedStatus,
-      sources: deepRes.deepResearchHits,
-      supportingSourceIndices: deepRes.deepResearchHits.map((_, i) => i),
-      refutingSourceIndices: []
-    }, articleResearchContext);
+    const correctionData = researchSources.length > 0
+      ? await generateClaimCorrection(claimToResearch, {
+        status: deepRes.updatedStatus,
+        sources: researchSources,
+        supportingSourceIndices,
+        refutingSourceIndices
+      }, articleResearchContext)
+      : {
+        hasCorrection: Boolean(claimToResearch.hasCorrection),
+        correctedClaim: claimToResearch.correctedClaim || null,
+        correctionBasis: claimToResearch.correctionBasis || null,
+        partiallyAccurate: Boolean(claimToResearch.partiallyAccurate)
+      };
+
+    const updatedClaim = buildClaimResearchUpdate(claimToResearch, deepRes, correctionData);
+    const persisted = await persistClaimResearchResult(ownedClaim, parsedClaimIndex, updatedClaim);
 
     return res.status(200).json({
       success: true,
-      claimId: claim.id || claim.claimId,
-      status: deepRes.updatedStatus,
-      verdict: deepRes.updatedStatus,
-      confidence: deepRes.updatedConfidence,
+      analysisId: analysisId || null,
+      claimIndex: Number.isInteger(parsedClaimIndex) ? parsedClaimIndex : null,
+      claimId: claimToResearch.id || claimToResearch.claimId || null,
+      status: updatedClaim.status,
+      verdict: updatedClaim.verdict,
+      confidence: updatedClaim.confidence,
       deepResearch: deepRes,
+      sources: updatedClaim.sources,
+      updatedClaim,
+      persisted,
       hasCorrection: correctionData.hasCorrection,
       correctedClaim: correctionData.correctedClaim,
       correctionBasis: correctionData.correctionBasis,
@@ -164,7 +346,7 @@ const deepResearchClaim = async (req, res) => {
     });
   } catch (err) {
     console.error('[Manual Deep Research Controller Error]:', err);
-    return res.status(500).json({ error: 'Failed to perform deep research on claim.' });
+    return res.status(err.statusCode || 500).json({ error: err.statusCode ? err.message : 'Failed to perform deep research on claim.' });
   }
 };
 
@@ -229,5 +411,8 @@ module.exports = {
   streamProgress,
   getJobStatus,
   deepResearchClaim,
-  proxyImage
+  proxyImage,
+  mapResearchStatusToVerdict,
+  mergeSourcesByUrl,
+  buildClaimResearchUpdate
 };

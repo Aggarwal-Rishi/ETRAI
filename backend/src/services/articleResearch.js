@@ -171,81 +171,114 @@ ${JSON.stringify(articleEvidencePool.map(e => ({ title: e.title, snippet: e.snip
  * NO FIXED CONFIDENCE VALUES (Purged 92.5% hack).
  */
 async function performPerClaimDeepResearch(claim, articleResearchContext = null, isManualTrigger = false, mockDeepHits = null) {
-  const claimText = typeof claim === 'string' ? claim : (claim.text || claim.claimText || '');
-  const searchQ = claim.searchQuery || claimText;
-  const entities = Array.isArray(claim.entities) ? claim.entities : [];
+  const claimObject = typeof claim === 'string' ? { text: claim } : (claim || {});
+  const claimText = String(claimObject.text || claimObject.claimText || '').trim();
+  if (!claimText) throw new Error('Claim text is required for individual research.');
+  const searchQ = String(claimObject.searchQuery || claimText).trim();
+  const entities = Array.isArray(claimObject.entities) ? claimObject.entities.filter(Boolean).map(String) : [];
+  const claimContext = claimObject.articleContext || articleResearchContext || {};
 
   // 1. QUERY DECOMPOSITION: 3-5 distinct search angles
-  const decomposedQueries = [
-    `"${entities[0] || ''}" ${searchQ.split(' ').slice(0, 4).join(' ')}`.trim(),
-    `${claim.articleContext?.location || ''} ${claim.articleContext?.date || ''} ${searchQ}`.trim(),
-    `official report ${searchQ}`.trim(),
+  const decomposedQueries = Array.from(new Set([
+    entities[0] ? `"${entities[0]}" ${searchQ.split(/\s+/).slice(0, 6).join(' ')}` : '',
+    `${claimContext.location || ''} ${claimContext.date || ''} ${searchQ}`,
+    `official report ${searchQ}`,
     searchQ
-  ].filter(q => q.length > 5);
+  ].map(query => query.replace(/\s+/g, ' ').trim()).filter(query => query.length > 5))).slice(0, 4);
 
-  const deepHits = Array.isArray(mockDeepHits) ? mockDeepHits : [];
+  const deepHits = Array.isArray(mockDeepHits) ? [...mockDeepHits] : [];
+  const searchLimitations = [];
   const apiKey = process.env.SERPER_API_KEY;
-  const hasSerper = apiKey && !apiKey.includes('your_serper_api_key');
+  const hasSerper = isKeyValid(apiKey);
 
   if (!Array.isArray(mockDeepHits) && hasSerper) {
-    for (const dq of decomposedQueries) {
+    const executeSearch = async dq => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
         const res = await fetch('https://google.serper.dev/search', {
           method: 'POST',
           headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
           body: JSON.stringify({ q: dq, num: 3 }),
           signal: controller.signal
         });
-        clearTimeout(timeout);
-
-        if (res.ok) {
-          const data = await res.json();
-          (data.organic || []).forEach(hit => {
-            if (!deepHits.some(h => (h.link || h.url) === (hit.link || hit.url))) {
-              deepHits.push({
-                title: hit.title,
-                snippet: hit.snippet,
-                link: hit.link,
-                url: hit.link,
-                domain: new URL(hit.link).hostname.replace(/^www\./, ''),
-                query: dq
-              });
-            }
-          });
+        if (!res.ok) {
+          return { query: dq, hits: [], limitation: `Search provider returned HTTP ${res.status}.` };
         }
-      } catch (e) {}
+        const data = await res.json();
+        return { query: dq, hits: Array.isArray(data.organic) ? data.organic : [] };
+      } catch (error) {
+        return {
+          query: dq,
+          hits: [],
+          limitation: error.name === 'AbortError' ? 'Search provider timed out.' : 'Search provider request failed.'
+        };
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    // Two searches at a time avoids both the former minute-long serial path
+    // and a burst of four simultaneous provider requests.
+    const searchResults = [];
+    for (let start = 0; start < decomposedQueries.length; start += 2) {
+      searchResults.push(...await Promise.all(decomposedQueries.slice(start, start + 2).map(executeSearch)));
     }
+    searchResults.forEach(result => {
+      if (result.limitation) searchLimitations.push(`${result.query}: ${result.limitation}`);
+      result.hits.forEach(hit => {
+        const sourceUrl = hit.link || hit.url || '';
+        if (!sourceUrl || deepHits.some(existing => (existing.link || existing.url) === sourceUrl)) return;
+        let domain = '';
+        try { domain = new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch (_) {}
+        deepHits.push({
+          title: hit.title,
+          snippet: hit.snippet,
+          link: sourceUrl,
+          url: sourceUrl,
+          domain,
+          query: result.query
+        });
+      });
+    });
+  } else if (!Array.isArray(mockDeepHits)) {
+    searchLimitations.push('Serper web search is not configured.');
   }
 
-  // 2. DEEPER CONTENT RETRIEVAL: Fetch full page text for top 2-3 hits
-  const fullPagesFetched = [];
-  for (const hit of deepHits.slice(0, 3)) {
+  // Bound all downstream evaluation and response payloads.
+  if (deepHits.length > 12) {
+    deepHits.splice(12);
+  }
+
+  // 2. DEEPER CONTENT RETRIEVAL: Fetch top source pages concurrently.
+  const fullPagesFetched = await Promise.all(deepHits.slice(0, 3).map(async hit => {
     const linkUrl = hit.link || hit.url || '';
     const pageText = linkUrl.startsWith('http') ? await fetchFullPageText(linkUrl) : (hit.snippet || '');
-    fullPagesFetched.push({
+    return {
       url: linkUrl,
       domain: hit.domain || '',
       title: hit.title || '',
       textLength: pageText.length,
-      snippet: hit.snippet || ''
-    });
-  }
+      snippet: hit.snippet || '',
+      fetchedPassage: pageText.slice(0, 3000)
+    };
+  }));
+  const fetchedTextByUrl = new Map(fullPagesFetched.map(page => [page.url, page.fetchedPassage || '']));
 
   // 3. DETERMINISTIC EVIDENCE EVALUATION (Per Hit)
   const stopWords = new Set(['the','a','an','is','are','was','were','and','or','in','on','at','to','for','with','by','from','that','this','it','as','be','has','have','had']);
   const cLower = claimText.toLowerCase();
   const claimTokens = cLower.replace(/[^\w\s]/g, ' ').split(/\s+/).filter(t => t.length > 3 && !stopWords.has(t));
-  const claimDate = claim.articleContext?.date || '';
-  const claimLocation = claim.articleContext?.location || '';
+  const claimDate = claimContext.date || '';
+  const claimLocation = claimContext.location || '';
 
   const seenSignatures = new Set();
   const evaluatedSources = deepHits.map(hit => {
     const title = (hit.title || '').toLowerCase();
     const snippet = (hit.snippet || '').toLowerCase();
-    const fullContent = `${title} ${snippet}`;
+    const sourceUrl = hit.link || hit.url || '';
+    const fetchedPassage = fetchedTextByUrl.get(sourceUrl) || '';
+    const fullContent = `${title} ${snippet} ${fetchedPassage.toLowerCase()}`;
 
     // Relevance Score
     const matchingTokens = claimTokens.filter(tok => fullContent.includes(tok));
@@ -290,9 +323,11 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
 
     return {
       url: hit.link || hit.url,
+      link: hit.link || hit.url,
       domain: hit.domain,
       title: hit.title,
       snippet: hit.snippet,
+      fetchedPassage: fetchedPassage.slice(0, 1500),
       relevanceScore,
       entityMatch,
       eventMatch,
@@ -305,10 +340,12 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
     };
   });
 
-  // Categorize Sources
-  const supportingSources = evaluatedSources.filter(s => s.stance === 'SUPPORTS');
-  const refutingSources = evaluatedSources.filter(s => s.stance === 'REFUTES');
-  const neutralSources = evaluatedSources.filter(s => s.stance === 'NEUTRAL');
+  // Categorize only independent sources so syndicated copies cannot inflate
+  // evidence state or confidence. Duplicates remain in evaluatedSources for audit.
+  const independentSources = evaluatedSources.filter(source => source.isIndependent !== false);
+  const supportingSources = independentSources.filter(s => s.stance === 'SUPPORTS');
+  const refutingSources = independentSources.filter(s => s.stance === 'REFUTES');
+  const neutralSources = independentSources.filter(s => s.stance === 'NEUTRAL');
 
   // Compute Evidence State
   let evidenceState = 'INSUFFICIENT';
@@ -361,7 +398,12 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
     reasoning,
     decomposedQueries,
     fullPagesFetched,
+    fullPagesFetchedCount: fullPagesFetched.filter(page => page.textLength > 0).length,
     evaluatedSources,
+    deepResearchHits: evaluatedSources,
+    triggerType: isManualTrigger ? 'MANUAL' : 'AUTOMATIC',
+    limitations: Array.from(new Set(searchLimitations)),
+    searchedAt: new Date().toISOString(),
     updatedConfidence: confidence,
     updatedStatus
   };

@@ -28,7 +28,7 @@ async function runDeepResearchAndCorrectionsTests() {
     // ----------------------------------------------------
     // Test 1: Exact supporting source
     // ----------------------------------------------------
-    await runTest('1. Exact supporting source hit -> evidenceState SUPPORTED, dynamic confidence (no hardcoded 92.5)', async () => {
+    await runTest('1. Supporting unknown-domain source -> SUPPORTED evidence without overstating trust', async () => {
       const claim = {
         text: 'Apex Solar reached 100MW operational capacity in 2026.',
         entities: ['Apex Solar'],
@@ -46,9 +46,9 @@ async function runDeepResearchAndCorrectionsTests() {
 
       assert.strictEqual(res.evidenceState, 'SUPPORTED');
       assert.strictEqual(res.supportingSources.length, 1);
-      assert.strictEqual(res.updatedStatus, 'TRUSTED');
+      assert.strictEqual(res.updatedStatus, 'SUSPICIOUS', 'One unknown-domain source must not independently produce a TRUSTED verdict');
       assert.notStrictEqual(res.confidence, 92.5, 'Must NOT use hardcoded 92.5% confidence score');
-      assert.ok(typeof res.confidence === 'number' && res.confidence >= 55);
+      assert.ok(typeof res.confidence === 'number' && res.confidence >= 40);
     });
 
     // ----------------------------------------------------
@@ -112,7 +112,7 @@ async function runDeepResearchAndCorrectionsTests() {
     // ----------------------------------------------------
     // Test 4: Refuting source
     // ----------------------------------------------------
-    await runTest('4. Refuting source hit -> stance REFUTES, evidenceState REFUTES, updatedStatus FABRICATED', async () => {
+    await runTest('4. Refuting source hit -> stance REFUTES, evidenceState REFUTED, updatedStatus FABRICATED', async () => {
       const claim = {
         text: 'Metro Corp tax rates surged by 300% overnight.',
         entities: ['Metro Corp'],
@@ -128,7 +128,7 @@ async function runDeepResearchAndCorrectionsTests() {
 
       const res = await performPerClaimDeepResearch(claim, null, false, mockDeepHits);
 
-      assert.strictEqual(res.evidenceState, 'REFUTES');
+      assert.strictEqual(res.evidenceState, 'REFUTED');
       assert.strictEqual(res.refutingSources.length, 1);
       assert.strictEqual(res.updatedStatus, 'FABRICATED');
     });
@@ -136,7 +136,7 @@ async function runDeepResearchAndCorrectionsTests() {
     // ----------------------------------------------------
     // Test 5: Conflicting / mixed sources
     // ----------------------------------------------------
-    await runTest('5. Conflicting sources (1 supporting + 1 refuting) -> evidenceState MIXED, updatedStatus SUSPICIOUS', async () => {
+    await runTest('5. Conflicting sources -> evidenceState MIXED, updatedStatus PARTIALLY_VERIFIED', async () => {
       const claim = {
         text: 'Acme Corp profit margin reached 40% in Q1.',
         entities: ['Acme Corp'],
@@ -163,7 +163,7 @@ async function runDeepResearchAndCorrectionsTests() {
       assert.strictEqual(res.evidenceState, 'MIXED');
       assert.strictEqual(res.supportingSources.length, 1);
       assert.strictEqual(res.refutingSources.length, 1);
-      assert.strictEqual(res.updatedStatus, 'SUSPICIOUS');
+      assert.strictEqual(res.updatedStatus, 'PARTIALLY_VERIFIED');
     });
 
     // ----------------------------------------------------

@@ -52,7 +52,7 @@ function mapForensicFindingsToClaims(claims = [], forensicFindings = []) {
         relevanceScore,
         confidence: finding.confidence || 85,
         description: finding.description,
-        source: 'ETRAI Media Forensics Engine',
+        source: 'DeepTrust Media Forensics Engine',
         domain: 'forensics.etrai.local',
         isIndependent: true,
         reason: finding.description

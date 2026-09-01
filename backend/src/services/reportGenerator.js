@@ -265,6 +265,13 @@ Return ONLY a JSON object with this exact structure:
     }
   }
 
+  const videoCompletenessSummary = mediaAnalysis?.videoContextReport?.completeness;
+  if (videoCompletenessSummary) {
+    const videoHighlight = `Video context: ${videoCompletenessSummary.label || String(videoCompletenessSummary.verdict || 'inconclusive').replaceAll('_', ' ')}`;
+    keyHighlights = [videoHighlight, ...keyHighlights.filter(item => item !== videoHighlight)].slice(0, 4);
+    explanationOfFindings = `${explanationOfFindings} Video originality/context assessment: ${videoCompletenessSummary.explanation || videoCompletenessSummary.verdict}.`;
+  }
+
   const manipulationAnalysis = {
     verdict: articleVerdict,
     factualAccuracyScore,
@@ -330,6 +337,21 @@ Return ONLY a JSON object with this exact structure:
       sourceRole: 'SEGMENT_CORROBORATION',
       timestampRange: segment.timestamp_range,
       limitation: source.limitation || null
+    });
+  }
+
+  const videoCompleteness = mediaAnalysis?.videoContextReport?.completeness;
+  const originalVideoSource = videoCompleteness?.source;
+  if (originalVideoSource?.url && !uniqueDiscoveredSources.some(item => (item.url || item.link) === originalVideoSource.url)) {
+    uniqueDiscoveredSources.push({
+      title: originalVideoSource.title || `Original-video candidate · ${originalVideoSource.domain || 'matched source'}`,
+      url: originalVideoSource.url,
+      domain: originalVideoSource.domain || null,
+      publishedAt: originalVideoSource.publishedAt || null,
+      evidenceType: videoCompleteness.verdict === 'COMPLETE_ORIGINAL_VIDEO' ? 'VERIFIED_ORIGINAL_VIDEO' : 'VIDEO_PROVENANCE_CANDIDATE',
+      sourceRole: 'VIDEO_ORIGINALITY_AND_CONTEXT',
+      confidence: videoCompleteness.confidence,
+      limitation: (videoCompleteness.limitations || []).join(' ') || null
     });
   }
 

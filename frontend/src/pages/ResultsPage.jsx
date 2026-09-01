@@ -46,6 +46,8 @@ export default function ResultsPage() {
   const [activeReportTab, setActiveReportTab] = useState('full'); // 'full' | 'text' | 'links' | 'images' | 'videos' | 'numbers'
   const [openClaimIdx, setOpenClaimIdx] = useState(0);
   const [toastMsg, setToastMsg] = useState(null);
+  const [researchingClaimIdx, setResearchingClaimIdx] = useState(null);
+  const [claimSearchErrors, setClaimSearchErrors] = useState({});
 
   // SSE progress state for live pipeline jobs
   const [progressState, setProgressState] = useState({
@@ -62,6 +64,43 @@ export default function ResultsPage() {
   // Fetch report data
   useEffect(() => {
     let eventSource = null;
+    let retryTimer = null;
+    let disposed = false;
+    let recoveryFinished = false;
+    let recoveryAttempts = 0;
+    let consecutiveNotFound = 0;
+    let reportNotFound = false;
+    let jobNotFound = false;
+    const maxRecoveryAttempts = 120;
+    const token = localStorage.getItem('etrai_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const stopRecovery = () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      if (retryTimer) {
+        window.clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
+
+    const acceptReport = (reportPayload) => {
+      const isUsableReport = reportPayload && typeof reportPayload === 'object' && (
+        Array.isArray(reportPayload.claims) ||
+        Boolean(reportPayload.scores) ||
+        Boolean(reportPayload.mediaAnalysis) ||
+        Boolean(reportPayload.summary)
+      );
+      if (!isUsableReport || disposed) return false;
+      recoveryFinished = true;
+      setReport(reportPayload);
+      setError('');
+      setLoading(false);
+      stopRecovery();
+      return true;
+    };
 
     const fetchReportDetail = async () => {
       const controller = new AbortController();
@@ -69,36 +108,95 @@ export default function ResultsPage() {
       // a duplicate stream-recovery fetch while the primary request is active.
       const timeoutId = window.setTimeout(() => controller.abort(), 30000);
       try {
-        const token = localStorage.getItem('etrai_token');
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
         const res = await fetch(apiUrl(`/api/v1/reports/${id}`), {
           headers,
           credentials: 'include',
           signal: controller.signal
         });
         if (res.ok) {
+          reportNotFound = false;
           const data = await res.json();
           const reportPayload = data.report?.reportData || data.report;
-          if (reportPayload && (reportPayload.claims || reportPayload.scores)) {
-            setReport(reportPayload);
-            setLoading(false);
-            return true;
-          }
+          if (acceptReport(reportPayload)) return true;
+        } else {
+          reportNotFound = res.status === 404;
         }
-      } catch (e) {
-        // Fall back to SSE stream
+      } catch (_) {
+        // Polling and the live job stream handle transient database failures.
       } finally {
         window.clearTimeout(timeoutId);
       }
       return false;
     };
 
-    const init = async () => {
-      const exists = await fetchReportDetail();
-      if (exists) return;
+    const fetchLiveJobState = async () => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+      try {
+        const res = await fetch(apiUrl(`/api/v1/verify/job/${id}`), {
+          headers,
+          credentials: 'include',
+          signal: controller.signal
+        });
+        if (!res.ok) {
+          jobNotFound = res.status === 404;
+          return false;
+        }
+        jobNotFound = false;
+        const data = await res.json();
+        const job = data.job;
+        if (!job) return false;
+        setProgressState(job);
+        if (job.status === 'COMPLETED') {
+          return acceptReport(job.reportData);
+        }
+        if (job.status === 'FAILED') {
+          recoveryFinished = true;
+          stopRecovery();
+          setError(job.error || 'Verification pipeline encountered an error.');
+          setLoading(false);
+          return true;
+        }
+        return false;
+      } catch (_) {
+        return false;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    };
 
-      eventSource = new EventSource(apiUrl(`/api/v1/verify/stream/${id}`), { withCredentials: true });
+    const scheduleRecovery = (delay = 5000) => {
+      if (disposed || recoveryFinished || retryTimer) return;
+      retryTimer = window.setTimeout(async () => {
+        retryTimer = null;
+        if (disposed) return;
+        if (await fetchReportDetail()) return;
+        if (await fetchLiveJobState()) return;
+        consecutiveNotFound = reportNotFound && jobNotFound ? consecutiveNotFound + 1 : 0;
+        if (consecutiveNotFound >= 3) {
+          recoveryFinished = true;
+          stopRecovery();
+          setError('This dossier is not present in saved reports or active job memory. Please start a new analysis for this content.');
+          setLoading(false);
+          return;
+        }
+        recoveryAttempts += 1;
+        if (recoveryAttempts >= maxRecoveryAttempts) {
+          recoveryFinished = true;
+          stopRecovery();
+          setError('The dossier is still unavailable after repeated report and live-job recovery attempts.');
+          setLoading(false);
+          return;
+        }
+        scheduleRecovery(5000);
+      }, delay);
+    };
+
+    const init = async () => {
+      const streamPath = token
+        ? `/api/v1/verify/stream/${id}?token=${encodeURIComponent(token)}`
+        : `/api/v1/verify/stream/${id}`;
+      eventSource = new EventSource(apiUrl(streamPath), { withCredentials: true });
 
       eventSource.onmessage = (event) => {
         try {
@@ -106,13 +204,14 @@ export default function ResultsPage() {
           setProgressState(data);
 
           if (data.status === 'COMPLETED' && data.reportData) {
-            setReport(data.reportData);
-            setLoading(false);
-            eventSource.close();
+            acceptReport(data.reportData);
+          } else if (data.status === 'COMPLETED') {
+            scheduleRecovery(0);
           } else if (data.status === 'FAILED') {
+            recoveryFinished = true;
+            stopRecovery();
             setError(data.error || 'Verification pipeline encountered an error.');
             setLoading(false);
-            eventSource.close();
           }
         } catch (e) {
           console.error('[SSE parse error]:', e);
@@ -120,21 +219,22 @@ export default function ResultsPage() {
       };
 
       eventSource.onerror = () => {
-        // Fallback polling
-        setTimeout(async () => {
-          const loaded = await fetchReportDetail();
-          if (!loaded) {
-            setError('Unable to load verification report or connect to live pipeline.');
-            setLoading(false);
-          }
-        }, 4000);
+        // EventSource reconnects automatically. Keep authenticated polling active
+        // until either the stored report or the in-memory completed job is found.
+        scheduleRecovery(1000);
       };
+
+      // Start the stored-report request in parallel with the live stream so a
+      // slow database cannot hide a completed in-memory job for 30 seconds.
+      const exists = await fetchReportDetail();
+      if (!exists) scheduleRecovery(1000);
     };
 
     init();
 
     return () => {
-      if (eventSource) eventSource.close();
+      disposed = true;
+      stopRecovery();
     };
   }, [id]);
 
@@ -169,9 +269,21 @@ export default function ResultsPage() {
           </div>
           <h2 className="text-xl font-bold text-white">Dossier Unavailable</h2>
           <p className="text-xs text-slate-400 max-w-md text-center">{error || 'Verification report could not be found.'}</p>
-          <Link to="/dashboard" className="px-4 py-2 bg-slate-800 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-700">
-            Return to Dashboard
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-500 inline-flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Retry Loading
+            </button>
+            <Link to="/dashboard" className="px-4 py-2 bg-slate-800 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-700">
+              Return to Dashboard
+            </Link>
+            <Link to="/analysis" className="px-4 py-2 bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-800">
+              Start New Analysis
+            </Link>
+          </div>
         </main>
       </div>
     );
@@ -215,6 +327,62 @@ export default function ResultsPage() {
     window.print();
   };
 
+  const handleClaimResearch = async (claim, claimIndex) => {
+    if (researchingClaimIdx !== null) return;
+    setResearchingClaimIdx(claimIndex);
+    setClaimSearchErrors(previous => ({ ...previous, [claimIndex]: null }));
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 75000);
+
+    try {
+      const token = localStorage.getItem('etrai_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(apiUrl('/api/v1/verify/claim-deep-research'), {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+        body: JSON.stringify({
+          analysisId: id,
+          claimIndex,
+          claim,
+          articleResearchContext: report.articleResearchContext || report.articleDeepResearch || null
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.updatedClaim) {
+        throw new Error(payload.error || 'Individual claim research did not return an updated claim.');
+      }
+
+      setReport(previous => {
+        const updatedClaims = [...(previous.claims || [])];
+        updatedClaims[claimIndex] = payload.updatedClaim;
+        const sourceMap = new Map();
+        [...(previous.sources || []), ...(payload.updatedClaim.sources || [])].forEach((source, sourceIndex) => {
+          const sourceUrl = source?.url || source?.link || '';
+          const sourceKey = sourceUrl || `${source?.domain || 'source'}:${source?.title || sourceIndex}`;
+          sourceMap.set(sourceKey, { ...(sourceMap.get(sourceKey) || {}), ...source });
+        });
+        return { ...previous, claims: updatedClaims, sources: Array.from(sourceMap.values()) };
+      });
+      const retrievedSourceCount = payload.deepResearch?.evaluatedSources?.length || 0;
+      showToast(retrievedSourceCount > 0
+        ? (payload.persisted
+          ? `Claim ${claimIndex + 1} research completed and saved`
+          : `Claim ${claimIndex + 1} research completed`)
+        : `No new sources found for claim ${claimIndex + 1}; its previous verdict was preserved`);
+    } catch (researchError) {
+      const message = researchError.name === 'AbortError'
+        ? 'Individual claim search took too long. Please try again.'
+        : (researchError.message || 'Individual claim search failed.');
+      setClaimSearchErrors(previous => ({ ...previous, [claimIndex]: message }));
+    } finally {
+      window.clearTimeout(timeoutId);
+      setResearchingClaimIdx(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans print:bg-white print:text-black">
       <div className="print:hidden">
@@ -236,7 +404,7 @@ export default function ResultsPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-black">DEEPTRUST VERIFICATION DOSSIER</h1>
-            <p className="text-xs text-neutral-600 font-mono mt-1">ETRAI AI Multi-Agent Evidence Network</p>
+            <p className="text-xs text-neutral-600 font-mono mt-1">DeepTrust AI Multi-Agent Evidence Network</p>
           </div>
           <div className="text-right font-mono text-xs text-neutral-700">
             <div><strong>RUN ID:</strong> {id}</div>
@@ -644,19 +812,53 @@ export default function ResultsPage() {
                                 <span className="text-[10px] font-mono uppercase text-indigo-400 font-bold flex items-center gap-1.5">
                                   <Layers className="w-3.5 h-3.5 text-indigo-400" /> Full Claim Statement
                                 </span>
-                                <div className="flex items-center gap-2 font-mono text-[10px]">
+                                <div className="flex items-center gap-2 font-mono text-[10px] flex-wrap">
                                   <span className="px-2 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 rounded">
                                     {c.category || c.claimType || 'Factual Assertion'}
                                   </span>
                                   <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-bold">
                                     Confidence: {claimConfidence}%
                                   </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleClaimResearch(c, idx)}
+                                    disabled={researchingClaimIdx !== null}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-sans text-[10px] font-bold text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {researchingClaimIdx === idx
+                                      ? <RefreshCw className="h-3 w-3 animate-spin" />
+                                      : <Search className="h-3 w-3" />}
+                                    {researchingClaimIdx === idx
+                                      ? 'Searching this claim...'
+                                      : (c.deepResearch?.triggerType === 'MANUAL' ? 'Search this claim again' : 'Search this claim')}
+                                  </button>
                                 </div>
                               </div>
                               <p className="text-white font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
                                 {fullClaimText}
                               </p>
                             </div>
+
+                            {claimSearchErrors[idx] && (
+                              <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-200">
+                                <span className="font-bold">Individual claim search failed:</span> {claimSearchErrors[idx]}
+                              </div>
+                            )}
+
+                            {c.deepResearch?.triggerType === 'MANUAL' && (
+                              <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs text-cyan-100">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-bold">Individual claim research completed</span>
+                                  <span className="font-mono text-[10px] text-cyan-300">
+                                    {c.deepResearch.decomposedQueries?.length || 0} queries · {c.deepResearch.evaluatedSources?.length || 0} sources · {c.deepResearch.fullPagesFetchedCount || 0} pages read
+                                  </span>
+                                </div>
+                                <p className="mt-1.5 leading-relaxed text-slate-300">{c.deepResearch.reasoning}</p>
+                                {c.deepResearch.limitations?.length > 0 && (
+                                  <p className="mt-1.5 text-[10px] text-amber-300">{c.deepResearch.limitations.join(' ')}</p>
+                                )}
+                              </div>
+                            )}
 
                             {/* 2. REAL NEWS & EVIDENTIARY FINDING SYNTHESIS */}
                             <div className={`p-4 rounded-xl border space-y-2.5 ${

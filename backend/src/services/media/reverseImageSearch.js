@@ -150,7 +150,7 @@ function isUsefulOcrText(value = '') {
 /**
  * Searches Serper.dev Google Search for matching visual articles and indexed images
  */
-async function querySerperSearch(query, apiKey) {
+async function querySerperSearch(query, apiKey, options = {}) {
   if (!query || !apiKey || !isKeyValid(apiKey)) {
     return { success: false, status: 'UNAVAILABLE', matches: [], error: 'Missing or invalid Serper API key or query' };
   }
@@ -163,8 +163,10 @@ async function querySerperSearch(query, apiKey) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        q: `${query} news OR photo OR wire`,
-        num: 6
+        q: options.intent === 'VIDEO_ORIGINAL'
+          ? `${query} ("full video" OR interview OR speech OR briefing OR original)`
+          : `${query} news OR photo OR wire`,
+        num: options.intent === 'VIDEO_ORIGINAL' ? 8 : 6
       }),
       timeout: 8000
     });

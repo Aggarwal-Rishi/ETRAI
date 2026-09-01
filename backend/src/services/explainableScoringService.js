@@ -575,7 +575,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     },
     counterfactualExplanation,
     counterfactualConditions,
-    summaryText: `Investigation scored ${finalTrustScore}/100 (${finalVerdict}) under ETRAI Scoring Methodology v${SCORING_VERSION}.`
+    summaryText: `Investigation scored ${finalTrustScore}/100 (${finalVerdict}) under DeepTrust Scoring Methodology v${SCORING_VERSION}.`
   };
 }
 

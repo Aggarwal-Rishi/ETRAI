@@ -153,7 +153,7 @@ const handleDataExport = async (req, res) => {
   try {
     const data = await exportUserData(req.user.id);
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename=etrai-export-${Date.now()}.json`);
+    res.setHeader('Content-Disposition', `attachment; filename=deeptrust-export-${Date.now()}.json`);
     return res.status(200).send(JSON.stringify(data, null, 2));
   } catch (err) {
     console.error('[Data Export Error]:', err);

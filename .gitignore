@@ -12,6 +12,8 @@ backend/.env
 dist/
 build/
 out/
+.codex-dist/
+frontend/.codex-dist/
 vite.config.js.timestamp*
 
 # Database / Prisma

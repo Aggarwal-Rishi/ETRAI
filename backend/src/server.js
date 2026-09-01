@@ -28,7 +28,7 @@ process.on('unhandledRejection', (reason, promise) => {
 const server = app.listen(PORT, () => {
   const summary = getSanitizedConfigSummary();
   console.log(`====================================================`);
-  console.log(`🚀 ETRAI Backend Server listening on port ${PORT}`);
+  console.log(`🚀 DeepTrust Backend Server listening on port ${PORT}`);
   console.log(`🌍 Environment: ${summary.env}`);
   console.log(`📦 Database: ${summary.databaseType}`);
   console.log(`🤖 Gemini Configured: ${summary.geminiConfigured} (${summary.geminiModel})`);
@@ -45,9 +45,9 @@ const server = app.listen(PORT, () => {
         const bcrypt = require('bcryptjs');
         const hash = await bcrypt.hash('Password123!', 10);
         const accounts = [
-          { email: 'demo@etrai.io', fullName: 'Demo Analyst', role: 'OWNER', company: 'ETRAI Newsroom' },
-          { email: 'admin@etrai.io', fullName: 'ETRAI Administrator', role: 'OWNER', company: 'ETRAI HQ' },
-          { email: 'demo@etrai.ai', fullName: 'Demo User', role: 'OWNER', company: 'ETRAI Labs' }
+          { email: 'demo@etrai.io', fullName: 'Demo Analyst', role: 'OWNER', company: 'DeepTrust Newsroom' },
+          { email: 'admin@etrai.io', fullName: 'DeepTrust Administrator', role: 'OWNER', company: 'DeepTrust HQ' },
+          { email: 'demo@etrai.ai', fullName: 'Demo User', role: 'OWNER', company: 'DeepTrust Labs' }
         ];
         for (const acc of accounts) {
           await prisma.user.create({

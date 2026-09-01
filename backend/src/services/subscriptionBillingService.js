@@ -90,7 +90,8 @@ const PLANS = {
 
 // Supported Promotional Discount Codes
 const PROMO_CODES = {
-  ETRAI20: { discountPercent: 20, description: '20% off any monthly or annual subscription' },
+  DEEPTRUST20: { discountPercent: 20, description: '20% off any monthly or annual subscription' },
+  ETRAI20: { discountPercent: 20, description: 'Legacy 20% discount code' },
   NEWSROOM50: { discountPercent: 50, description: '50% off for verified newsrooms and academic labs' },
   LAUNCHFREE: { discountPercent: 100, description: '100% off Starter tier during introductory rollout' }
 };

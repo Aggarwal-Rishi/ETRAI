@@ -56,7 +56,7 @@ function sanitizeReportForExport(reportData = {}, options = {}) {
     exportVersion: 'ETRAI-v2.4-Explainable-Dossier',
     exportedAt: new Date().toISOString(),
     reportId: clean.id || clean.reportId || 'dossier_' + crypto.randomBytes(6).toString('hex'),
-    title: clean.title || clean.sourceTitle || 'ETRAI Verification Dossier',
+    title: clean.title || clean.sourceTitle || 'DeepTrust Verification Dossier',
     methodologyVersion: clean.methodologyVersion || clean.scoringDerivation?.methodologyVersion || clean.explainableScoring?.scoringVersion || 'ETRAI-v2.4-TransparentScoring',
     
     // 1. Executive Verdict & Scores
@@ -202,7 +202,7 @@ function generateReportJsonExport(reportData = {}) {
 function generateReportMarkdownExport(reportData = {}) {
   const report = sanitizeReportForExport(reportData);
   const lines = [
-    '# ETRAI Fact-Check & Verification Report',
+    '# DeepTrust Fact-Check & Verification Report',
     '',
     `**Title:** ${report.title}`,
     `**Overall Verdict:** ${report.verdict}`,
@@ -315,7 +315,7 @@ function generateReportPdfExport(reportData = {}) {
   const sanitized = sanitizeReportForExport(reportData);
 
   const lines = [];
-  lines.push(`ETRAI INVESTIGATION DOSSIER`);
+  lines.push(`DEEPTRUST INVESTIGATION DOSSIER`);
   lines.push(`================================================================`);
   lines.push(`Title: ${sanitized.title}`);
   lines.push(`Investigation ID: ${sanitized.reportId}`);
@@ -364,7 +364,7 @@ function generateReportPdfExport(reportData = {}) {
 
   lines.push(``);
   lines.push(`================================================================`);
-  lines.push(`End of Dossier · Sealed by ETRAI Multi-Agent AI Pipeline`);
+  lines.push(`End of Dossier · Sealed by DeepTrust Multi-Agent AI Pipeline`);
 
   // Build authentic PDF stream object
   const contentStream = lines.map((l, i) => {

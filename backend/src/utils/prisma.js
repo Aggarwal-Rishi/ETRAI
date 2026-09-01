@@ -397,8 +397,9 @@ const dbService = {
   // ANALYSIS & REPORT PERSISTENCE METHODS
   // -------------------------------------------------------------
   findAnalysisById: async (id, userId) => {
+    const where = userId ? { id, userId } : { id };
     const item = await prisma.analysis.findFirst({
-      where: { id, userId },
+      where,
       include: {
         mediaAnalysis: true,
         claims: { include: { evidenceItems: true, entityConnections: true, quoteAttributions: true } },

@@ -11,7 +11,24 @@ const { incrementVerificationUsage } = require('./subscriptionBillingService');
 const { operationalIntelligence } = require('./operationalIntelligenceService');
 const { compactReportMediaPayload } = require('../utils/reportMediaPayload');
 
-const JOB_MAX_TIMEOUT_MS = 180000; // 3 minutes maximum timeout per verification job
+const MIN_JOB_TIMEOUT_MS = 60 * 1000;
+const MAX_JOB_TIMEOUT_MS = 30 * 60 * 1000;
+
+function parseTimeoutMs(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.max(MIN_JOB_TIMEOUT_MS, Math.min(MAX_JOB_TIMEOUT_MS, parsed));
+}
+
+function resolveJobTimeoutMs(mediaCategory = 'TEXT') {
+  if (mediaCategory === 'VIDEO') {
+    return parseTimeoutMs(process.env.VIDEO_PIPELINE_TIMEOUT_MS, 10 * 60 * 1000);
+  }
+  if (mediaCategory === 'PHOTO') {
+    return parseTimeoutMs(process.env.PHOTO_PIPELINE_TIMEOUT_MS, 5 * 60 * 1000);
+  }
+  return parseTimeoutMs(process.env.PIPELINE_TIMEOUT_MS, 3 * 60 * 1000);
+}
 
 function buildImageSourceEvidence(mediaAnalysis) {
   const comparison = mediaAnalysis?.imageSourceContextComparison;
@@ -135,6 +152,8 @@ async function runVerificationPipeline({
   file,
   selectedTypes,
   enableReverseSearch = true,
+  allowExternalVisualSearch = false,
+  allowExternalTranscriptSearch = false,
   traceProvenance = true,
   detectEntities = true
 }) {
@@ -145,6 +164,7 @@ async function runVerificationPipeline({
   if (mediaCategory === 'IMAGE' || mediaCategory === 'PHOTO') mediaCategory = 'PHOTO';
   if (mediaCategory === 'VIDEO') mediaCategory = 'VIDEO';
   const isMediaJob = mediaCategory === 'PHOTO' || mediaCategory === 'VIDEO';
+  const jobTimeoutMs = resolveJobTimeoutMs(mediaCategory);
 
   const inputSourceStr = inputType === 'URL' 
     ? url 
@@ -183,20 +203,37 @@ async function runVerificationPipeline({
     // Process Input via Agent 1
     const contentRes = await processInputContent(
       { inputType, text, url, file },
-      { enableReverseSearch }
+      {
+        enableReverseSearch,
+        allowExternalVisualSearch,
+        allowExternalTranscriptSearch,
+        detectEntities,
+        onVideoProgress: mediaCategory === 'VIDEO'
+          ? update => sseManager.emitProgress(jobId, {
+            userId,
+            status: 'PROCESSING',
+            progress: update.progress,
+            step: update.step,
+            stage: update.stage
+          })
+          : null
+      }
     );
     const mediaAnalysis = contentRes.mediaAnalysis || null;
     const hasAttachedNews = Boolean(text && text.trim().length > 10);
     const observationOnlyImage = mediaCategory === 'PHOTO' && !hasAttachedNews;
 
     if (mediaCategory === 'VIDEO') {
-      if (mediaAnalysis?.transcript) {
-        sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 40, step: 'Agent 1: Transcribing speech-to-text via Whisper API...', stage: 'AUDIO_TRANSCRIPTION' });
-      }
-      sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 50, step: 'Agent 1: Analyzing keyframes with vision model...', stage: 'FRAME_ANALYSIS' });
-      if (mediaAnalysis?.ocrText) {
-        sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 60, step: 'Agent 1: Extracting visible text from keyframes...', stage: 'OCR' });
-      }
+      const provenanceStatus = mediaAnalysis?.videoContextReport?.provenance?.status || 'UNAVAILABLE';
+      sseManager.emitProgress(jobId, {
+        userId,
+        status: 'PROCESSING',
+        progress: 68,
+        step: allowExternalVisualSearch || allowExternalTranscriptSearch
+          ? `Agent 1: Video observation and source-context assessment complete (${String(provenanceStatus).replaceAll('_', ' ')})...`
+          : 'Agent 1: Video observation and local context assessment complete (external searches not authorized)...',
+        stage: 'VIDEO_CONTEXT'
+      });
     } else if (mediaCategory === 'PHOTO') {
       if (mediaAnalysis?.ocrText) {
         sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 50, step: 'Agent 1: Extracting visible text via OCR...', stage: 'OCR' });
@@ -452,7 +489,7 @@ async function runVerificationPipeline({
     reportData.discoveredImages = linkAssetRes.assetInventory.images;
     reportData.discoveredVideos = linkAssetRes.assetInventory.videos;
     reportData.discoveredDocuments = linkAssetRes.assetInventory.documents;
-    reportData.analysisOptions = { enableReverseSearch, traceProvenance, detectEntities };
+    reportData.analysisOptions = { enableReverseSearch, allowExternalVisualSearch, allowExternalTranscriptSearch, traceProvenance, detectEntities };
     compactReportMediaPayload(reportData);
 
     logger.log('phase4_reportGenerator', 'INFO', `Calculated deterministic category scores`, {
@@ -774,13 +811,14 @@ async function runVerificationPipeline({
     return reportData;
   })();
 
+  let timeoutTimer = null;
   const timeoutPromise = new Promise((_, reject) => {
-    const timer = setTimeout(() => {
-      const err = new Error(`Verification job timed out after ${JOB_MAX_TIMEOUT_MS / 1000} seconds.`);
+    timeoutTimer = setTimeout(() => {
+      const err = new Error(`Verification job exceeded its ${Math.round(jobTimeoutMs / 60000)}-minute safety limit.`);
       err.isTimeout = true;
       reject(err);
-    }, JOB_MAX_TIMEOUT_MS);
-    if (timer.unref) timer.unref();
+    }, jobTimeoutMs);
+    if (timeoutTimer.unref) timeoutTimer.unref();
   });
 
   try {
@@ -828,6 +866,8 @@ async function runVerificationPipeline({
     });
 
     throw error;
+  } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer);
   }
 }
 
@@ -835,5 +875,6 @@ module.exports = {
   runVerificationPipeline,
   buildImageSourceEvidence,
   verifyObservationClaimsAgainstImageSource,
-  buildImageSourceResearchContext
+  buildImageSourceResearchContext,
+  resolveJobTimeoutMs
 };

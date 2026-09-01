@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Volume2, ShieldCheck, AlertTriangle, Scissors, Activity, ExternalLink } from 'lucide-react';
+import { Film, Volume2, ShieldCheck, AlertTriangle, Scissors, Activity, ExternalLink, Search, Users, Clock } from 'lucide-react';
 
 function LegacyVideoForensicsExample({
   duration = '41s',
@@ -178,6 +178,13 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
   const splices = Array.isArray(audio.splices) ? audio.splices : [];
   const confirmedSplices = Array.isArray(audio.confirmedSplices) ? audio.confirmedSplices : [];
   const contextReport = analysis.videoContextReport || forensics.contextReport || null;
+  const provenance = contextReport?.provenance || analysis.videoProvenance || null;
+  const completeness = contextReport?.completeness || provenance?.completeness || null;
+  const recognizedFigures = Array.isArray(provenance?.recognizedFigures) ? provenance.recognizedFigures : [];
+  const frameSearches = Array.isArray(provenance?.frameSearches) ? provenance.frameSearches : [];
+  const transcriptSearch = provenance?.transcriptSearch || null;
+  const transcriptSourceMatches = Array.isArray(transcriptSearch?.matches) ? transcriptSearch.matches : [];
+  const transcriptQueries = Array.isArray(transcriptSearch?.queries) ? transcriptSearch.queries : [];
   const contextSegments = Array.isArray(contextReport?.segments) ? contextReport.segments : [];
   const limitations = Array.isArray(analysis.limitations) ? analysis.limitations : [];
   const duration = Number(metadata.durationSeconds || audio.durationSeconds || 0);
@@ -204,6 +211,12 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
       ? 'text-amber-300 border-amber-500/30 bg-amber-500/10'
       : 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10';
 
+  const completenessTone = completeness?.verdict === 'MISLEADING_OUT_OF_CONTEXT'
+    ? 'text-rose-300 border-rose-500/30 bg-rose-500/10'
+    : completeness?.verdict === 'COMPLETE_ORIGINAL_VIDEO' || completeness?.verdict === 'FAITHFUL_EXCERPT'
+      ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
+      : 'text-amber-300 border-amber-500/30 bg-amber-500/10';
+
   return (
     <section id="video-forensics" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-6 shadow-xl scroll-mt-24">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
@@ -226,6 +239,117 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
           </div>
         </div>
       </div>
+
+      {completeness && (
+        <div className="rounded-2xl border border-indigo-500/25 bg-slate-950/55 p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5" /> Original video &amp; context completeness
+              </span>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">{completeness.explanation}</p>
+            </div>
+            <span className={`self-start rounded-full border px-3 py-1 text-[10px] font-mono font-bold ${completenessTone}`}>
+              {completeness.label || String(completeness.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Uploaded duration</span><strong className="mt-1 block font-mono text-slate-200">{completeness.uploadedDurationSeconds ? formatTime(completeness.uploadedDurationSeconds) : 'Unknown'}</strong></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Original duration</span><strong className="mt-1 block font-mono text-slate-200">{completeness.originalDurationSeconds ? formatTime(completeness.originalDurationSeconds) : 'Not recovered'}</strong></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Match in source</span><strong className="mt-1 block font-mono text-slate-200">{completeness.matchTimeline?.sourceStartSec !== null && completeness.matchTimeline?.sourceStartSec !== undefined ? `${formatTime(completeness.matchTimeline.sourceStartSec)}–${formatTime(completeness.matchTimeline.sourceEndSec)}` : 'Not located'}</strong></div>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Source confidence</span><strong className="mt-1 block font-mono text-slate-200">{Number(completeness.confidence || 0)} / 100</strong></div>
+          </div>
+
+          {completeness.source && (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 text-[11px]">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500">Best matched source</span>
+                  <p className="mt-1 break-words font-semibold text-slate-200">{completeness.source.title || completeness.source.domain || 'Matched video source'}</p>
+                  <p className="mt-1 text-slate-500">{[completeness.source.publisher, completeness.source.publishedAt, completeness.source.confidence].filter(Boolean).join(' · ')}</p>
+                  {completeness.source.transcriptEvidenceScore && <p className="mt-1 font-mono text-cyan-300">Transcript evidence: {Math.round(completeness.source.transcriptEvidenceScore)} / 100 · {String(completeness.source.transcriptMatchType || 'TRANSCRIPT MATCH').replaceAll('_', ' ')}</p>}
+                </div>
+                {completeness.source.url && <a href={completeness.source.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-indigo-300 hover:text-indigo-200">Open source <ExternalLink className="w-3 h-3" /></a>}
+              </div>
+            </div>
+          )}
+
+          {completeness.contextWindow && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400"><Clock className="w-3.5 h-3.5 text-indigo-400" /> Full-source context window</div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
+                {[['Before the clip', completeness.contextWindow.before], ['Matched clip', completeness.contextWindow.matched], ['After the clip', completeness.contextWindow.after]].map(([label, value]) => (
+                  <div key={label} className={`rounded-xl border p-3 ${label === 'Matched clip' ? 'border-indigo-500/30 bg-indigo-500/5' : 'border-slate-800 bg-slate-900/45'}`}>
+                    <span className="block text-[9px] uppercase tracking-wider text-slate-500">{label}</span>
+                    <p className="mt-1.5 whitespace-pre-wrap break-words leading-relaxed text-slate-300">{value || 'Not recovered'}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500">Context integrity: {String(completeness.contextIntegrity?.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')}</p>
+            </div>
+          )}
+
+          {recognizedFigures.length > 0 && (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-cyan-400" /> Public-figure search clues</span>
+              <div className="flex flex-wrap gap-2">
+                {recognizedFigures.map((figure, index) => <span key={`${figure.name}-${index}`} title={figure.basis || 'No identity basis supplied'} className={`rounded-full border px-2.5 py-1 text-[10px] font-mono ${figure.searchUsed ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{figure.name}{figure.confidence !== null && figure.confidence !== undefined ? ` · ${Math.round(figure.confidence)}%` : ''}{figure.searchUsed ? ' · searched' : ' · not used'}</span>)}
+              </div>
+              <p className="text-[10px] text-slate-500">Only visually supported public-figure names at or above the confidence threshold are used as search terms; ordinary or uncertain people are not identified.</p>
+            </div>
+          )}
+
+          {transcriptSearch && (
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-3 text-[11px]">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"><Search className="w-3.5 h-3.5" /> Transcript original-news search</span>
+                <span className="font-mono text-slate-400">{String(transcriptSearch.status || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(transcriptSearch.executedQueryCount || 0)} searched · {Number(transcriptSearch.matchedSourceCount || 0)} matched</span>
+              </div>
+
+              {transcriptSearch.status === 'CONSENT_REQUIRED' && <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 text-amber-200">Not searched: enable “Use transcript excerpts to find the original news” when starting the video analysis.</p>}
+
+              {transcriptSourceMatches.length > 0 && (
+                <div className="space-y-2">
+                  {transcriptSourceMatches.slice(0, 5).map((match, index) => (
+                    <div key={`${match.sourceUrl}-${index}`} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="break-words font-semibold text-slate-200">{match.title || match.domain || 'Transcript-matched source'}</p>
+                          <p className="mt-1 text-slate-500">{[match.publisher, match.domain, match.publishedAt].filter(Boolean).join(' · ')}</p>
+                          <p className="mt-1 font-mono text-cyan-300">{Math.round(Number(match.transcriptEvidenceScore || 0))}/100 · {String(match.transcriptMatchType || match.sourceKind || 'TRANSCRIPT CLUE').replaceAll('_', ' ')}</p>
+                        </div>
+                        {match.sourceUrl && <a href={match.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-cyan-300 hover:text-cyan-200">Open source <ExternalLink className="w-3 h-3" /></a>}
+                      </div>
+                      {Array.isArray(match.matchedTranscriptPhrases) && match.matchedTranscriptPhrases.length > 0 && <p className="mt-2 break-words text-slate-400"><span className="text-slate-600">Matched spoken phrase:</span> “{match.matchedTranscriptPhrases[0]}”</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {transcriptQueries.length > 0 && transcriptSearch.status !== 'CONSENT_REQUIRED' && (
+                <details className="rounded-lg border border-slate-800 bg-slate-950/45 p-2.5">
+                  <summary className="cursor-pointer font-mono text-slate-400">Show transcript-derived search queries ({transcriptQueries.length})</summary>
+                  <div className="mt-2 space-y-2">{transcriptQueries.map((query, index) => <div key={query.id || index} className="border-b border-slate-800 pb-2 last:border-0 last:pb-0"><p className="break-words text-slate-300">{query.query}</p><p className="mt-0.5 text-slate-600">{String(query.provider || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(query.resultCount || 0)} result(s)</p></div>)}</div>
+                </details>
+              )}
+
+              {Array.isArray(transcriptSearch.limitations) && transcriptSearch.limitations.length > 0 && <p className="text-amber-300/75">{transcriptSearch.limitations.join(' ')}</p>}
+            </div>
+          )}
+
+          {frameSearches.length > 0 && (
+            <details className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 text-[11px]">
+              <summary className="cursor-pointer font-mono text-slate-300">Keyframe source-search status ({frameSearches.length} selected)</summary>
+              <div className="mt-3 space-y-2">
+                {frameSearches.map((search, index) => <div key={`${search.frameIndex}-${index}`} className="flex flex-col gap-1 border-b border-slate-800 pb-2 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><span className="text-slate-400">{formatTime(search.timestamp)} · {String(search.provider || 'UNAVAILABLE').replaceAll('_', ' ')}</span><span className={search.exactMatch ? 'text-emerald-300' : 'text-amber-300'}>{search.exactMatch ? 'Locally verified visual match' : String(search.status || 'NO MATCH').replaceAll('_', ' ')}</span></div>)}
+              </div>
+            </details>
+          )}
+
+          {Array.isArray(completeness.limitations) && completeness.limitations.length > 0 && <p className="text-[10px] leading-relaxed text-amber-300/75">{completeness.limitations.join(' ')}</p>}
+        </div>
+      )}
 
       <div>
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2.5">Keyframe sequence integrity</span>

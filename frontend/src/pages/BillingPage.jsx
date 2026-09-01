@@ -626,7 +626,7 @@ export default function BillingPage() {
                     <label className="block text-xs font-semibold text-white">Purchase Order (PO) Number</label>
                     <input
                       type="text"
-                      placeholder="PO-2026-ETRAI-008"
+                      placeholder="PO-2026-DEEPTRUST-008"
                       value={poNumber}
                       onChange={(e) => setPoNumber(e.target.value)}
                       className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
@@ -777,7 +777,7 @@ export default function BillingPage() {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="ETRAI20"
+                      placeholder="DEEPTRUST20"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                       className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono uppercase text-xs focus:outline-none focus:border-indigo-500"

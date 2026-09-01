@@ -12,13 +12,13 @@ const {
   deleteReport,
   getRecentTickerReports
 } = require('../controllers/reportsController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, optionalAuth } = require('../middleware/authMiddleware');
 
 router.get('/public/recent-ticker', getRecentTickerReports);
 router.get('/', protect, getReports);
 router.get('/export-csv', protect, exportHistoryCsv);
 router.get('/usage-summary', protect, getUsageSummary);
-router.get('/:id', protect, getReportById);
+router.get('/:id', optionalAuth, getReportById);
 router.get('/:id/provenance', protect, getReportProvenance);
 router.get('/:id/share', getReportShare); // Publicly accessible with sanitization
 router.get('/:id/export', protect, getReportExport);
