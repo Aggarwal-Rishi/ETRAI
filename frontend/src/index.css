@@ -153,6 +153,7 @@
 
 /* Buttons */
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -163,9 +164,12 @@
   border: 1px solid transparent;
   transition: all 0.18s ease;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .btn-primary {
+  position: relative;
+  overflow: hidden;
   background: var(--slab, #0E2E63);
   color: #FFFCF4;
   box-shadow: 0 4px 14px rgba(14, 46, 99, 0.25);
@@ -179,6 +183,8 @@
 }
 
 .btn-clay {
+  position: relative;
+  overflow: hidden;
   background: var(--clay, #D97757);
   color: #FFFFFF;
   box-shadow: 0 4px 12px rgba(217, 119, 87, 0.25);
@@ -189,6 +195,176 @@
   background: var(--clay-deep, #B0512F);
   box-shadow: 0 6px 16px rgba(176, 81, 47, 0.35);
   transform: translateY(-1px);
+}
+
+/* ============ INTERACTIVE PRISM SHINE BUTTONS ============ */
+.btn-primary,
+.btn-clay,
+.btn-shine,
+:is(button, a)[class*="btn-primary"],
+:is(button, a)[class*="btn-clay"],
+:is(button, a)[class*="bg-[#D97757]"],
+:is(button, a)[class*="bg-[#0033C4]"],
+:is(button, a)[class*="bg-[#0E2E63]"],
+:is(button, a)[class*="bg-[#0B5CD5]"],
+:is(button, a)[class*="bg-indigo-600"],
+:is(button, a)[class*="bg-indigo-500"],
+:is(button, a)[class*="bg-clay"] {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, filter 0.3s ease, background 0.25s ease !important;
+}
+
+/* Subtle top-edge glass bevel reflection */
+.btn-primary::before,
+.btn-clay::before,
+.btn-shine::before,
+:is(button, a)[class*="btn-primary"]::before,
+:is(button, a)[class*="btn-clay"]::before,
+:is(button, a)[class*="bg-[#D97757]"]::before,
+:is(button, a)[class*="bg-[#0033C4]"]::before,
+:is(button, a)[class*="bg-[#0E2E63]"]::before,
+:is(button, a)[class*="bg-[#0B5CD5]"]::before,
+:is(button, a)[class*="bg-indigo-600"]::before,
+:is(button, a)[class*="bg-indigo-500"]::before,
+:is(button, a)[class*="bg-clay"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.btn-primary:hover::before,
+.btn-clay:hover::before,
+.btn-shine:hover::before,
+:is(button, a)[class*="btn-primary"]:hover::before,
+:is(button, a)[class*="btn-clay"]:hover::before,
+:is(button, a)[class*="bg-[#D97757]"]:hover::before,
+:is(button, a)[class*="bg-[#0033C4]"]:hover::before,
+:is(button, a)[class*="bg-[#0E2E63]"]:hover::before,
+:is(button, a)[class*="bg-[#0B5CD5]"]:hover::before,
+:is(button, a)[class*="bg-indigo-600"]:hover::before,
+:is(button, a)[class*="bg-indigo-500"]:hover::before,
+:is(button, a)[class*="bg-clay"]:hover::before {
+  opacity: 1;
+}
+
+/* Luminous crystalline flare — slow, luxurious cursor-triggered sweep */
+.btn-primary::after,
+.btn-clay::after,
+.btn-shine::after,
+:is(button, a)[class*="btn-primary"]::after,
+:is(button, a)[class*="btn-clay"]::after,
+:is(button, a)[class*="bg-[#D97757]"]::after,
+:is(button, a)[class*="bg-[#0033C4]"]::after,
+:is(button, a)[class*="bg-[#0E2E63]"]::after,
+:is(button, a)[class*="bg-[#0B5CD5]"]::after,
+:is(button, a)[class*="bg-indigo-600"]::after,
+:is(button, a)[class*="bg-indigo-500"]::after,
+:is(button, a)[class*="bg-clay"]::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -180%;
+  width: 95%;
+  height: 220%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 15%,
+    rgba(255, 255, 255, 0.22) 32%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(255, 255, 255, 0.22) 68%,
+    rgba(255, 255, 255, 0.04) 85%,
+    transparent 100%
+  );
+  transform: rotate(28deg);
+  pointer-events: none;
+  opacity: 0;
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 4px rgba(255, 255, 255, 1));
+  z-index: 2;
+}
+
+/* Hover / Focus interaction triggers the flare sweep at a smooth cinematic pace */
+.btn-primary:hover::after,
+.btn-clay:hover::after,
+.btn-shine:hover::after,
+:is(button, a)[class*="btn-primary"]:hover::after,
+:is(button, a)[class*="btn-clay"]:hover::after,
+:is(button, a)[class*="bg-[#D97757]"]:hover::after,
+:is(button, a)[class*="bg-[#0033C4]"]:hover::after,
+:is(button, a)[class*="bg-[#0E2E63]"]:hover::after,
+:is(button, a)[class*="bg-[#0B5CD5]"]:hover::after,
+:is(button, a)[class*="bg-indigo-600"]:hover::after,
+:is(button, a)[class*="bg-indigo-500"]:hover::after,
+:is(button, a)[class*="bg-clay"]:hover::after,
+.btn-primary:focus-visible::after,
+.btn-clay:focus-visible::after,
+.btn-shine:focus-visible::after,
+:is(button, a)[class*="btn-primary"]:focus-visible::after,
+:is(button, a)[class*="btn-clay"]:focus-visible::after,
+:is(button, a)[class*="bg-[#D97757]"]:focus-visible::after,
+:is(button, a)[class*="bg-[#0033C4]"]:focus-visible::after {
+  animation: btn-laser-shine 1.85s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+/* Interactive cursor hover feedback */
+.btn-primary:hover,
+:is(button, a)[class*="btn-primary"]:hover,
+:is(button, a)[class*="bg-[#0E2E63]"]:hover,
+:is(button, a)[class*="bg-[#0B5CD5]"]:hover {
+  transform: translateY(-2px) scale(1.018);
+  box-shadow: 0 10px 28px rgba(11, 92, 213, 0.4), 0 0 20px rgba(255, 255, 255, 0.25), inset 0 1px 1.5px rgba(255, 255, 255, 0.5) !important;
+}
+
+.btn-clay:hover,
+:is(button, a)[class*="btn-clay"]:hover,
+:is(button, a)[class*="bg-[#D97757]"]:hover,
+:is(button, a)[class*="bg-clay"]:hover {
+  transform: translateY(-2px) scale(1.018);
+  box-shadow: 0 10px 28px rgba(217, 119, 87, 0.48), 0 0 20px rgba(232, 143, 107, 0.35), inset 0 1px 1.5px rgba(255, 255, 255, 0.5) !important;
+}
+
+:is(button, a)[class*="bg-[#0033C4]"]:hover {
+  transform: translateY(-2px) scale(1.018);
+  box-shadow: 0 10px 28px rgba(0, 51, 196, 0.55), 0 0 22px rgba(10, 69, 228, 0.4), inset 0 1px 1.5px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Active press tactile feedback */
+.btn-primary:active,
+.btn-clay:active,
+.btn-shine:active,
+:is(button, a)[class*="btn-primary"]:active,
+:is(button, a)[class*="btn-clay"]:active,
+:is(button, a)[class*="bg-[#D97757]"]:active,
+:is(button, a)[class*="bg-[#0033C4]"]:active,
+:is(button, a)[class*="bg-[#0E2E63]"]:active,
+:is(button, a)[class*="bg-[#0B5CD5]"]:active {
+  transform: translateY(1px) scale(0.985) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+@keyframes btn-laser-shine {
+  0% {
+    left: -180%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    left: 260%;
+    opacity: 0;
+  }
 }
 
 .btn-ghost {
@@ -377,16 +553,6 @@
   animation: etrai-route-arrive 0.48s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-.etrai-route-stage--app,
-.etrai-route-stage--app a,
-.etrai-route-stage--app button,
-.etrai-route-stage--app input,
-.etrai-route-stage--app textarea,
-.etrai-route-stage--app select,
-.etrai-route-stage--app [role="button"] {
-  cursor: none !important;
-}
-
 /* Ambient 3D canvas backdrop */
 .etrai-route-stage--app > [class*="min-h-screen"] {
   background-color: transparent !important;
@@ -445,17 +611,7 @@ header.sticky nav a.active,
   transform: translateY(-1px);
 }
 
-@media (hover: none), (pointer: coarse) {
-  .etrai-route-stage--app,
-  .etrai-route-stage--app a,
-  .etrai-route-stage--app button,
-  .etrai-route-stage--app input,
-  .etrai-route-stage--app textarea,
-  .etrai-route-stage--app select,
-  .etrai-route-stage--app [role="button"] {
-    cursor: auto !important;
-  }
-}
+
 
 @media (max-width: 640px) {
   .etrai-route-stage--app :is(input, textarea, select) {

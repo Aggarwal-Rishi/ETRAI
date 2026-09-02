@@ -14,22 +14,22 @@ export default function ReverifyModal({
   const estimatedCost = ((report.cost || 2.45) * 0.98).toFixed(2);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-scaleUp text-slate-200 text-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+      <div className="bg-white border border-[#CECECE] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scaleUp text-[#2C4E86] text-xs">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#CECECE] bg-[#F8F8F6]">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-400">
+            <div className="p-2 bg-[#F6E7DF] border border-[#E88F6B]/30 rounded-xl text-[#D97757]">
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Re-Verify Stored Report?</h3>
-              <p className="text-xs text-slate-400 truncate max-w-xs">{report.claim || report.title || report.id}</p>
+              <h3 className="text-base font-bold text-[#0B5CD5]">Re-Verify Stored Report?</h3>
+              <p className="text-xs text-[#7386A8] truncate max-w-xs">{report.claim || report.title || report.id}</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-[#7386A8] hover:text-[#0B5CD5] rounded-lg hover:bg-[#EFEEE9] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -37,54 +37,54 @@ export default function ReverifyModal({
 
         {/* Body Content */}
         <div className="p-6 space-y-4">
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-[#2C4E86] leading-relaxed">
             Re-verifying will run the current verification pipeline over the same subject against today's ranked sources, recent debunks, and available archives.
           </p>
 
           {/* Token & Cost Estimates */}
-          <div className="grid grid-cols-2 gap-3 p-4 bg-slate-950/80 border border-slate-800 rounded-xl">
+          <div className="grid grid-cols-2 gap-3 p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl">
             <div>
-              <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Estimated Tokens</span>
-              <span className="font-mono text-base font-semibold text-indigo-400">
+              <span className="text-[10px] uppercase font-mono text-[#7386A8] block mb-1 font-semibold">Estimated Tokens</span>
+              <span className="font-mono text-base font-bold text-[#0B5CD5]">
                 ~{(estimatedTokens / 1000).toFixed(0)}k
               </span>
-              <span className="text-[10px] text-slate-500 block">Based on prior run complexity</span>
+              <span className="text-[10px] text-[#7386A8] block">Based on prior run complexity</span>
             </div>
             <div>
-              <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Estimated Cost</span>
-              <span className="font-mono text-base font-semibold text-emerald-400">
+              <span className="text-[10px] uppercase font-mono text-[#7386A8] block mb-1 font-semibold">Estimated Cost</span>
+              <span className="font-mono text-base font-bold text-[#3E7A55]">
                 ~${estimatedCost}
               </span>
-              <span className="text-[10px] text-slate-500 block">Billed to monthly allowance</span>
+              <span className="text-[10px] text-[#7386A8] block">Billed to monthly allowance</span>
             </div>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="p-3 bg-[#F7EEDA] border border-[#E8D4B0] rounded-2xl text-xs text-[#2C4E86] flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-[#B98520] flex-shrink-0 mt-0.5" />
             <span>
-              The existing version is retained in your ledger under <strong>v1</strong>. The re-verification will be stored as <strong>v2</strong>.
+              The existing version is retained in your ledger under <strong className="text-[#0B5CD5]">v1</strong>. The re-verification will be stored as <strong className="text-[#0B5CD5]">v2</strong>.
             </span>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-900 border-t border-slate-800 flex items-center justify-end gap-2.5">
+        <div className="px-6 py-4 bg-[#F8F8F6] border-t border-[#CECECE] flex items-center justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl transition"
+            className="px-4 py-2 text-xs font-semibold text-[#2C4E86] hover:text-[#0B5CD5] bg-[#EFEEE9] hover:bg-[#CECECE] rounded-xl transition shadow-xs"
           >
             Keep Current Version
           </button>
           <button
             onClick={() => { onRerunWatch(report); onClose(); }}
-            className="px-4 py-2 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold text-[#0B5CD5] bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] rounded-xl transition flex items-center gap-1.5 shadow-xs"
           >
-            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+            <Eye className="w-3.5 h-3.5 text-[#D97757]" />
             Run & Watch
           </button>
           <button
             onClick={() => { onRerunNow(report); onClose(); }}
-            className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/20 transition flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-bold text-white bg-[#D97757] hover:bg-[#B0512F] rounded-xl shadow-md transition flex items-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Re-verify Now

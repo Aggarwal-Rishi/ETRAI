@@ -27,9 +27,9 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-        <span className="text-sm font-medium">Verifying Session...</span>
+      <div className="min-h-screen bg-[#FFF6E3] flex flex-col items-center justify-center text-[#2C4E86] gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-[#D97757]" />
+        <span className="text-sm font-semibold text-[#0B5CD5] font-mono">Verifying Session...</span>
       </div>
     );
   }

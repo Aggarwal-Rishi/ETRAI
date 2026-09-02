@@ -261,13 +261,13 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-[#F2C46B]" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -275,27 +275,27 @@ export default function BillingPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
         
         {/* Sandbox Transparency Notice Banner */}
-        <div className="p-4 bg-slate-900/90 border border-[#F2C46B]/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="p-4 bg-white border border-[#CECECE] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#F2C46B]/10 text-[#F2C46B] rounded-xl border border-[#F2C46B]/20">
+            <div className="p-2 bg-[#F6E7DF] text-[#B0512F] rounded-xl border border-[#E88F6B]/30">
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-semibold text-white block">
+              <span className="font-semibold text-[#0B5CD5] block">
                 Billing Preview & Sandbox Mode
               </span>
-              <span className="text-slate-400 text-[11px]">
+              <span className="text-[#2C4E86] text-[11px]">
                 Direct live payment card/UPI tokenization is scheduled for production. Completing this flow adjusts your workspace quota with zero live charges.
               </span>
             </div>
           </div>
-          <span className="px-2.5 py-1 bg-slate-800 text-[#F2C46B] rounded-lg font-mono text-[10px] font-bold uppercase border border-slate-700">
+          <span className="px-2.5 py-1 bg-[#EFEEE9] text-[#0B5CD5] rounded-lg font-mono text-[10px] font-bold uppercase border border-[#CECECE]">
             Sandbox Active
           </span>
         </div>
 
         {/* 4-Step Stepper Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-[#CECECE] pb-4">
           {[
             { s: 1, label: '01 Select Plan' },
             { s: 2, label: '02 Payment Method' },
@@ -306,18 +306,18 @@ export default function BillingPage() {
               key={st.s}
               className={`flex items-center gap-2 text-xs font-mono font-bold ${
                 step === st.s
-                  ? 'text-[#F2C46B]'
+                  ? 'text-[#D97757]'
                   : step > st.s
-                  ? 'text-emerald-400'
-                  : 'text-slate-600'
+                  ? 'text-[#3E7A55]'
+                  : 'text-[#7386A8]'
               }`}
             >
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${
                 step === st.s
-                  ? 'bg-[#F2C46B] text-slate-950'
+                  ? 'bg-[#D97757] text-white'
                   : step > st.s
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-slate-900 border border-slate-800'
+                  ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF]'
+                  : 'bg-[#EFEEE9] border border-[#CECECE]'
               }`}>
                 {step > st.s ? <Check className="w-3 h-3 stroke-[3]" /> : st.s}
               </div>
@@ -334,20 +334,20 @@ export default function BillingPage() {
             
             {/* Header & Toggle */}
             <div className="text-center space-y-3">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B5CD5]">
                 Choose the right verification capacity for your desk
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
+              <p className="text-xs sm:text-sm text-[#2C4E86] max-w-xl mx-auto">
                 All plans include the 4-agent DeepTrust rail, cryptographic sealed dossiers, and full export capabilities.
               </p>
 
               {/* Monthly / Annual Toggle */}
-              <div className="inline-flex items-center gap-3 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl">
+              <div className="inline-flex items-center gap-3 p-1.5 bg-white border border-[#CECECE] rounded-2xl shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsAnnual(false)}
                   className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    !isAnnual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    !isAnnual ? 'bg-[#0B5CD5] text-white shadow-sm' : 'text-[#2C4E86] hover:text-[#0B5CD5]'
                   }`}
                 >
                   Monthly billing
@@ -356,11 +356,11 @@ export default function BillingPage() {
                   type="button"
                   onClick={() => setIsAnnual(true)}
                   className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                    isAnnual ? 'bg-[#D97757] text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    isAnnual ? 'bg-[#D97757] text-white shadow-sm' : 'text-[#2C4E86] hover:text-[#0B5CD5]'
                   }`}
                 >
                   <span>Annual billing</span>
-                  <span className="px-1.5 py-0.2 bg-[#F2C46B] text-slate-950 rounded text-[9.5px] font-mono font-bold">
+                  <span className="px-1.5 py-0.2 bg-[#F6E7DF] text-[#B0512F] rounded text-[9.5px] font-mono font-bold">
                     2 months free
                   </span>
                 </button>
@@ -381,47 +381,47 @@ export default function BillingPage() {
                     }}
                     className={`p-6 rounded-3xl border transition-all flex flex-col justify-between space-y-6 relative cursor-pointer ${
                       isSelected
-                        ? 'bg-gradient-to-b from-[#000D59] to-slate-900 border-indigo-500 shadow-2xl ring-2 ring-indigo-500/20 scale-[1.02]'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                        ? 'bg-[#FFF6E3] border-[#D97757] shadow-xl ring-2 ring-[#D97757]/20 scale-[1.02]'
+                        : 'bg-white border-[#CECECE] hover:border-[#D97757] shadow-sm'
                     }`}
                   >
                     {plan.best && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-gradient-to-r from-[#D97757] to-[#F2C46B] text-slate-950 rounded-full font-mono text-[10px] font-extrabold uppercase shadow-md">
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-[#D97757] text-white rounded-full font-mono text-[10px] font-extrabold uppercase shadow-md">
                         Most Popular
                       </span>
                     )}
 
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-white">{plan.n}</h3>
+                        <h3 className="text-lg font-bold text-[#0B5CD5]">{plan.n}</h3>
                         {plan.cur && (
-                          <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">
+                          <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-mono text-[10px]">
                             Active
                           </span>
                         )}
                       </div>
 
-                      <p className="text-xs text-slate-400 leading-relaxed min-h-[32px]">{plan.d}</p>
+                      <p className="text-xs text-[#2C4E86] leading-relaxed min-h-[32px]">{plan.d}</p>
 
                       <div className="py-2">
                         {price !== null ? (
                           <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-black font-mono text-white">
+                            <span className="text-3xl font-black font-mono text-[#0B5CD5]">
                               ₹{price.toLocaleString('en-IN')}
                             </span>
-                            <span className="text-xs text-slate-400 font-mono">
+                            <span className="text-xs text-[#7386A8] font-mono">
                               /{isAnnual ? 'yr' : 'mo'}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-2xl font-bold font-mono text-indigo-300">Custom Agreement</span>
+                          <span className="text-2xl font-bold font-mono text-[#0B5CD5]">Custom Agreement</span>
                         )}
                       </div>
 
-                      <ul className="space-y-2 pt-2 border-t border-slate-800/80 text-xs text-slate-300">
+                      <ul className="space-y-2 pt-2 border-t border-[#CECECE] text-xs text-[#2C4E86]">
                         {plan.f.map((feat, fIdx) => (
                           <li key={fIdx} className="flex items-start gap-2">
-                            <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                            <Check className="w-3.5 h-3.5 text-[#3E7A55] mt-0.5 flex-shrink-0" />
                             <span>{feat}</span>
                           </li>
                         ))}
@@ -442,7 +442,7 @@ export default function BillingPage() {
                       className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                         isSelected
                           ? 'bg-[#D97757] hover:bg-[#B0512F] text-white shadow-md'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                          : 'bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5]'
                       }`}
                     >
                       <span>{plan.k === 'Enterprise' ? 'Contact Sales' : isSelected ? 'Configure Plan' : 'Select ' + plan.n}</span>
@@ -454,38 +454,38 @@ export default function BillingPage() {
             </div>
 
             {/* Compare & Buy Matrix Table */}
-            <div className="p-6 sm:p-8 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
-              <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+            <div className="p-6 sm:p-8 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
+              <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
                 Full Capability & Quota Comparison
               </h3>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                      <th className="pb-3 w-1/3">Feature Category</th>
-                      <th className="pb-3 text-center">Starter</th>
-                      <th className="pb-3 text-center bg-slate-950/40 rounded-t-xl">Team</th>
-                      <th className="pb-3 text-center text-[#F2C46B]">Newsroom</th>
-                      <th className="pb-3 text-center">Enterprise</th>
+                    <tr className="border-b border-[#CECECE] text-[#2C4E86] font-mono text-[11px] bg-[#EFEEE9]">
+                      <th className="py-3 px-3 w-1/3">Feature Category</th>
+                      <th className="py-3 text-center">Starter</th>
+                      <th className="py-3 text-center">Team</th>
+                      <th className="py-3 text-center text-[#D97757]">Newsroom</th>
+                      <th className="py-3 text-center">Enterprise</th>
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  <tbody className="divide-y divide-[#CECECE] text-[#2C4E86]">
                     {CMP.map((group, gIdx) => (
                       <React.Fragment key={gIdx}>
-                        <tr className="bg-slate-950/80 font-bold text-slate-200 text-[11px] font-mono">
-                          <td colSpan="5" className="py-2.5 px-3 uppercase text-indigo-400">{group.g}</td>
+                        <tr className="bg-[#EFEEE9] font-bold text-[#0B5CD5] text-[11px] font-mono">
+                          <td colSpan="5" className="py-2.5 px-3 uppercase text-[#0B5CD5]">{group.g}</td>
                         </tr>
                         {group.rows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-slate-850 transition">
-                            <td className="py-3 px-3 font-medium text-slate-300">{row[0]}</td>
+                          <tr key={rIdx} className="hover:bg-[#F8F8F6] transition">
+                            <td className="py-3 px-3 font-medium text-[#0B5CD5]">{row[0]}</td>
                             {row[1].map((val, vIdx) => (
                               <td key={vIdx} className="py-3 text-center font-mono">
                                 {typeof val === 'boolean' ? (
-                                  val ? <Check className="w-4 h-4 text-emerald-400 mx-auto" /> : <span className="text-slate-600">—</span>
+                                  val ? <Check className="w-4 h-4 text-[#3E7A55] mx-auto" /> : <span className="text-[#7386A8]">—</span>
                                 ) : (
-                                  <span className="text-slate-200">{val}</span>
+                                  <span className="text-[#2C4E86]">{val}</span>
                                 )}
                               </td>
                             ))}
@@ -508,12 +508,12 @@ export default function BillingPage() {
             <div className="space-y-1">
               <button
                 onClick={() => setStep(1)}
-                className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 mb-2"
+                className="text-xs font-semibold text-[#2C4E86] hover:text-[#0B5CD5] flex items-center gap-1.5 mb-2"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to Plan Selection
               </button>
-              <h2 className="text-xl font-bold text-white">Select Payment Method</h2>
-              <p className="text-xs text-slate-400">
+              <h2 className="text-xl font-bold text-[#0B5CD5]">Select Payment Method</h2>
+              <p className="text-xs text-[#2C4E86]">
                 Upgrading to <strong>{selectedPlan.n}</strong> ({isAnnual ? 'Annual' : 'Monthly'} cycle).
               </p>
             </div>
@@ -534,8 +534,8 @@ export default function BillingPage() {
                     onClick={() => setPayMethod(m.id)}
                     className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col items-center justify-center space-y-2 text-center ${
                       isSelected
-                        ? 'bg-indigo-950/60 border-indigo-500 text-white shadow-lg ring-2 ring-indigo-500/20'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-[#FFF6E3] border-[#D97757] text-[#0B5CD5] shadow-md ring-2 ring-[#D97757]/20'
+                        : 'bg-white border-[#CECECE] text-[#2C4E86] hover:border-[#D97757]'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -546,70 +546,70 @@ export default function BillingPage() {
             </div>
 
             {/* Method Input Fields */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm">
               
               {payMethod === 'UPI' && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-white">Virtual Payment Address (VPA / UPI ID)</label>
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">Virtual Payment Address (VPA / UPI ID)</label>
                   <input
                     type="text"
                     placeholder="deskname@okhdfcbank"
                     value={upiId}
                     onChange={(e) => setUpiId(e.target.value)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                   />
-                  <p className="text-[11px] text-slate-500">Collect request will be dispatched to your UPI application.</p>
+                  <p className="text-[11px] text-[#7386A8]">Collect request will be dispatched to your UPI application.</p>
                 </div>
               )}
 
               {payMethod === 'CARD' && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-white">Card Number</label>
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">Card Number</label>
                     <input
                       type="text"
                       placeholder="4532 •••• •••• 8821"
                       value={cardNumber}
                       onChange={(e) => setCardNumber(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-white">Expiry Date</label>
+                      <label className="block text-xs font-semibold text-[#0B5CD5]">Expiry Date</label>
                       <input
                         type="text"
                         placeholder="MM / YY"
                         value={cardExpiry}
                         onChange={(e) => setCardExpiry(e.target.value)}
-                        className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                        className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-white">CVV</label>
+                      <label className="block text-xs font-semibold text-[#0B5CD5]">CVV</label>
                       <input
                         type="password"
                         placeholder="•••"
                         maxLength={4}
                         value={cardCvv}
                         onChange={(e) => setCardCvv(e.target.value)}
-                        className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                        className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-emerald-400" /> PCI-DSS compliant client-side tokenized processing.
+                  <p className="text-[10px] text-[#7386A8] flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-[#3E7A55]" /> PCI-DSS compliant client-side tokenized processing.
                   </p>
                 </div>
               )}
 
               {payMethod === 'NETBANKING' && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-white">Select Primary Bank</label>
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">Select Primary Bank</label>
                   <select
                     value={selectedBank}
                     onChange={(e) => setSelectedBank(e.target.value)}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                   >
                     <option value="HDFC Bank">HDFC Bank</option>
                     <option value="ICICI Bank">ICICI Bank</option>
@@ -623,22 +623,22 @@ export default function BillingPage() {
               {payMethod === 'INVOICE' && (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-white">Purchase Order (PO) Number</label>
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">Purchase Order (PO) Number</label>
                     <input
                       type="text"
                       placeholder="PO-2026-DEEPTRUST-008"
                       value={poNumber}
                       onChange={(e) => setPoNumber(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-white">Accounts Payable Email</label>
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">Accounts Payable Email</label>
                     <input
                       type="email"
                       value={accountsEmail}
                       onChange={(e) => setAccountsEmail(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                 </div>
@@ -647,7 +647,7 @@ export default function BillingPage() {
 
             <button
               onClick={() => setStep(3)}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl text-xs shadow-lg transition flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-bold rounded-2xl text-xs shadow-md transition flex items-center justify-center gap-2"
             >
               <span>Continue to Summary & Tax Review</span>
               <ArrowRight className="w-4 h-4" />
@@ -665,67 +665,67 @@ export default function BillingPage() {
             <div className="lg:col-span-7 space-y-6">
               <button
                 onClick={() => setStep(2)}
-                className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5"
+                className="text-xs font-semibold text-[#2C4E86] hover:text-[#0B5CD5] flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to Payment Method
               </button>
 
-              <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
-                <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-white">
+              <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
                   Tax & Invoice Entity Details
                 </h3>
 
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Company / Organization Name</label>
+                    <label className="block text-[#2C4E86] mb-1">Company / Organization Name</label>
                     <input
                       type="text"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">GSTIN Number (Optional)</label>
+                    <label className="block text-[#2C4E86] mb-1">GSTIN Number (Optional)</label>
                     <input
                       type="text"
                       placeholder="27AAACE1234F1Z5"
                       value={gstin}
                       onChange={(e) => setGstin(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Registered Billing Address</label>
+                    <label className="block text-[#2C4E86] mb-1">Registered Billing Address</label>
                     <textarea
                       rows={2}
                       value={billingAddress}
                       onChange={(e) => setBillingAddress(e.target.value)}
-                      className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Extra Seats Stepper */}
-              <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+              <div className="p-5 bg-white border border-[#CECECE] rounded-2xl flex items-center justify-between shadow-xs">
                 <div>
-                  <span className="font-bold text-xs text-white block">Add Extra Seats</span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="font-bold text-xs text-[#0B5CD5] block">Add Extra Seats</span>
+                  <span className="text-[11px] text-[#7386A8]">
                     ₹{(selectedPlan.extraSeatCost || 0).toLocaleString()} / seat / mo
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setExtraSeats(Math.max(0, extraSeats - 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs"
+                    className="w-7 h-7 rounded-lg bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] font-bold flex items-center justify-center text-xs"
                   >
                     -
                   </button>
-                  <span className="font-mono text-sm font-bold text-white w-4 text-center">{extraSeats}</span>
+                  <span className="font-mono text-sm font-bold text-[#0B5CD5] w-4 text-center">{extraSeats}</span>
                   <button
                     onClick={() => setExtraSeats(extraSeats + 1)}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center text-xs"
+                    className="w-7 h-7 rounded-lg bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] font-bold flex items-center justify-center text-xs"
                   >
                     +
                   </button>
@@ -735,69 +735,69 @@ export default function BillingPage() {
 
             {/* Right: Order Summary & Pay */}
             <div className="lg:col-span-5 space-y-6">
-              <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl text-xs">
-                <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-white border-b border-slate-800 pb-2">
+              <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm text-xs">
+                <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[#0B5CD5] border-b border-[#CECECE] pb-2">
                   Order Summary
                 </h3>
 
                 <div className="space-y-2.5">
-                  <div className="flex justify-between items-center text-slate-300">
+                  <div className="flex justify-between items-center text-[#2C4E86]">
                     <span>{selectedPlan.n} Plan ({isAnnual ? 'Annual' : 'Monthly'})</span>
-                    <span className="font-mono font-bold text-white">₹{(basePrice || 0).toLocaleString()}</span>
+                    <span className="font-mono font-bold text-[#0B5CD5]">₹{(basePrice || 0).toLocaleString()}</span>
                   </div>
 
                   {extraSeats > 0 && (
-                    <div className="flex justify-between items-center text-slate-300">
+                    <div className="flex justify-between items-center text-[#2C4E86]">
                       <span>{extraSeats} Extra Seat{extraSeats > 1 ? 's' : ''}</span>
-                      <span className="font-mono font-bold text-white">₹{extraSeatPrice.toLocaleString()}</span>
+                      <span className="font-mono font-bold text-[#0B5CD5]">₹{extraSeatPrice.toLocaleString()}</span>
                     </div>
                   )}
 
                   {appliedCoupon && (
-                    <div className="flex justify-between items-center text-emerald-400 font-semibold">
+                    <div className="flex justify-between items-center text-[#3E7A55] font-semibold">
                       <span>Promo ({appliedCoupon.code || couponCode})</span>
                       <span className="font-mono">-₹{discountAmount.toLocaleString()}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center text-slate-400 pt-2 border-t border-slate-800">
+                  <div className="flex justify-between items-center text-[#7386A8] pt-2 border-t border-[#CECECE]">
                     <span>GST (18%)</span>
                     <span className="font-mono">₹{gstAmount.toLocaleString()}</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm font-bold text-white pt-2 border-t border-slate-800">
+                  <div className="flex justify-between items-center text-sm font-bold text-[#0B5CD5] pt-2 border-t border-[#CECECE]">
                     <span>Total Amount</span>
-                    <span className="font-mono text-emerald-400 text-base">₹{finalTotalInr.toLocaleString()}</span>
+                    <span className="font-mono text-[#3E7A55] text-base">₹{finalTotalInr.toLocaleString()}</span>
                   </div>
                 </div>
 
                 {/* Coupon Code Input */}
-                <div className="pt-3 border-t border-slate-800 space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-slate-300">Have a promo coupon?</label>
+                <div className="pt-3 border-t border-[#CECECE] space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-[#0B5CD5]">Have a promo coupon?</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="DEEPTRUST20"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono uppercase text-xs focus:outline-none focus:border-indigo-500"
+                      className="flex-1 px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] font-mono uppercase text-xs focus:outline-none focus:border-[#D97757]"
                     />
                     <button
                       type="button"
                       onClick={handleApplyCoupon}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl"
+                      className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] text-xs font-semibold rounded-xl"
                     >
                       Apply
                     </button>
                   </div>
-                  {couponError && <p className="text-[10px] text-rose-400">{couponError}</p>}
+                  {couponError && <p className="text-[10px] text-[#B23F35]">{couponError}</p>}
                 </div>
 
                 {/* Pay Action Button */}
                 <button
                   onClick={handleProcessUpgrade}
                   disabled={isSubmitting}
-                  className="w-full py-3.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-extrabold rounded-2xl text-xs shadow-xl shadow-[#D97757]/20 transition flex items-center justify-center gap-2 mt-4"
+                  className="w-full py-3.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-extrabold rounded-2xl text-xs shadow-md shadow-[#D97757]/20 transition flex items-center justify-center gap-2 mt-4"
                 >
                   <Lock className="w-3.5 h-3.5" />
                   <span>{isSubmitting ? 'Confirming Upgrade...' : `Confirm & Upgrade · ₹${finalTotalInr.toLocaleString()}`}</span>
@@ -812,44 +812,44 @@ export default function BillingPage() {
         {/* ========================================================================= */}
         {step === 4 && (
           <div className="max-w-xl mx-auto space-y-6 text-center animate-scaleUp">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 rounded-full bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF] flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
             </div>
 
             <div className="space-y-1">
-              <h2 className="text-2xl font-black text-white">Upgrade Successfully Activated!</h2>
-              <p className="text-xs text-slate-400">
+              <h2 className="text-2xl font-black text-[#0B5CD5]">Upgrade Successfully Activated!</h2>
+              <p className="text-xs text-[#2C4E86]">
                 Your workspace is now equipped with the <strong>{invoiceRecord?.planName || 'Newsroom'}</strong> tier capacity.
               </p>
             </div>
 
             {/* Receipt Card */}
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-left text-xs shadow-2xl">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="font-mono text-slate-400 text-[11px] uppercase">Invoice Record</span>
-                <span className="font-mono font-bold text-indigo-400">{invoiceRecord?.invoiceId}</span>
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-left text-xs shadow-md">
+              <div className="flex justify-between items-center border-b border-[#CECECE] pb-2">
+                <span className="font-mono text-[#7386A8] text-[11px] uppercase">Invoice Record</span>
+                <span className="font-mono font-bold text-[#0B5CD5]">{invoiceRecord?.invoiceId}</span>
               </div>
 
               <div className="space-y-2 font-mono">
-                <div className="flex justify-between text-slate-300">
+                <div className="flex justify-between text-[#2C4E86]">
                   <span>Organization</span>
-                  <span className="text-white font-sans font-medium">{invoiceRecord?.company}</span>
+                  <span className="text-[#0B5CD5] font-sans font-medium">{invoiceRecord?.company}</span>
                 </div>
-                <div className="flex justify-between text-slate-300">
+                <div className="flex justify-between text-[#2C4E86]">
                   <span>Billing Cycle</span>
-                  <span className="text-white">{invoiceRecord?.cycle}</span>
+                  <span className="text-[#0B5CD5]">{invoiceRecord?.cycle}</span>
                 </div>
-                <div className="flex justify-between text-slate-300">
+                <div className="flex justify-between text-[#2C4E86]">
                   <span>Next Renewal Date</span>
-                  <span className="text-white">{invoiceRecord?.renewalDate}</span>
+                  <span className="text-[#0B5CD5]">{invoiceRecord?.renewalDate}</span>
                 </div>
-                <div className="flex justify-between text-slate-300">
+                <div className="flex justify-between text-[#2C4E86]">
                   <span>Payment Channel</span>
-                  <span className="text-white">{invoiceRecord?.paymentMethod} (Sandbox Verified)</span>
+                  <span className="text-[#0B5CD5]">{invoiceRecord?.paymentMethod} (Sandbox Verified)</span>
                 </div>
-                <div className="flex justify-between text-slate-300 pt-2 border-t border-slate-800 font-bold">
+                <div className="flex justify-between text-[#2C4E86] pt-2 border-t border-[#CECECE] font-bold">
                   <span>Total Amount Paid</span>
-                  <span className="text-emerald-400 text-sm">₹{invoiceRecord?.amount?.toLocaleString()}</span>
+                  <span className="text-[#3E7A55] text-sm">₹{invoiceRecord?.amount?.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -861,14 +861,14 @@ export default function BillingPage() {
                   window.print();
                   showToast('Receipt PDF exported');
                 }}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5"
+                className="px-4 py-2 bg-white hover:bg-[#F8F8F6] border border-[#CECECE] text-[#0B5CD5] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Tax Invoice (PDF)</span>
               </button>
               <button
                 onClick={() => window.location.href = '/dashboard'}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                className="px-5 py-2 bg-[#D97757] hover:bg-[#B0512F] text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
               >
                 <span>Go to Dashboard</span>
                 <ArrowRight className="w-3.5 h-3.5" />

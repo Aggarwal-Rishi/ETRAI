@@ -266,7 +266,6 @@ export default function HistoryPage() {
       showToast('No records available to export');
       return;
     }
-
     const headers = 'Run ID,Version,Subject,Category,Source,News Date,Run Date,Media Type,Verdict,Trust Score,Tokens Consumed,Cost USD\n';
     const rows = filteredRuns.map(r => {
       const titleClean = `"${(r.title || '').replace(/"/g, '""')}"`;
@@ -327,13 +326,13 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#0c1427] border border-[#17233f] text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-blue-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -343,11 +342,11 @@ export default function HistoryPage() {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
-              <Clock className="w-6 h-6 text-indigo-400" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#0B5CD5] tracking-tight flex items-center gap-2.5">
+              <Clock className="w-6 h-6 text-[#D97757]" />
               History
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
               Every run you've generated, with the score at the time it ran and what it cost to run.
             </p>
           </div>
@@ -355,14 +354,14 @@ export default function HistoryPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => showToast('Cost report scheduled for your account email')}
-              className="bg-[#0c1427] hover:bg-[#101a33] border border-[#17233f] text-slate-300 text-xs font-semibold px-4 py-2 rounded-xl shadow-sm flex items-center gap-2 transition cursor-pointer"
+              className="bg-white hover:bg-[#F8F8F6] border border-[#CECECE] text-[#0B5CD5] text-xs font-semibold px-4 py-2 rounded-xl shadow-xs flex items-center gap-2 transition cursor-pointer"
             >
-              <Mail className="w-3.5 h-3.5 text-blue-400" />
+              <Mail className="w-3.5 h-3.5 text-[#0B5CD5]" />
               <span>Send cost report</span>
             </button>
             <button
               onClick={exportCSV}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 flex items-center gap-2 transition cursor-pointer"
+              className="bg-[#D97757] hover:bg-[#B0512F] text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md shadow-[#D97757]/20 flex items-center gap-2 transition cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export CSV</span>
@@ -371,57 +370,57 @@ export default function HistoryPage() {
         </div>
 
         {/* 4 Usage & Cost Metrics Summary Card */}
-        <div className="bg-[#0c1427] border border-[#17233f] rounded-2xl p-6 shadow-xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#17233f]">
+        <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#CECECE]">
             
             {/* Column 1 */}
             <div className="sm:px-6 first:sm:pl-0">
-              <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase font-mono block">
+              <span className="text-[11px] font-semibold text-[#7386A8] tracking-wider uppercase font-mono block">
                 RUNS SHOWN
               </span>
-              <div className="text-3xl font-bold font-mono text-white mt-2">
+              <div className="text-3xl font-bold font-mono text-[#0B5CD5] mt-2">
                 {filteredRuns.length}
               </div>
-              <div className="text-xs text-slate-500 mt-1 font-medium font-mono">
+              <div className="text-xs text-[#7386A8] mt-1 font-medium font-mono">
                 310 this cycle
               </div>
             </div>
 
             {/* Column 2 */}
             <div className="pt-4 sm:pt-0 sm:px-6">
-              <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase font-mono block">
+              <span className="text-[11px] font-semibold text-[#7386A8] tracking-wider uppercase font-mono block">
                 TOKENS CONSUMED
               </span>
-              <div className="text-3xl font-bold font-mono text-indigo-400 mt-2">
+              <div className="text-3xl font-bold font-mono text-[#0B5CD5] mt-2">
                 {(totalTokens / 1e6).toFixed(2)}M
               </div>
-              <div className="text-xs text-slate-500 mt-1 font-medium">
+              <div className="text-xs text-[#7386A8] mt-1 font-medium">
                 Input + output, all agents
               </div>
             </div>
 
             {/* Column 3 */}
             <div className="pt-4 sm:pt-0 sm:px-6">
-              <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase font-mono block">
+              <span className="text-[11px] font-semibold text-[#7386A8] tracking-wider uppercase font-mono block">
                 COST
               </span>
-              <div className="text-3xl font-bold font-mono text-emerald-400 mt-2">
+              <div className="text-3xl font-bold font-mono text-[#3E7A55] mt-2">
                 ${totalCost.toFixed(2)}
               </div>
-              <div className="text-xs text-slate-500 mt-1 font-medium">
+              <div className="text-xs text-[#7386A8] mt-1 font-medium">
                 Billed to your plan allowance
               </div>
             </div>
 
             {/* Column 4 */}
             <div className="pt-4 sm:pt-0 sm:px-6 last:sm:pr-0">
-              <span className="text-[11px] font-semibold text-slate-400 tracking-wider uppercase font-mono block">
+              <span className="text-[11px] font-semibold text-[#7386A8] tracking-wider uppercase font-mono block">
                 AVERAGE PER RUN
               </span>
-              <div className="text-3xl font-bold font-mono text-blue-400 mt-2">
+              <div className="text-3xl font-bold font-mono text-[#D97757] mt-2">
                 ${avgCost}
               </div>
-              <div className="text-xs text-slate-500 mt-1 font-medium font-mono">
+              <div className="text-xs text-[#7386A8] mt-1 font-medium font-mono">
                 {avgTok} tokens
               </div>
             </div>
@@ -430,28 +429,28 @@ export default function HistoryPage() {
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-[#0c1427] border border-[#17233f] rounded-2xl p-3 shadow-xl flex flex-wrap items-center gap-3 text-xs">
+        <div className="bg-white border border-[#CECECE] rounded-2xl p-3 shadow-sm flex flex-wrap items-center gap-3 text-xs">
           
-          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold pl-1">
+          <span className="text-[11px] font-mono text-[#7386A8] uppercase tracking-wider font-semibold pl-1">
             Filter
           </span>
 
           {/* Date range pickers */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">From</span>
+            <span className="text-xs text-[#2C4E86] font-medium">From</span>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="px-3 py-1.5 bg-[#070b14] border border-[#17233f] rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
               title="Filter From Date"
             />
-            <span className="text-xs text-slate-400 font-medium">to</span>
+            <span className="text-xs text-[#2C4E86] font-medium">to</span>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="px-3 py-1.5 bg-[#070b14] border border-[#17233f] rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
               title="Filter To Date"
             />
           </div>
@@ -460,7 +459,7 @@ export default function HistoryPage() {
           <select
             value={catFilter}
             onChange={(e) => setCatFilter(e.target.value)}
-            className="px-3 py-1.5 bg-[#070b14] border border-[#17233f] rounded-xl text-xs text-slate-200 font-semibold focus:outline-none focus:border-indigo-500"
+            className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] font-semibold focus:outline-none focus:border-[#D97757]"
           >
             {categories.map(c => (
               <option key={c} value={c}>{c === 'ALL' ? 'All categories' : c}</option>
@@ -469,13 +468,13 @@ export default function HistoryPage() {
 
           {/* Search Query */}
           <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#7386A8] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search subject, source or run ID"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#070b14] border border-[#17233f] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] placeholder-[#7386A8] focus:outline-none focus:border-[#D97757]"
             />
           </div>
 
@@ -483,14 +482,14 @@ export default function HistoryPage() {
           {(catFilter !== 'ALL' || searchQuery || mediaFilter !== 'ALL' || fromDate || toDate) ? (
             <button
               onClick={handleClearFilters}
-              className="text-xs font-semibold text-blue-400 hover:underline px-2 py-1 cursor-pointer"
+              className="text-xs font-semibold text-[#0B5CD5] hover:underline px-2 py-1 cursor-pointer"
             >
               Clear
             </button>
           ) : (
             <button
               onClick={handleClearFilters}
-              className="text-xs font-medium text-slate-500 hover:text-slate-300 px-2 py-1 cursor-pointer"
+              className="text-xs font-medium text-[#7386A8] hover:text-[#0B5CD5] px-2 py-1 cursor-pointer"
             >
               Clear
             </button>
@@ -514,8 +513,8 @@ export default function HistoryPage() {
                   onClick={() => setMediaFilter(t.id)}
                   className={`px-4 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
                     active
-                      ? 'bg-indigo-600 border border-indigo-500 text-white shadow-md shadow-indigo-600/20'
-                      : 'bg-[#0c1427] text-slate-400 border border-[#17233f] hover:bg-[#101a33] hover:text-white'
+                      ? 'bg-[#D97757] border border-[#D97757] text-white shadow-sm'
+                      : 'bg-white text-[#2C4E86] border border-[#CECECE] hover:border-[#D97757] hover:text-[#0B5CD5]'
                   }`}
                 >
                   {t.label}
@@ -524,13 +523,13 @@ export default function HistoryPage() {
             })}
           </div>
 
-          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-semibold">
+          <span className="text-[10px] font-mono text-[#7386A8] uppercase tracking-widest font-semibold">
             CLICK A COLUMN HEAD TO SORT
           </span>
         </div>
 
         {/* Main Verification Ledger Table (13 Columns with all options, buttons & badges) */}
-        <div className="bg-[#0c1427] border border-[#17233f] rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-[#CECECE] rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[1390px] table-fixed text-left text-xs">
               <colgroup>
@@ -549,42 +548,42 @@ export default function HistoryPage() {
                 <col className="w-[85px]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-[#17233f] bg-[#070b14] text-slate-400 uppercase font-mono text-[10px] tracking-wider select-none">
+                <tr className="border-b border-[#CECECE] bg-[#EFEEE9] text-[#2C4E86] uppercase font-mono text-[10px] tracking-wider select-none">
                   <th className="px-3 py-3 w-10 text-center" title="Stored Report">
-                    <Lock className="w-3.5 h-3.5 mx-auto text-slate-400" />
+                    <Lock className="w-3.5 h-3.5 mx-auto text-[#7386A8]" />
                   </th>
-                  <th className="px-3 py-3 cursor-pointer hover:text-white" onClick={() => handleSort('id')}>
+                  <th className="px-3 py-3 cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('id')}>
                     RUN ID {sortKey === 'id' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
-                  <th className="px-3 py-3 cursor-pointer hover:text-white" onClick={() => handleSort('title')}>
+                  <th className="px-3 py-3 cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('title')}>
                     SUBJECT / HEADLINE {sortKey === 'title' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
                   <th className="px-3 py-3">CATEGORY</th>
                   <th className="px-3 py-3">SOURCE</th>
                   <th className="px-3 py-3">NEWS DATE</th>
-                  <th className="px-3 py-3 cursor-pointer hover:text-white" onClick={() => handleSort('createdAt')}>
+                  <th className="px-3 py-3 cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('createdAt')}>
                     RUN DATE {sortKey === 'createdAt' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
                   <th className="px-3 py-3">MEDIA</th>
                   <th className="px-3 py-3">VERDICT</th>
-                  <th className="px-3 py-3 text-right cursor-pointer hover:text-white" onClick={() => handleSort('trustScore')}>
+                  <th className="px-3 py-3 text-right cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('trustScore')}>
                     TRUST {sortKey === 'trustScore' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
-                  <th className="px-3 py-3 text-right cursor-pointer hover:text-white" onClick={() => handleSort('tokensConsumed')}>
+                  <th className="px-3 py-3 text-right cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('tokensConsumed')}>
                     TOKENS {sortKey === 'tokensConsumed' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
-                  <th className="px-3 py-3 text-right cursor-pointer hover:text-white" onClick={() => handleSort('costUsd')}>
+                  <th className="px-3 py-3 text-right cursor-pointer hover:text-[#0B5CD5]" onClick={() => handleSort('costUsd')}>
                     COST {sortKey === 'costUsd' && (sortDir === 1 ? '↑' : '↓')}
                   </th>
                   <th className="px-3 py-3 text-right">ACTION</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-[#17233f]/60 text-slate-300">
+              <tbody className="divide-y divide-[#CECECE] text-[#0B5CD5]">
                 {loading ? (
                   <tr>
-                    <td colSpan="13" className="py-16 text-center text-slate-400 font-mono">
-                      <RefreshCw className="w-4 h-4 animate-spin text-indigo-400 mx-auto mb-2" />
+                    <td colSpan="13" className="py-16 text-center text-[#7386A8] font-mono">
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#D97757] mx-auto mb-2" />
                       Loading verification ledger from database...
                     </td>
                   </tr>
@@ -605,13 +604,13 @@ export default function HistoryPage() {
                     })} · ${new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
                     return (
-                      <tr key={r.id} className="hover:bg-[#101a33] transition">
+                      <tr key={r.id} className="hover:bg-[#F8F8F6] transition">
                         
                         {/* 1. Lock Icon / Reverify Action */}
                         <td className="px-3 py-2.5 text-center">
                           <button
                             onClick={() => setReverifyReport(r)}
-                            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-indigo-400 transition cursor-pointer"
+                            className="p-1 hover:bg-[#EFEEE9] rounded text-[#7386A8] hover:text-[#D97757] transition cursor-pointer"
                             title="Stored dossier · click to re-verify against today's sources"
                           >
                             <Lock className="w-3.5 h-3.5" />
@@ -621,38 +620,38 @@ export default function HistoryPage() {
                         {/* 2. Run ID + Version */}
                         <td className="px-3 py-2.5 font-mono text-[11px] overflow-hidden">
                           <div className="flex items-center gap-1 min-w-0 whitespace-nowrap">
-                            <span className="text-indigo-400 truncate">{r.id.slice(0, 12)}</span>
-                            <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded text-[9px] font-bold flex-shrink-0">
+                            <span className="text-[#0B5CD5] font-semibold truncate">{r.id.slice(0, 12)}</span>
+                            <span className="px-1.5 py-0.2 bg-[#F6E7DF] text-[#B0512F] rounded text-[9px] font-bold flex-shrink-0">
                               v{r.runVersion || 1}
                             </span>
                           </div>
                         </td>
 
                         {/* 3. Headline */}
-                        <td className="px-3 py-2.5 font-medium text-white overflow-hidden" title={r.title}>
+                        <td className="px-3 py-2.5 font-semibold text-[#0B5CD5] overflow-hidden" title={r.title}>
                           <span className="block w-full truncate">{r.title || 'Untitled verification'}</span>
                         </td>
 
                         {/* 4. Category */}
-                        <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{r.category || 'General'}</td>
+                        <td className="px-3 py-2.5 text-[#2C4E86] whitespace-nowrap">{r.category || 'General'}</td>
 
                         {/* 5. Source */}
-                        <td className="px-3 py-2.5 text-slate-400 overflow-hidden" title={r.inputSource}>
+                        <td className="px-3 py-2.5 text-[#2C4E86] overflow-hidden" title={r.inputSource}>
                           <span className="block w-full truncate">{r.inputSource || 'Direct Input'}</span>
                         </td>
 
                         {/* 6. News Date */}
-                        <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                        <td className="px-3 py-2.5 text-[#7386A8] font-mono text-[11px] whitespace-nowrap">
                           {newsDateDisplay}
                         </td>
 
                         {/* 7. Run Date */}
-                        <td className="px-3 py-2.5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                        <td className="px-3 py-2.5 text-[#7386A8] font-mono text-[11px] whitespace-nowrap">
                           {runDateDisplay}
                         </td>
 
                         {/* 8. Media Tag */}
-                        <td className="px-3 py-2.5 text-slate-400 text-[10px] font-mono whitespace-nowrap uppercase">
+                        <td className="px-3 py-2.5 text-[#2C4E86] text-[10px] font-mono whitespace-nowrap uppercase">
                           {r.inputType || 'TEXT'}
                         </td>
 
@@ -663,18 +662,18 @@ export default function HistoryPage() {
 
                         {/* 10. Trust Score */}
                         <td className={`px-3 py-2.5 text-right font-mono font-bold ${
-                          score >= 75 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                          score >= 75 ? 'text-[#3E7A55]' : score >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'
                         }`}>
                           {score}
                         </td>
 
                         {/* 11. Tokens */}
-                        <td className="px-3 py-2.5 text-right font-mono text-slate-400">
+                        <td className="px-3 py-2.5 text-right font-mono text-[#7386A8]">
                           {(r.tokensConsumed || 0).toLocaleString()}
                         </td>
 
                         {/* 12. Cost */}
-                        <td className="px-3 py-2.5 text-right font-mono text-emerald-400 font-medium">
+                        <td className="px-3 py-2.5 text-right font-mono text-[#3E7A55] font-medium">
                           ${(r.costUsd || 0.0).toFixed(3)}
                         </td>
 
@@ -683,14 +682,14 @@ export default function HistoryPage() {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => navigate(`/results/${r.id}`)}
-                              className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition font-medium cursor-pointer"
+                              className="px-2.5 py-1 text-xs bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] rounded-lg transition font-medium cursor-pointer"
                               title="Open Report"
                             >
                               Open
                             </button>
                             <button
                               onClick={() => setDeleteTarget(r)}
-                              className="p-1 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer"
+                              className="p-1 hover:bg-[#F7E3E0] text-[#7386A8] hover:text-[#B23F35] rounded-lg transition cursor-pointer"
                               title="Delete report from history"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -702,7 +701,7 @@ export default function HistoryPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="13" className="py-16 text-center text-slate-400 text-xs">
+                    <td colSpan="13" className="py-16 text-center text-[#7386A8] text-xs">
                       No verification runs found matching current filter parameters.
                     </td>
                   </tr>
@@ -710,15 +709,15 @@ export default function HistoryPage() {
               </tbody>
 
               {/* Table Footer: Cumulative Totals */}
-              <tfoot className="border-t-2 border-[#17233f] bg-[#070b14]/90 font-mono font-bold text-xs text-slate-200">
+              <tfoot className="border-t-2 border-[#CECECE] bg-[#EFEEE9] font-mono font-bold text-xs text-[#0B5CD5]">
                 <tr>
-                  <td colSpan="10" className="px-4 py-3 text-right text-slate-400">
+                  <td colSpan="10" className="px-4 py-3 text-right text-[#2C4E86]">
                     Cumulative Total ({filteredRuns.length} Runs Filtered)
                   </td>
-                  <td className="px-3 py-3 text-right text-indigo-400">
+                  <td className="px-3 py-3 text-right text-[#0B5CD5]">
                     {totalTokens.toLocaleString()}
                   </td>
-                  <td className="px-3 py-3 text-right text-emerald-400">
+                  <td className="px-3 py-3 text-right text-[#3E7A55]">
                     ${totalCost.toFixed(3)}
                   </td>
                   <td></td>
@@ -728,38 +727,38 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-500 italic">
+        <p className="text-[11px] text-[#7386A8] italic">
           * New dossiers include a SHA-256 integrity seal. Running re-verification applies today's sources and stores a fresh v2 record while preserving the prior version.
         </p>
       </main>
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0c1427] border border-[#17233f] rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fadeIn text-slate-200">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#CECECE] rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fadeIn text-[#0B5CD5]">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                <div className="w-10 h-10 rounded-2xl bg-[#F7E3E0] border border-[#EBC7C2] flex items-center justify-center text-[#B23F35]">
                   <Trash2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Delete Report?</h3>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">Run ID: {deleteTarget.id.slice(0, 16)}</p>
+                  <h3 className="text-base font-bold text-[#0B5CD5]">Delete Report?</h3>
+                  <p className="text-xs text-[#7386A8] font-mono mt-0.5">Run ID: {deleteTarget.id.slice(0, 16)}</p>
                 </div>
               </div>
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-[#EFEEE9] rounded-lg text-[#7386A8] hover:text-[#0B5CD5] transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-3.5 bg-[#070b14] rounded-2xl border border-[#17233f] text-xs text-slate-300 space-y-1.5">
-              <span className="font-semibold text-white block truncate" title={deleteTarget.title}>
+            <div className="p-3.5 bg-[#F8F8F6] rounded-2xl border border-[#CECECE] text-xs text-[#0B5CD5] space-y-1.5">
+              <span className="font-semibold text-[#0B5CD5] block truncate" title={deleteTarget.title}>
                 {deleteTarget.title || 'Untitled Verification Report'}
               </span>
-              <p className="text-slate-400 text-[11px] leading-relaxed">
+              <p className="text-[#2C4E86] text-[11px] leading-relaxed">
                 Permanently removes this stored report, claims audit, evidence nodes, and provenance records from your workspace ledger. This action cannot be undone.
               </p>
             </div>
@@ -769,7 +768,7 @@ export default function HistoryPage() {
                 type="button"
                 onClick={() => setDeleteTarget(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -777,7 +776,7 @@ export default function HistoryPage() {
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#B23F35] hover:bg-[#8E2F27] text-white transition flex items-center gap-2 shadow-lg shadow-[#B23F35]/20 cursor-pointer"
               >
                 {isDeleting ? (
                   <>

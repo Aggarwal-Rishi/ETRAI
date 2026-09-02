@@ -9,6 +9,11 @@
 
 const { createGeminiClient, getProviderStatus, isKeyValid } = require('./providerManager');
 const { analyzeSentiment } = require('./sentimentService');
+const {
+  entityKey,
+  extractVisualEntityCandidates,
+  verifyVisualEntities
+} = require('./media/mediaEntityVerification');
 
 // Standard Canonical Knowledge Dictionary for Fast Deterministic Alias Resolution
 const CANONICAL_KNOWLEDGE_BASE = {
@@ -422,21 +427,42 @@ function analyzePotentialFramingSignals(text = '', entities = [], quotes = []) {
 async function performEntityAndIntentAnalysis(text = '', options = {}) {
   const claims = options.claims || [];
   const sources = options.sources || [];
+  const mediaAnalysis = options.mediaAnalysis || null;
 
   // 1. Deterministic Named Entity Extraction across all 8 types
   let entities = extractEntitiesDeterministic(text);
+  const visualEntities = extractVisualEntityCandidates(mediaAnalysis);
+  const entityMap = new Map(entities.map(entity => [entityKey(entity.normalizedName || entity.name), entity]));
+  visualEntities.forEach(visualEntity => {
+    const key = entityKey(visualEntity.normalizedName || visualEntity.name);
+    const textEntity = entityMap.get(key);
+    if (!textEntity) {
+      entityMap.set(key, visualEntity);
+      return;
+    }
+    entityMap.set(key, {
+      ...textEntity,
+      ...visualEntity,
+      type: textEntity.type === 'PERSON' || visualEntity.type === 'PERSON' ? 'PERSON' : (visualEntity.type || textEntity.type),
+      mentionsCount: Number(textEntity.mentionsCount || 1) + Number(visualEntity.mentionsCount || 1),
+      confidence: Math.max(Number(textEntity.confidence || 0), Number(visualEntity.confidence || 0)),
+      detectionMethods: Array.from(new Set(['TEXT', ...(textEntity.detectionMethods || []), ...(visualEntity.detectionMethods || [])])),
+      frameTimestamps: Array.from(new Set([...(textEntity.frameTimestamps || []), ...(visualEntity.frameTimestamps || [])])).sort((a, b) => a - b)
+    });
+  });
+  entities = [...entityMap.values()];
 
   // 2. Quote & Speaker Attribution Extraction
   const quotes = extractQuotesAndAttributions(text, sources);
 
   // 3. Connect Entities to Claims
-  const entityClaimConnections = connectEntitiesToClaims(entities, claims);
+  let entityClaimConnections = connectEntitiesToClaims(entities, claims);
 
   // 4. Potential Framing Signals Engine
   const framingAnalysis = analyzePotentialFramingSignals(text, entities, quotes);
 
   // 5. Geographic & Jurisdictional Analysis
-  const geographicRelevance = {
+  let geographicRelevance = {
     primaryJurisdiction: entities.find(e => e.type === 'LOCATION')?.jurisdiction || 'National',
     locationsIdentified: entities.filter(e => e.type === 'LOCATION').map(e => e.name),
     isCrossBorderJurisdiction: entities.some(e => e.jurisdiction === 'International')
@@ -496,6 +522,33 @@ Text: ${text.substring(0, 2000)}`;
     }
   }
 
+  // For media jobs, corroborate prominent visual identities. External lookup is
+  // independently gated by the caller's per-analysis consent option.
+  const entityVerification = mediaAnalysis
+    ? await verifyVisualEntities(entities, mediaAnalysis, text, options)
+    : {
+      entities,
+      summary: {
+        visuallyDetectedCount: 0,
+        searchedCount: 0,
+        verifiedCount: 0,
+        probableCount: 0,
+        ambiguousCount: 0,
+        unverifiedCount: 0,
+        providerStatus: 'NOT_APPLICABLE',
+        searchedAt: null
+      },
+      evidenceSources: [],
+      searches: []
+    };
+  entities = entityVerification.entities;
+  entityClaimConnections = connectEntitiesToClaims(entities, claims);
+  geographicRelevance = {
+    primaryJurisdiction: entities.find(e => e.type === 'LOCATION')?.jurisdiction || 'National',
+    locationsIdentified: entities.filter(e => e.type === 'LOCATION').map(e => e.normalizedName || e.name),
+    isCrossBorderJurisdiction: entities.some(e => e.jurisdiction === 'International')
+  };
+
   return {
     entitiesCount: entities.length,
     entities,
@@ -504,6 +557,9 @@ Text: ${text.substring(0, 2000)}`;
     entityClaimConnections,
     geographicRelevance,
     entityInconsistencies,
+    entityVerification: entityVerification.summary,
+    entitySearches: entityVerification.searches,
+    entityEvidenceSources: entityVerification.evidenceSources,
     framingAnalysis,
     intentAnalysis: {
       primaryIntent: framingAnalysis.primaryFramingSignal,
@@ -557,5 +613,7 @@ module.exports = {
   connectEntitiesToClaims,
   analyzePotentialFramingSignals,
   inferPotentialIntent,
+  extractVisualEntityCandidates,
+  verifyVisualEntities,
   CANONICAL_KNOWLEDGE_BASE
 };

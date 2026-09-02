@@ -95,12 +95,12 @@ export default function LatestNewsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
-      {/* Toast Notification */}
+      {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
           <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
@@ -109,13 +109,13 @@ export default function LatestNewsPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 animate-fadeIn">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-              <Radio className="w-6 h-6 text-[#E88F6B]" />
+            <h1 className="text-2xl font-bold text-[#0B5CD5] flex items-center gap-2.5">
+              <Radio className="w-6 h-6 text-[#D97757]" />
               Latest News Desk
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
               Live intake of analyzed stories and candidate items across your ranked sources.
             </p>
           </div>
@@ -123,7 +123,7 @@ export default function LatestNewsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsFetchModalOpen(true)}
-              className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-indigo-600 to-[#D97757] hover:from-indigo-500 hover:to-[#B0512F] rounded-xl shadow-lg shadow-indigo-500/20 transition flex items-center gap-2"
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#D97757] hover:bg-[#B0512F] rounded-xl shadow-md transition flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Fetch News</span>
@@ -132,27 +132,27 @@ export default function LatestNewsPage() {
         </div>
 
         {/* Auto-Fetch Status Banner (Honest Scope Declaration) */}
-        <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="p-4 bg-white border border-[#CECECE] rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20">
+            <div className="p-2 bg-[#F6E7DF] text-[#B0512F] rounded-xl border border-[#E88F6B]/30">
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-semibold text-white block">
+              <span className="font-semibold text-[#0B5CD5] block">
                 Scheduled Ingestion: Manual & On-Demand
               </span>
-              <span className="text-slate-400 text-[11px]">
+              <span className="text-[#2C4E86] text-[11px]">
                 Continuous automated cron polling is scheduled for Phase 2. Use "Fetch News" for on-demand multi-source intake.
               </span>
             </div>
           </div>
-          <span className="px-2.5 py-1 bg-slate-800 text-[#E88F6B] rounded-lg font-mono text-[10px] font-bold uppercase border border-slate-700">
+          <span className="px-2.5 py-1 bg-[#EFEEE9] text-[#0B5CD5] rounded-lg font-mono text-[10px] font-bold uppercase border border-[#CECECE]">
             On-Demand Active
           </span>
         </div>
 
         {/* Verdict Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-[#CECECE]">
           {[
             { key: 'ALL', label: 'All Items' },
             { key: 'REAL', label: 'Verified Real' },
@@ -166,8 +166,8 @@ export default function LatestNewsPage() {
               onClick={() => setSelectedVerdict(tab.key)}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ${
                 selectedVerdict === tab.key
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  ? 'bg-[#D97757] border-[#D97757] text-white shadow-md'
+                  : 'bg-[#EFEEE9] border-[#CECECE] text-[#2C4E86] hover:text-[#0B5CD5] hover:border-[#AAAAAA]'
               }`}
             >
               {tab.label}
@@ -176,15 +176,15 @@ export default function LatestNewsPage() {
         </div>
 
         {/* Filter Control Bar */}
-        <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl flex flex-wrap items-center gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-400 font-medium">
+        <div className="p-3.5 bg-white border border-[#CECECE] rounded-2xl flex flex-wrap items-center gap-3 text-xs shadow-sm">
+          <div className="flex items-center gap-2 text-[#2C4E86] font-medium">
             <Filter className="w-3.5 h-3.5" /> Filters:
           </div>
 
           <select
             value={selectedCat}
             onChange={(e) => setSelectedCat(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
           >
             {categories.map(c => (
               <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>
@@ -194,7 +194,7 @@ export default function LatestNewsPage() {
           <select
             value={selectedSrc}
             onChange={(e) => setSelectedSrc(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
           >
             {sources.map(s => (
               <option key={s} value={s}>{s === 'All' ? 'All Sources' : s}</option>
@@ -202,13 +202,13 @@ export default function LatestNewsPage() {
           </select>
 
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-[#7386A8] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search headline, claim, or source domain..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
             />
           </div>
 
@@ -219,13 +219,13 @@ export default function LatestNewsPage() {
                 setSelectedSrc('All');
                 setSearchQuery('');
               }}
-              className="text-slate-400 hover:text-white font-medium"
+              className="text-[#7386A8] hover:text-[#0B5CD5] font-medium"
             >
               Clear
             </button>
           )}
 
-          <span className="text-slate-500 font-mono text-[11px] ml-auto">
+          <span className="text-[#7386A8] font-mono text-[11px] ml-auto">
             {filteredFeed.length} items shown
           </span>
         </div>
@@ -233,14 +233,13 @@ export default function LatestNewsPage() {
         {/* Live News Feed List */}
         <div className="space-y-3">
           {loading ? (
-            <div className="py-16 text-center text-xs text-slate-400 font-mono flex items-center justify-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin text-[#E88F6B]" />
+            <div className="py-16 text-center text-xs text-[#7386A8] font-mono flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-[#D97757]" />
               <span>Querying verified intelligence feeds...</span>
             </div>
           ) : filteredFeed.length > 0 ? (
             filteredFeed.map((item, idx) => {
               const score = item.trustScore !== null && item.trustScore !== undefined ? item.trustScore : item.score;
-              const hasAnalysis = !!item.analysisId || !!item.id;
               
               return (
                 <div
@@ -250,24 +249,24 @@ export default function LatestNewsPage() {
                       navigate(`/results/${item.analysisId || item.id}`);
                     }
                   }}
-                  className="p-4 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-indigo-500/40 rounded-2xl cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  className="p-4 bg-white hover:bg-[#F8F8F6] border border-[#CECECE] hover:border-[#D97757] rounded-2xl cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm"
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
-                      <span className="font-semibold text-slate-200">{item.source || item.domain || 'Direct Source'}</span>
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-[#7386A8]">
+                      <span className="font-semibold text-[#0B5CD5]">{item.source || item.domain || 'Direct Source'}</span>
                       <span>·</span>
-                      <span className="text-slate-500">{item.publishedAt || item.tm || 'Recent'}</span>
+                      <span className="text-[#7386A8]">{item.publishedAt || item.tm || 'Recent'}</span>
                       <span>·</span>
-                      <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">
+                      <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-mono text-[10px]">
                         {item.category || 'General'}
                       </span>
                       {item.mediaType && (
-                        <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded font-mono text-[10px]">
+                        <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#0B5CD5] rounded font-mono text-[10px]">
                           {item.mediaType}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-sm font-semibold text-white group-hover:text-indigo-300 transition line-clamp-2">
+                    <h3 className="text-sm font-semibold text-[#0B5CD5] group-hover:text-[#D97757] transition line-clamp-2">
                       {item.title || item.t}
                     </h3>
                   </div>
@@ -278,11 +277,11 @@ export default function LatestNewsPage() {
                         <VerdictBadge status={item.verdict} size="sm" />
                         <div className="text-right">
                           <span className={`font-mono text-base font-bold block ${
-                            score >= 75 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                            score >= 75 ? 'text-[#3E7A55]' : score >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'
                           }`}>
                             {score}
                           </span>
-                          <span className="text-[9px] uppercase font-mono text-slate-500">Trust / 100</span>
+                          <span className="text-[9px] uppercase font-mono text-[#7386A8]">Trust / 100</span>
                         </div>
                       </div>
                     ) : (
@@ -302,10 +301,10 @@ export default function LatestNewsPage() {
               );
             })
           ) : (
-            <div className="py-16 text-center bg-slate-900/40 rounded-3xl border border-dashed border-slate-800 text-xs text-slate-400 space-y-2">
-              <Radio className="w-6 h-6 text-indigo-400 mx-auto" />
-              <p className="font-bold text-white text-sm">No news stories matching current filters</p>
-              <p className="text-slate-400 max-w-sm mx-auto">
+            <div className="py-16 text-center bg-white rounded-3xl border border-dashed border-[#CECECE] text-xs text-[#7386A8] space-y-2 shadow-sm">
+              <Radio className="w-6 h-6 text-[#D97757] mx-auto" />
+              <p className="font-bold text-[#0B5CD5] text-sm">No news stories matching current filters</p>
+              <p className="text-[#2C4E86] max-w-sm mx-auto">
                 Adjust your category, source, or verdict filters to view analyzed items.
               </p>
             </div>

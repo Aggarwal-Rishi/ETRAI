@@ -227,11 +227,13 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   let mediaIntegrity = 85;
   const mediaFindings = analysisData.mediaAnalysis?.forensics || analysisData.mediaAnalysis;
   const videoContextVerdict = analysisData.mediaAnalysis?.videoContextReport?.verdict || mediaFindings?.contextReport?.verdict;
+  const forensicVerdict = mediaFindings?.forensicVerdict || mediaFindings?.verdict || analysisData.mediaAnalysis?.forensicVerdict;
   if (mediaFindings) {
     if (mediaFindings.c2pa?.hasC2paManifest) mediaIntegrity = 100;
-    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || mediaFindings.forensicVerdict === 'MANIPULATION_DETECTED') mediaIntegrity = 25;
+    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED') mediaIntegrity = 25;
     else if (videoContextVerdict === 'Manipulated') mediaIntegrity = 45;
     else if (videoContextVerdict === 'Deceptive Context') mediaIntegrity = 60;
+    else if (forensicVerdict === 'INCONCLUSIVE_LIMITED_ANALYSIS') mediaIntegrity = 50;
     else if (mediaFindings.integrity && !mediaFindings.integrity.isIntegrityIntact) mediaIntegrity = 40;
     else mediaIntegrity = 90;
   }
@@ -350,7 +352,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
 
   // 3. Media Manipulation Penalty (STRICTLY ONLY IF MEDIA WAS SUBMITTED)
   if (hasMedia && mediaFindings) {
-    if (mediaFindings.ela?.isManipulatedLikely || mediaFindings.forensicVerdict === 'MANIPULATION_DETECTED' || ['Deepfake', 'Manipulated', 'Deceptive Context'].includes(videoContextVerdict)) {
+    if (mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED' || ['Deepfake', 'Manipulated', 'Deceptive Context'].includes(videoContextVerdict)) {
       const penalty = videoContextVerdict === 'Deceptive Context' ? 15 : videoContextVerdict === 'Manipulated' ? 20 : 30;
       appliedPenalties.push({
         ...PENALTY_CATALOG.VERIFIED_MANIPULATION,

@@ -267,33 +267,33 @@ export default function AccountSecurityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slateDark-950 text-slate-100 flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans selection:bg-[#D97757] selection:text-white">
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="border-b border-slateDark-800 pb-6 mb-8">
-          <div className="flex items-center gap-2 text-xs font-semibold text-brand-400 uppercase tracking-widest mb-1">
+        <div className="border-b border-[#CECECE] pb-6 mb-8">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#D97757] uppercase tracking-widest mb-1">
             <Shield className="w-3.5 h-3.5" /> Security & Account Center
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B5CD5] tracking-tight">
             Account & Security Management
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
             Manage your credentials, two-factor authentication, active sessions, GDPR export, and data governance.
           </p>
         </div>
 
         {/* Global Alerts */}
         {errorMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400" />
+          <div className="mb-6 p-4 rounded-xl bg-[#F7E3E0] border border-[#EBC7C2] text-[#B23F35] text-sm flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-[#B23F35]" />
             <span>{errorMsg}</span>
           </div>
         )}
         {successMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+          <div className="mb-6 p-4 rounded-xl bg-[#E4EFE7] border border-[#C6DFCF] text-[#2C5B3E] text-sm flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-[#3E7A55]" />
             <span>{successMsg}</span>
           </div>
         )}
@@ -302,17 +302,17 @@ export default function AccountSecurityPage() {
           {/* Column 1: Password & 2FA */}
           <div className="space-y-8">
             {/* Password Change Card */}
-            <div className="bg-slateDark-900 border border-slateDark-800 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                <Key className="w-4 h-4 text-brand-400" /> Change Password
+            <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-base font-bold text-[#0B5CD5] mb-1 flex items-center gap-2">
+                <Key className="w-4 h-4 text-[#D97757]" /> Change Password
               </h2>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[#2C4E86] mb-5">
                 Requires re-authentication. Automatically revokes all other active sessions.
               </p>
 
               <form onSubmit={handlePasswordChange} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86] mb-1">
                     Current Password
                   </label>
                   <input
@@ -320,12 +320,12 @@ export default function AccountSecurityPage() {
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86] mb-1">
                     New Password (min 8 chars)
                   </label>
                   <input
@@ -333,12 +333,12 @@ export default function AccountSecurityPage() {
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86] mb-1">
                     Confirm New Password
                   </label>
                   <input
@@ -346,14 +346,14 @@ export default function AccountSecurityPage() {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={updatingPassword}
-                  className="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
+                  className="w-full bg-[#D97757] hover:bg-[#B0512F] text-white text-xs font-bold py-2.5 rounded-xl transition-colors shadow-md shadow-[#D97757]/20 flex items-center justify-center gap-2"
                 >
                   {updatingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
                   Update Account Password
@@ -362,22 +362,22 @@ export default function AccountSecurityPage() {
             </div>
 
             {/* 2FA Card */}
-            <div className="bg-slateDark-900 border border-slateDark-800 rounded-2xl p-6 shadow-xl">
+            <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-brand-400" /> Two-Factor Authentication (2FA)
+                <h2 className="text-base font-bold text-[#0B5CD5] flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-[#D97757]" /> Two-Factor Authentication (2FA)
                 </h2>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                     twoFactorEnabled
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                      ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF]'
+                      : 'bg-[#EFEEE9] text-[#7386A8] border border-[#CECECE]'
                   }`}
                 >
                   {twoFactorEnabled ? 'ENABLED' : 'DISABLED'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[#2C4E86] mb-5">
                 Add an extra layer of protection using TOTP authenticator apps (Google Authenticator, Authy).
               </p>
 
@@ -385,32 +385,32 @@ export default function AccountSecurityPage() {
                 <button
                   onClick={handleStart2faSetup}
                   disabled={settingUp2fa}
-                  className="bg-slateDark-800 hover:bg-slateDark-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl border border-slateDark-700 flex items-center gap-2"
+                  className="bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] text-xs font-semibold px-4 py-2.5 rounded-xl border border-[#CECECE] flex items-center gap-2 transition"
                 >
                   {settingUp2fa ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Set Up Two-Factor Authentication'}
                 </button>
               )}
 
               {setup2faData && (
-                <div className="space-y-4 p-4 rounded-xl bg-slateDark-800/50 border border-slateDark-700">
-                  <div className="text-xs text-slate-300 font-medium">
+                <div className="space-y-4 p-4 rounded-xl bg-[#F8F8F6] border border-[#CECECE]">
+                  <div className="text-xs text-[#0B5CD5] font-medium">
                     1. Scan QR code or copy manual key into your authenticator app:
                   </div>
-                  <div className="bg-slateDark-950 p-2.5 rounded-lg font-mono text-[11px] text-amber-300 select-all break-all border border-slateDark-700">
+                  <div className="bg-white p-2.5 rounded-lg font-mono text-[11px] text-[#D97757] select-all break-all border border-[#CECECE]">
                     {setup2faData.secret}
                   </div>
 
-                  <div className="text-xs text-slate-300 font-medium">
+                  <div className="text-xs text-[#0B5CD5] font-medium">
                     2. Save your 8 one-time backup recovery codes:
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5 bg-slateDark-950 p-2.5 rounded-lg font-mono text-[10px] text-slate-300 border border-slateDark-700">
+                  <div className="grid grid-cols-2 gap-1.5 bg-white p-2.5 rounded-lg font-mono text-[10px] text-[#2C4E86] border border-[#CECECE]">
                     {setup2faData.recoveryCodes?.map((code, idx) => (
                       <div key={idx}>{code}</div>
                     ))}
                   </div>
 
                   <form onSubmit={handleVerify2fa} className="space-y-3 pt-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86]">
                       3. Enter 6-Digit Authenticator Code
                     </label>
                     <input
@@ -419,12 +419,12 @@ export default function AccountSecurityPage() {
                       placeholder="123456"
                       value={totpCode}
                       onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-center text-sm font-mono tracking-widest text-white outline-none focus:border-brand-500"
+                      className="w-full bg-white border border-[#CECECE] rounded-xl px-3.5 py-2 text-center text-sm font-mono tracking-widest text-[#0B5CD5] outline-none focus:border-[#D97757]"
                     />
                     <button
                       type="submit"
                       disabled={totpCode.length !== 6}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-xl transition-colors"
+                      className="w-full bg-[#3E7A55] hover:bg-[#2C5B3E] disabled:opacity-50 text-white text-xs font-bold py-2 rounded-xl transition-colors shadow-xs"
                     >
                       Confirm and Enable 2FA
                     </button>
@@ -434,7 +434,7 @@ export default function AccountSecurityPage() {
 
               {twoFactorEnabled && (
                 <form onSubmit={handleDisable2fa} className="space-y-3 pt-2">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86]">
                     Confirm Password to Disable 2FA
                   </label>
                   <input
@@ -443,11 +443,11 @@ export default function AccountSecurityPage() {
                     placeholder="Current account password"
                     value={disable2faPassword}
                     onChange={(e) => setDisable2faPassword(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   />
                   <button
                     type="submit"
-                    className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold px-4 py-2 rounded-xl border border-rose-500/30"
+                    className="bg-[#F7E3E0] hover:bg-[#F2CCC7] text-[#B23F35] text-xs font-semibold px-4 py-2 rounded-xl border border-[#EBC7C2]"
                   >
                     Disable Two-Factor Authentication
                   </button>
@@ -456,23 +456,23 @@ export default function AccountSecurityPage() {
             </div>
 
             {/* Data Governance & Sovereignty */}
-            <div className="bg-slateDark-900 border border-slateDark-800 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-brand-400" /> Data Sovereignty & Retention
+            <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-base font-bold text-[#0B5CD5] mb-1 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#D97757]" /> Data Sovereignty & Retention
               </h2>
-              <p className="text-xs text-slate-400 mb-5">
+              <p className="text-xs text-[#2C4E86] mb-5">
                 Configure data residency boundaries and lifecycle retention periods.
               </p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86] mb-1">
                     Primary Data Region
                   </label>
                   <select
                     value={dataRegion}
                     onChange={(e) => setDataRegion(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   >
                     <option value="IN-MUMBAI-1">IN-MUMBAI-1 (Asia Pacific / India Sovereign)</option>
                     <option value="EU-FRANKFURT-1">EU-FRANKFURT-1 (European Union GDPR)</option>
@@ -482,13 +482,13 @@ export default function AccountSecurityPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2C4E86] mb-1">
                     Data Retention Policy
                   </label>
                   <select
                     value={retentionPeriod}
                     onChange={(e) => setRetentionPeriod(e.target.value)}
-                    className="w-full bg-slateDark-800 border border-slateDark-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-brand-500"
+                    className="w-full bg-[#F8F8F6] border border-[#CECECE] rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#D97757]"
                   >
                     <option value="30_DAYS">30 Days Auto-Purge</option>
                     <option value="90_DAYS">90 Days Auto-Purge</option>
@@ -504,42 +504,42 @@ export default function AccountSecurityPage() {
           {/* Column 2: Sessions, GDPR Export, Danger Zone */}
           <div className="space-y-8">
             {/* Active Sessions */}
-            <div className="bg-slateDark-900 border border-slateDark-800 rounded-2xl p-6 shadow-xl">
+            <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <Laptop className="w-4 h-4 text-brand-400" /> Active Sessions ({sessions.length})
+                  <h2 className="text-base font-bold text-[#0B5CD5] flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-[#D97757]" /> Active Sessions ({sessions.length})
                   </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Devices currently authenticated to your account.</p>
+                  <p className="text-xs text-[#2C4E86] mt-0.5">Devices currently authenticated to your account.</p>
                 </div>
                 {sessions.length > 1 && (
                   <button
                     onClick={handleRevokeAllOtherSessions}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold transition-colors"
+                    className="text-[11px] text-[#B0512F] hover:underline font-semibold transition-colors"
                   >
                     Revoke Other Sessions
                   </button>
                 )}
               </div>
 
-              <div className="divide-y divide-slateDark-800">
+              <div className="divide-y divide-[#CECECE]">
                 {sessions.map((s) => (
                   <div key={s.id} className="py-3 flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-white">{s.ipAddress}</span>
+                        <span className="text-xs font-semibold text-[#0B5CD5]">{s.ipAddress}</span>
                         {s.isCurrent && (
-                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                          <span className="text-[9px] bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF] px-1.5 py-0.2 rounded font-bold">
                             Current Device
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-xs">{s.userAgent}</div>
+                      <div className="text-[10px] text-[#7386A8] truncate max-w-xs">{s.userAgent}</div>
                     </div>
                     {!s.isCurrent && (
                       <button
                         onClick={() => handleRevokeSession(s.id)}
-                        className="text-[11px] text-rose-400 hover:text-rose-300 font-medium"
+                        className="text-[11px] text-[#B23F35] hover:underline font-medium"
                       >
                         Revoke
                       </button>
@@ -550,34 +550,34 @@ export default function AccountSecurityPage() {
             </div>
 
             {/* GDPR Data Export */}
-            <div className="bg-slateDark-900 border border-slateDark-800 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                <Download className="w-4 h-4 text-brand-400" /> Data Portability & Export
+            <div className="bg-white border border-[#CECECE] rounded-2xl p-6 shadow-sm">
+              <h2 className="text-base font-bold text-[#0B5CD5] mb-1 flex items-center gap-2">
+                <Download className="w-4 h-4 text-[#D97757]" /> Data Portability & Export
               </h2>
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-[#2C4E86] mb-4">
                 Export all verification reports, claim audits, evidence items, and login telemetry as sanitized JSON.
               </p>
 
               <button
                 onClick={handleDownloadExport}
-                className="bg-slateDark-800 hover:bg-slateDark-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl border border-slateDark-700 flex items-center gap-2 transition-colors"
+                className="bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] text-xs font-semibold px-4 py-2.5 rounded-xl border border-[#CECECE] flex items-center gap-2 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" /> Download Full Account Export (.JSON)
               </button>
             </div>
 
             {/* Danger Zone: Account Deletion */}
-            <div className="bg-rose-950/20 border border-rose-900/40 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-base font-bold text-rose-400 mb-1 flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-rose-400" /> Danger Zone: Delete Account
+            <div className="bg-[#FFF6E3] border border-[#B23F35]/30 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-base font-bold text-[#B23F35] mb-1 flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-[#B23F35]" /> Danger Zone: Delete Account
               </h2>
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-[#2C4E86] mb-4">
                 Permanently delete your user profile, owned workspaces, verification history, and team seats. This action cannot be undone.
               </p>
 
               <form onSubmit={handleDeleteAccount} className="space-y-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  <label className="block text-[11px] font-semibold text-[#2C4E86] mb-1">
                     Enter Password to Confirm
                   </label>
                   <input
@@ -586,13 +586,13 @@ export default function AccountSecurityPage() {
                     placeholder="Account password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
-                    className="w-full bg-slateDark-900 border border-rose-900/50 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-rose-500"
+                    className="w-full bg-white border border-[#B23F35]/40 rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#B23F35]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                    Type <span className="font-mono text-rose-400">DELETE MY ACCOUNT</span>
+                  <label className="block text-[11px] font-semibold text-[#2C4E86] mb-1">
+                    Type <span className="font-mono text-[#B23F35] font-bold">DELETE MY ACCOUNT</span>
                   </label>
                   <input
                     type="text"
@@ -600,14 +600,14 @@ export default function AccountSecurityPage() {
                     placeholder="DELETE MY ACCOUNT"
                     value={confirmPhrase}
                     onChange={(e) => setConfirmPhrase(e.target.value)}
-                    className="w-full bg-slateDark-900 border border-rose-900/50 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-rose-500"
+                    className="w-full bg-white border border-[#B23F35]/40 rounded-xl px-3.5 py-2 text-xs text-[#0B5CD5] outline-none focus:border-[#B23F35]"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={deletingAccount || confirmPhrase !== 'DELETE MY ACCOUNT'}
-                  className="w-full bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-[#B23F35] hover:bg-[#8E2F27] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm shadow-[#B23F35]/20"
                 >
                   {deletingAccount ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   Permanently Delete My Account

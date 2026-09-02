@@ -562,7 +562,20 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
     fileInfo = arg1.fileInfo || arg1.file || arg1;
     buffer = arg1.buffer || (Buffer.isBuffer(arg2) ? arg2 : null);
     imageUrl = arg1.imageUrl || arg1.url || (typeof arg3 === 'string' ? arg3 : (typeof arg2 === 'string' ? arg2 : null));
-    options = typeof arg4 === 'object' && Object.keys(arg4).length > 0 ? arg4 : (typeof arg3 === 'object' ? arg3 : (typeof arg2 === 'object' && !Buffer.isBuffer(arg2) ? arg2 : options));
+    // `typeof null === 'object'`, so the previous overload resolver selected
+    // the default null arg3 instead of a valid two-argument options object.
+    // Video keyframe searches use performReverseImageSearch(payload, options),
+    // which then crashed on options.providerStatus before a provider ran.
+    const fourthArgOptions = arg4 && typeof arg4 === 'object' && !Buffer.isBuffer(arg4) && Object.keys(arg4).length > 0
+      ? arg4
+      : null;
+    const thirdArgOptions = arg3 && typeof arg3 === 'object' && !Buffer.isBuffer(arg3)
+      ? arg3
+      : null;
+    const secondArgOptions = arg2 && typeof arg2 === 'object' && !Buffer.isBuffer(arg2)
+      ? arg2
+      : null;
+    options = fourthArgOptions || thirdArgOptions || secondArgOptions || {};
   } else if (typeof arg1 === 'string') {
     imageUrl = arg1;
     options = arg2 || {};

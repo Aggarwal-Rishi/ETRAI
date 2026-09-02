@@ -325,6 +325,13 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
       matches: [],
       limitations: ['Reverse image search was disabled for this analysis.']
     };
+  } else if (options.allowExternalVisualSearch !== true) {
+    reverseSearch = {
+      status: 'WITHHELD',
+      provider: 'USER_CONSENT_REQUIRED',
+      matches: [],
+      limitations: ['External reverse-image search requires explicit per-analysis consent before image bytes or media-derived entity names are sent to a configured provider.']
+    };
   } else {
     try {
       reverseSearch = await searchReverseImage(buffer, mimeType, null, options);

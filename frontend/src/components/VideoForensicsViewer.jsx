@@ -218,36 +218,36 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
       : 'text-amber-300 border-amber-500/30 bg-amber-500/10';
 
   return (
-    <section id="video-forensics" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-6 shadow-xl scroll-mt-24">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
+    <section id="video-forensics" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm scroll-mt-24 text-xs text-[#2C4E86]">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-[#CECECE] pb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-bold text-[#E88F6B]">05 ·</span>
-          <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-white flex items-center gap-2">
-            <Film className="w-4 h-4 text-indigo-400" />
+          <span className="text-xs font-mono font-bold text-[#D97757]">05 ·</span>
+          <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5] flex items-center gap-2">
+            <Film className="w-4 h-4 text-[#D97757]" />
             {contextVerdict === 'Inconclusive' ? 'Video: Segment & Context Forensics' : `Video: ${contextVerdict}`}
           </h2>
         </div>
-        <span className="text-xs text-slate-400 font-mono">{file.filename || reportData?.sourceTitle?.replace(/^Video:\s*/i, '') || 'Video asset'}</span>
+        <span className="text-xs text-[#7386A8] font-mono">{file.filename || reportData?.sourceTitle?.replace(/^Video:\s*/i, '') || 'Video asset'}</span>
       </div>
 
-      <div className={`p-4 rounded-2xl border ${deceptiveCut ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-950/50 border-slate-800'}`}>
+      <div className={`p-4 rounded-2xl border ${deceptiveCut ? 'bg-[#F7E3E0] border-[#EBC7C2]' : 'bg-[#F8F8F6] border-[#CECECE]'}`}>
         <div className="flex items-start gap-3">
-          {deceptiveCut ? <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />}
+          {deceptiveCut ? <AlertTriangle className="w-5 h-5 text-[#B23F35] flex-shrink-0 mt-0.5" /> : <ShieldCheck className="w-5 h-5 text-[#3E7A55] flex-shrink-0 mt-0.5" />}
           <div className="space-y-1">
-            <p className="text-sm text-slate-200 leading-relaxed">{summary}</p>
-            <p className="text-[11px] text-slate-500 font-mono">Context verdict: {contextVerdict} · authenticity score {contextReport ? Math.round(Number(contextReport.authenticity_score || 0) * 100) : '—'} / 100 · technical signal: {String(forensics.verdict || 'ANALYSIS_LIMITED').replaceAll('_', ' ')}</p>
+            <p className="text-sm text-[#0B5CD5] font-semibold leading-relaxed">{summary}</p>
+            <p className="text-[11px] text-[#7386A8] font-mono">Context verdict: {contextVerdict} · authenticity score {contextReport ? Math.round(Number(contextReport.authenticity_score || 0) * 100) : '—'} / 100 · technical signal: {String(forensics.verdict || 'ANALYSIS_LIMITED').replaceAll('_', ' ')}</p>
           </div>
         </div>
       </div>
 
       {completeness && (
-        <div className="rounded-2xl border border-indigo-500/25 bg-slate-950/55 p-4 sm:p-5 space-y-4">
+        <div className="rounded-2xl border border-[#CECECE] bg-[#F8F8F6] p-4 sm:p-5 space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                <Search className="w-3.5 h-3.5" /> Original video &amp; context completeness
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0B5CD5] flex items-center gap-1.5 font-mono">
+                <Search className="w-3.5 h-3.5 text-[#D97757]" /> Original video &amp; context completeness
               </span>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">{completeness.explanation}</p>
+              <p className="mt-2 text-sm leading-relaxed text-[#2C4E86]">{completeness.explanation}</p>
             </div>
             <span className={`self-start rounded-full border px-3 py-1 text-[10px] font-mono font-bold ${completenessTone}`}>
               {completeness.label || String(completeness.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')}
@@ -255,184 +255,184 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Uploaded duration</span><strong className="mt-1 block font-mono text-slate-200">{completeness.uploadedDurationSeconds ? formatTime(completeness.uploadedDurationSeconds) : 'Unknown'}</strong></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Original duration</span><strong className="mt-1 block font-mono text-slate-200">{completeness.originalDurationSeconds ? formatTime(completeness.originalDurationSeconds) : 'Not recovered'}</strong></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Match in source</span><strong className="mt-1 block font-mono text-slate-200">{completeness.matchTimeline?.sourceStartSec !== null && completeness.matchTimeline?.sourceStartSec !== undefined ? `${formatTime(completeness.matchTimeline.sourceStartSec)}–${formatTime(completeness.matchTimeline.sourceEndSec)}` : 'Not located'}</strong></div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-500">Source confidence</span><strong className="mt-1 block font-mono text-slate-200">{Number(completeness.confidence || 0)} / 100</strong></div>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3"><span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Uploaded duration</span><strong className="mt-1 block font-mono text-[#0B5CD5] font-bold">{completeness.uploadedDurationSeconds ? formatTime(completeness.uploadedDurationSeconds) : 'Unknown'}</strong></div>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3"><span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Original duration</span><strong className="mt-1 block font-mono text-[#0B5CD5] font-bold">{completeness.originalDurationSeconds ? formatTime(completeness.originalDurationSeconds) : 'Not recovered'}</strong></div>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3"><span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Match in source</span><strong className="mt-1 block font-mono text-[#0B5CD5] font-bold">{completeness.matchTimeline?.sourceStartSec !== null && completeness.matchTimeline?.sourceStartSec !== undefined ? `${formatTime(completeness.matchTimeline.sourceStartSec)}–${formatTime(completeness.matchTimeline.sourceEndSec)}` : 'Not located'}</strong></div>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3"><span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Source confidence</span><strong className="mt-1 block font-mono text-[#0B5CD5] font-bold">{Number(completeness.confidence || 0)} / 100</strong></div>
           </div>
 
           {completeness.source && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 text-[11px]">
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 text-[11px]">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <span className="block text-[9px] uppercase tracking-wider text-slate-500">Best matched source</span>
-                  <p className="mt-1 break-words font-semibold text-slate-200">{completeness.source.title || completeness.source.domain || 'Matched video source'}</p>
-                  <p className="mt-1 text-slate-500">{[completeness.source.publisher, completeness.source.publishedAt, completeness.source.confidence].filter(Boolean).join(' · ')}</p>
-                  {completeness.source.transcriptEvidenceScore && <p className="mt-1 font-mono text-cyan-300">Transcript evidence: {Math.round(completeness.source.transcriptEvidenceScore)} / 100 · {String(completeness.source.transcriptMatchType || 'TRANSCRIPT MATCH').replaceAll('_', ' ')}</p>}
+                  <span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Best matched source</span>
+                  <p className="mt-1 break-words font-bold text-[#0B5CD5]">{completeness.source.title || completeness.source.domain || 'Matched video source'}</p>
+                  <p className="mt-1 text-[#7386A8]">{[completeness.source.publisher, completeness.source.publishedAt, completeness.source.confidence].filter(Boolean).join(' · ')}</p>
+                  {completeness.source.transcriptEvidenceScore && <p className="mt-1 font-mono text-[#D97757] font-bold">Transcript evidence: {Math.round(completeness.source.transcriptEvidenceScore)} / 100 · {String(completeness.source.transcriptMatchType || 'TRANSCRIPT MATCH').replaceAll('_', ' ')}</p>}
                 </div>
-                {completeness.source.url && <a href={completeness.source.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-indigo-300 hover:text-indigo-200">Open source <ExternalLink className="w-3 h-3" /></a>}
+                {completeness.source.url && <a href={completeness.source.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-[#D97757] hover:text-[#B0512F] font-semibold">Open source <ExternalLink className="w-3 h-3" /></a>}
               </div>
             </div>
           )}
 
           {completeness.contextWindow && (
             <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400"><Clock className="w-3.5 h-3.5 text-indigo-400" /> Full-source context window</div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#7386A8] font-mono"><Clock className="w-3.5 h-3.5 text-[#D97757]" /> Full-source context window</div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
                 {[['Before the clip', completeness.contextWindow.before], ['Matched clip', completeness.contextWindow.matched], ['After the clip', completeness.contextWindow.after]].map(([label, value]) => (
-                  <div key={label} className={`rounded-xl border p-3 ${label === 'Matched clip' ? 'border-indigo-500/30 bg-indigo-500/5' : 'border-slate-800 bg-slate-900/45'}`}>
-                    <span className="block text-[9px] uppercase tracking-wider text-slate-500">{label}</span>
-                    <p className="mt-1.5 whitespace-pre-wrap break-words leading-relaxed text-slate-300">{value || 'Not recovered'}</p>
+                  <div key={label} className={`rounded-xl border p-3 ${label === 'Matched clip' ? 'border-[#E88F6B] bg-[#F6E7DF]' : 'border-[#CECECE] bg-white'}`}>
+                    <span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">{label}</span>
+                    <p className="mt-1.5 whitespace-pre-wrap break-words leading-relaxed text-[#2C4E86]">{value || 'Not recovered'}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-500">Context integrity: {String(completeness.contextIntegrity?.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')}</p>
+              <p className="text-[10px] text-[#7386A8]">Context integrity: {String(completeness.contextIntegrity?.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')}</p>
             </div>
           )}
 
           {recognizedFigures.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-cyan-400" /> Public-figure search clues</span>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#7386A8] flex items-center gap-1.5 font-mono"><Users className="w-3.5 h-3.5 text-[#0B5CD5]" /> Public-figure search clues</span>
               <div className="flex flex-wrap gap-2">
-                {recognizedFigures.map((figure, index) => <span key={`${figure.name}-${index}`} title={figure.basis || 'No identity basis supplied'} className={`rounded-full border px-2.5 py-1 text-[10px] font-mono ${figure.searchUsed ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200' : 'border-slate-700 text-slate-400'}`}>{figure.name}{figure.confidence !== null && figure.confidence !== undefined ? ` · ${Math.round(figure.confidence)}%` : ''}{figure.searchUsed ? ' · searched' : ' · not used'}</span>)}
+                {recognizedFigures.map((figure, index) => <span key={`${figure.name}-${index}`} title={figure.basis || 'No identity basis supplied'} className={`rounded-full border px-2.5 py-1 text-[10px] font-mono ${figure.searchUsed ? 'border-[#CECECE] bg-[#EFEEE9] text-[#0B5CD5] font-bold' : 'border-[#CECECE] text-[#7386A8]'}`}>{figure.name}{figure.confidence !== null && figure.confidence !== undefined ? ` · ${Math.round(figure.confidence)}%` : ''}{figure.searchUsed ? ' · searched' : ' · not used'}</span>)}
               </div>
-              <p className="text-[10px] text-slate-500">Only visually supported public-figure names at or above the confidence threshold are used as search terms; ordinary or uncertain people are not identified.</p>
+              <p className="text-[10px] text-[#7386A8]">Only visually supported public-figure names at or above the confidence threshold are used as search terms; ordinary or uncertain people are not identified.</p>
             </div>
           )}
 
           {transcriptSearch && (
-            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-3 text-[11px]">
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 space-y-3 text-[11px]">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5"><Search className="w-3.5 h-3.5" /> Transcript original-news search</span>
-                <span className="font-mono text-slate-400">{String(transcriptSearch.status || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(transcriptSearch.executedQueryCount || 0)} searched · {Number(transcriptSearch.matchedSourceCount || 0)} matched</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#0B5CD5] flex items-center gap-1.5 font-mono"><Search className="w-3.5 h-3.5 text-[#D97757]" /> Transcript original-news search</span>
+                <span className="font-mono text-[#7386A8]">{String(transcriptSearch.status || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(transcriptSearch.executedQueryCount || 0)} searched · {Number(transcriptSearch.matchedSourceCount || 0)} matched</span>
               </div>
 
-              {transcriptSearch.status === 'CONSENT_REQUIRED' && <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 text-amber-200">Not searched: enable “Use transcript excerpts to find the original news” when starting the video analysis.</p>}
+              {transcriptSearch.status === 'CONSENT_REQUIRED' && <p className="rounded-lg border border-[#E8D4B0] bg-[#F7EEDA] p-2 text-[#B98520]">Not searched: enable “Use transcript excerpts to find the original news” when starting the video analysis.</p>}
 
               {transcriptSourceMatches.length > 0 && (
                 <div className="space-y-2">
                   {transcriptSourceMatches.slice(0, 5).map((match, index) => (
-                    <div key={`${match.sourceUrl}-${index}`} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                    <div key={`${match.sourceUrl}-${index}`} className="rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <p className="break-words font-semibold text-slate-200">{match.title || match.domain || 'Transcript-matched source'}</p>
-                          <p className="mt-1 text-slate-500">{[match.publisher, match.domain, match.publishedAt].filter(Boolean).join(' · ')}</p>
-                          <p className="mt-1 font-mono text-cyan-300">{Math.round(Number(match.transcriptEvidenceScore || 0))}/100 · {String(match.transcriptMatchType || match.sourceKind || 'TRANSCRIPT CLUE').replaceAll('_', ' ')}</p>
+                          <p className="break-words font-bold text-[#0B5CD5]">{match.title || match.domain || 'Transcript-matched source'}</p>
+                          <p className="mt-1 text-[#7386A8]">{[match.publisher, match.domain, match.publishedAt].filter(Boolean).join(' · ')}</p>
+                          <p className="mt-1 font-mono text-[#D97757] font-bold">{Math.round(Number(match.transcriptEvidenceScore || 0))}/100 · {String(match.transcriptMatchType || match.sourceKind || 'TRANSCRIPT CLUE').replaceAll('_', ' ')}</p>
                         </div>
-                        {match.sourceUrl && <a href={match.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-cyan-300 hover:text-cyan-200">Open source <ExternalLink className="w-3 h-3" /></a>}
+                        {match.sourceUrl && <a href={match.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 flex-shrink-0 items-center gap-1 text-[#D97757] hover:text-[#B0512F] font-semibold">Open source <ExternalLink className="w-3 h-3" /></a>}
                       </div>
-                      {Array.isArray(match.matchedTranscriptPhrases) && match.matchedTranscriptPhrases.length > 0 && <p className="mt-2 break-words text-slate-400"><span className="text-slate-600">Matched spoken phrase:</span> “{match.matchedTranscriptPhrases[0]}”</p>}
+                      {Array.isArray(match.matchedTranscriptPhrases) && match.matchedTranscriptPhrases.length > 0 && <p className="mt-2 break-words text-[#2C4E86]"><span className="text-[#7386A8]">Matched spoken phrase:</span> “{match.matchedTranscriptPhrases[0]}”</p>}
                     </div>
                   ))}
                 </div>
               )}
 
               {transcriptQueries.length > 0 && transcriptSearch.status !== 'CONSENT_REQUIRED' && (
-                <details className="rounded-lg border border-slate-800 bg-slate-950/45 p-2.5">
-                  <summary className="cursor-pointer font-mono text-slate-400">Show transcript-derived search queries ({transcriptQueries.length})</summary>
-                  <div className="mt-2 space-y-2">{transcriptQueries.map((query, index) => <div key={query.id || index} className="border-b border-slate-800 pb-2 last:border-0 last:pb-0"><p className="break-words text-slate-300">{query.query}</p><p className="mt-0.5 text-slate-600">{String(query.provider || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(query.resultCount || 0)} result(s)</p></div>)}</div>
+                <details className="rounded-lg border border-[#CECECE] bg-[#F8F8F6] p-2.5">
+                  <summary className="cursor-pointer font-mono text-[#7386A8]">Show transcript-derived search queries ({transcriptQueries.length})</summary>
+                  <div className="mt-2 space-y-2">{transcriptQueries.map((query, index) => <div key={query.id || index} className="border-b border-[#CECECE] pb-2 last:border-0 last:pb-0"><p className="break-words text-[#2C4E86]">{query.query}</p><p className="mt-0.5 text-[#7386A8]">{String(query.provider || 'UNAVAILABLE').replaceAll('_', ' ')} · {Number(query.resultCount || 0)} result(s)</p></div>)}</div>
                 </details>
               )}
 
-              {Array.isArray(transcriptSearch.limitations) && transcriptSearch.limitations.length > 0 && <p className="text-amber-300/75">{transcriptSearch.limitations.join(' ')}</p>}
+              {Array.isArray(transcriptSearch.limitations) && transcriptSearch.limitations.length > 0 && <p className="text-[#B98520]">{transcriptSearch.limitations.join(' ')}</p>}
             </div>
           )}
 
           {frameSearches.length > 0 && (
-            <details className="rounded-xl border border-slate-800 bg-slate-900/45 p-3 text-[11px]">
-              <summary className="cursor-pointer font-mono text-slate-300">Keyframe source-search status ({frameSearches.length} selected)</summary>
+            <details className="rounded-xl border border-[#CECECE] bg-white p-3 text-[11px]">
+              <summary className="cursor-pointer font-mono text-[#0B5CD5] font-semibold">Keyframe source-search status ({frameSearches.length} selected)</summary>
               <div className="mt-3 space-y-2">
-                {frameSearches.map((search, index) => <div key={`${search.frameIndex}-${index}`} className="flex flex-col gap-1 border-b border-slate-800 pb-2 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><span className="text-slate-400">{formatTime(search.timestamp)} · {String(search.provider || 'UNAVAILABLE').replaceAll('_', ' ')}</span><span className={search.exactMatch ? 'text-emerald-300' : 'text-amber-300'}>{search.exactMatch ? 'Locally verified visual match' : String(search.status || 'NO MATCH').replaceAll('_', ' ')}</span></div>)}
+                {frameSearches.map((search, index) => <div key={`${search.frameIndex}-${index}`} className="flex flex-col gap-1 border-b border-[#CECECE] pb-2 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"><span className="text-[#7386A8]">{formatTime(search.timestamp)} · {String(search.provider || 'UNAVAILABLE').replaceAll('_', ' ')}</span><span className={search.exactMatch ? 'text-[#3E7A55] font-bold' : 'text-[#B98520]'}>{search.exactMatch ? 'Locally verified visual match' : String(search.status || 'NO MATCH').replaceAll('_', ' ')}</span></div>)}
               </div>
             </details>
           )}
 
-          {Array.isArray(completeness.limitations) && completeness.limitations.length > 0 && <p className="text-[10px] leading-relaxed text-amber-300/75">{completeness.limitations.join(' ')}</p>}
+          {Array.isArray(completeness.limitations) && completeness.limitations.length > 0 && <p className="text-[10px] leading-relaxed text-[#B98520]">{completeness.limitations.join(' ')}</p>}
         </div>
       )}
 
       <div>
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2.5">Keyframe sequence integrity</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-[#7386A8] block mb-2.5 font-mono">Keyframe sequence integrity</span>
         {frames.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {frames.slice(0, 9).map((frame, index) => {
               const cut = cuts.find((item) => Math.abs(Number(item.timestamp) - Number(frame.timestamp)) < 0.25);
               return (
-                <div key={`${frame.timestamp}-${index}`} className={`rounded-xl border p-3 ${cut ? 'border-rose-500/50 bg-rose-950/15' : 'border-slate-800 bg-slate-950/60'}`}>
+                <div key={`${frame.timestamp}-${index}`} className={`rounded-2xl border p-3 ${cut ? 'border-[#EBC7C2] bg-[#F7E3E0]' : 'border-[#CECECE] bg-[#F8F8F6]'}`}>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-xs font-mono font-bold text-slate-200">{formatTime(frame.timestamp)}</span>
-                    <span className={`text-[10px] font-mono ${cut ? 'text-rose-300' : 'text-emerald-300'}`}>{cut ? String(cut.transitionType || 'TRANSITION').replaceAll('_', ' ') : 'SAMPLED'}</span>
+                    <span className="text-xs font-mono font-bold text-[#0B5CD5]">{formatTime(frame.timestamp)}</span>
+                    <span className={`text-[10px] font-mono font-bold ${cut ? 'text-[#B23F35]' : 'text-[#3E7A55]'}`}>{cut ? String(cut.transitionType || 'TRANSITION').replaceAll('_', ' ') : 'SAMPLED'}</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-3">{frame.description || 'Keyframe sampled for visual consistency.'}</p>
-                  {frame.visibleText && <p className="text-[10px] text-indigo-300 mt-2 line-clamp-2">OCR: {frame.visibleText}</p>}
+                  <p className="text-[11px] text-[#2C4E86] leading-relaxed line-clamp-3">{frame.description || 'Keyframe sampled for visual consistency.'}</p>
+                  {frame.visibleText && <p className="text-[10px] text-[#D97757] font-mono mt-2 line-clamp-2">OCR: {frame.visibleText}</p>}
                 </div>
               );
             })}
           </div>
-        ) : <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">No keyframes were available. The report does not invent frame or cut locations.</div>}
+        ) : <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#CECECE] text-xs text-[#7386A8]">No keyframes were available. The report does not invent frame or cut locations.</div>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Volume2 className="w-3.5 h-3.5 text-indigo-400" /> Audio edit timeline</span>
+        <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#0B5CD5] flex items-center gap-1.5 font-mono"><Volume2 className="w-3.5 h-3.5 text-[#D97757]" /> Audio edit timeline</span>
           {hasAudioAnalysis ? (
             <>
-              <div className="relative h-3 rounded-full bg-slate-800 overflow-visible mt-5">
+              <div className="relative h-3 rounded-full bg-[#EFEEE9] border border-[#CECECE] overflow-visible mt-5">
                 {splices.map((splice, index) => {
                   const pct = duration > 0 ? Math.min(100, Math.max(0, (Number(splice.timestampSec || 0) / duration) * 100)) : 0;
                   const confirmed = confirmedSplices.some(item => item.spliceId === splice.spliceId);
-                  return <span key={splice.spliceId || index} title={`${splice.description} · ${splice.confidence || 0}%`} className={`absolute top-1/2 -translate-y-1/2 rounded ${confirmed ? 'w-1 h-7 bg-rose-500' : 'w-0.5 h-4 bg-amber-400/60'}`} style={{ left: `${pct}%` }} />;
+                  return <span key={splice.spliceId || index} title={`${splice.description} · ${splice.confidence || 0}%`} className={`absolute top-1/2 -translate-y-1/2 rounded ${confirmed ? 'w-1.5 h-7 bg-[#B23F35]' : 'w-1 h-4 bg-[#B98520]'}`} style={{ left: `${pct}%` }} />;
                 })}
               </div>
-              <div className="flex justify-between text-[10px] font-mono text-slate-500"><span>0:00</span><span>{formatTime(duration)}</span></div>
+              <div className="flex justify-between text-[10px] font-mono text-[#7386A8]"><span>0:00</span><span>{formatTime(duration)}</span></div>
               <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                <span className="text-slate-500">RMS energy</span><span className="text-right text-slate-300">{audio.rmsEnergy ?? '—'}</span>
-                <span className="text-slate-500">Dynamic range</span><span className="text-right text-slate-300">{audio.dynamicRangeDb ?? '—'} dB</span>
-                <span className="text-slate-500">Silence ratio</span><span className="text-right text-slate-300">{audio.silenceRatioPct ?? '—'}%</span>
+                <span className="text-[#7386A8]">RMS energy</span><span className="text-right text-[#0B5CD5] font-bold">{audio.rmsEnergy ?? '—'}</span>
+                <span className="text-[#7386A8]">Dynamic range</span><span className="text-right text-[#0B5CD5] font-bold">{audio.dynamicRangeDb ?? '—'} dB</span>
+                <span className="text-[#7386A8]">Silence ratio</span><span className="text-right text-[#0B5CD5] font-bold">{audio.silenceRatioPct ?? '—'}%</span>
               </div>
             </>
-          ) : <p className="text-xs text-slate-400">An extracted PCM audio stream was unavailable, so no waveform or splice claim is shown.</p>}
+          ) : <p className="text-xs text-[#7386A8]">An extracted PCM audio stream was unavailable, so no waveform or splice claim is shown.</p>}
         </div>
 
-        <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-2.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2"><Activity className="w-3.5 h-3.5 text-cyan-400" /> Measured signals</span>
+        <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-2.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#0B5CD5] flex items-center gap-1.5 mb-2 font-mono"><Activity className="w-3.5 h-3.5 text-[#D97757]" /> Measured signals</span>
           {checks.map(([label, value, status]) => (
-            <div key={label} className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-slate-800/60 last:border-0">
-              <span className="text-slate-400">{label}</span>
+            <div key={label} className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-[#CECECE] last:border-0">
+              <span className="text-[#2C4E86]">{label}</span>
               <span className={`px-2 py-0.5 rounded-md border font-mono text-[10px] font-semibold ${tone(status)}`}>{value}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-2xl space-y-3">
-        <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Transcript evidence</span><span className="text-[10px] font-mono text-slate-500">{transcriptSegments.length} timestamped segment(s)</span></div>
-        {transcriptLanguage && <p className="text-[10px] font-mono text-slate-500">Detected language: {transcriptLanguage}</p>}
-        {transcript ? <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{transcript}</p> : <p className="text-xs text-slate-400">No transcript was recovered. No omitted quotation or source passage has been fabricated.</p>}
-        {translatedTranscript && <p className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-indigo-200"><span className="text-slate-500">English translation:</span> {translatedTranscript}</p>}
-        {transcriptSegments.length > 0 && <div className="space-y-1.5 pt-2 border-t border-slate-800">{transcriptSegments.slice(0, 12).map((segment, index) => <div key={`${segment.start}-${index}`} className="grid grid-cols-[70px_minmax(0,1fr)] gap-2 text-[11px]"><span className="font-mono text-indigo-300">{formatTime(segment.start)}–{formatTime(segment.end)}</span><div className="min-w-0"><p className="text-slate-400 break-words">{segment.text}</p>{segment.translatedText && <p className="text-indigo-300 break-words">Translation: {segment.translatedText}</p>}{segment.audioType && segment.audioType !== 'UNKNOWN' && <p className="mt-0.5 text-[9px] font-mono text-slate-600">{segment.audioType}</p>}</div></div>)}</div>}
+      <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-3">
+        <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wider text-[#0B5CD5] font-mono">Transcript evidence</span><span className="text-[10px] font-mono text-[#7386A8]">{transcriptSegments.length} timestamped segment(s)</span></div>
+        {transcriptLanguage && <p className="text-[10px] font-mono text-[#7386A8]">Detected language: {transcriptLanguage}</p>}
+        {transcript ? <p className="text-sm text-[#2C4E86] leading-relaxed whitespace-pre-wrap">{transcript}</p> : <p className="text-xs text-[#7386A8]">No transcript was recovered. No omitted quotation or source passage has been fabricated.</p>}
+        {translatedTranscript && <p className="rounded-xl border border-[#CECECE] bg-white p-3 text-xs text-[#0B5CD5]"><span className="text-[#7386A8]">English translation:</span> {translatedTranscript}</p>}
+        {transcriptSegments.length > 0 && <div className="space-y-1.5 pt-2 border-t border-[#CECECE]">{transcriptSegments.slice(0, 12).map((segment, index) => <div key={`${segment.start}-${index}`} className="grid grid-cols-[70px_minmax(0,1fr)] gap-2 text-[11px]"><span className="font-mono text-[#D97757] font-bold">{formatTime(segment.start)}–{formatTime(segment.end)}</span><div className="min-w-0"><p className="text-[#2C4E86] break-words">{segment.text}</p>{segment.translatedText && <p className="text-[#0B5CD5] break-words">Translation: {segment.translatedText}</p>}{segment.audioType && segment.audioType !== 'UNKNOWN' && <p className="mt-0.5 text-[9px] font-mono text-[#7386A8]">{segment.audioType}</p>}</div></div>)}</div>}
       </div>
 
       {contextSegments.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Timestamped segment verification</span>
-            <span className="text-[10px] font-mono text-slate-500">{contextSegments.length} segment(s) · {contextReport.methodology}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#0B5CD5] font-mono">Timestamped segment verification</span>
+            <span className="text-[10px] font-mono text-[#7386A8]">{contextSegments.length} segment(s) · {contextReport.methodology}</span>
           </div>
           <div className="space-y-3">
             {contextSegments.map((segment) => (
-              <div key={segment.segment_index} className="rounded-2xl border border-slate-800 bg-slate-950/55 p-4 space-y-3">
+              <div key={segment.segment_index} className="rounded-2xl border border-[#CECECE] bg-white p-4 space-y-3 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <strong className="text-xs font-mono text-white">Segment {segment.segment_index} · {segment.timestamp_range}</strong>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${segment.is_truncated ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-slate-700 text-slate-400'}`}>
+                  <strong className="text-xs font-mono text-[#0B5CD5]">Segment {segment.segment_index} · {segment.timestamp_range}</strong>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono font-bold ${segment.is_truncated ? 'border-[#EBC7C2] bg-[#F7E3E0] text-[#B23F35]' : 'border-[#CECECE] bg-[#F8F8F6] text-[#7386A8]'}`}>
                     {segment.is_truncated ? 'SOURCE-BACKED TRUNCATION' : 'NO PROVEN TRUNCATION'}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
-                  <div><span className="block uppercase text-[9px] tracking-wider text-slate-500">Visual authenticity</span><p className="mt-1 text-slate-300">{segment.visual_authenticity || 'Inconclusive'}</p></div>
-                  <div><span className="block uppercase text-[9px] tracking-wider text-slate-500">Audio provenance</span><p className="mt-1 text-slate-300">{segment.audio_authenticity || 'Undetermined'}</p></div>
+                  <div><span className="block uppercase text-[9px] tracking-wider text-[#7386A8]">Visual authenticity</span><p className="mt-1 text-[#2C4E86] font-semibold">{segment.visual_authenticity || 'Inconclusive'}</p></div>
+                  <div><span className="block uppercase text-[9px] tracking-wider text-[#7386A8]">Audio provenance</span><p className="mt-1 text-[#2C4E86] font-semibold">{segment.audio_authenticity || 'Undetermined'}</p></div>
                 </div>
-                <p className="text-xs leading-relaxed text-slate-400">{segment.actual_scene_breakdown || 'No scene description available.'}</p>
+                <p className="text-xs leading-relaxed text-[#2C4E86]">{segment.actual_scene_breakdown || 'No scene description available.'}</p>
                 {segment.visual_details && Object.entries({
                   'Visible text': segment.visual_details.visible_text,
                   'Public figures': segment.visual_details.public_figures?.map?.((item) => item.name || item.visibleAppearance || String(item)).join(', '),
@@ -441,7 +441,7 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
                   'Attire': segment.visual_details.attire?.join?.(', '),
                   'Security details': segment.visual_details.security_details?.join?.(', ')
                 }).some(([, value]) => value) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3">
                     {Object.entries({
                       'Visible text': segment.visual_details.visible_text,
                       'Public figures': segment.visual_details.public_figures?.map?.((item) => item.name || item.visibleAppearance || String(item)).join(', '),
@@ -449,27 +449,27 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
                       'Badges / uniforms': [...(segment.visual_details.badges || []), ...(segment.visual_details.uniforms || [])].join(', '),
                       'Attire': segment.visual_details.attire?.join?.(', '),
                       'Security details': segment.visual_details.security_details?.join?.(', ')
-                    }).filter(([, value]) => value).map(([label, value]) => <div key={label} className="min-w-0 text-[11px]"><span className="block text-[9px] uppercase text-slate-600">{label}</span><p className="mt-0.5 break-words text-slate-300">{value}</p></div>)}
+                    }).filter(([, value]) => value).map(([label, value]) => <div key={label} className="min-w-0 text-[11px]"><span className="block text-[9px] uppercase text-[#7386A8]">{label}</span><p className="mt-0.5 break-words text-[#2C4E86]">{value}</p></div>)}
                   </div>
                 )}
                 {(segment.transcript_original || segment.transcript_translation) && (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-[11px] space-y-1">
-                    {segment.transcript_original && <p className="text-slate-300"><span className="text-slate-500">Transcript:</span> {segment.transcript_original}</p>}
-                    {segment.transcript_translation && <p className="text-indigo-300"><span className="text-slate-500">Translation:</span> {segment.transcript_translation}</p>}
+                  <div className="rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3 text-[11px] space-y-1">
+                    {segment.transcript_original && <p className="text-[#2C4E86]"><span className="text-[#7386A8]">Transcript:</span> {segment.transcript_original}</p>}
+                    {segment.transcript_translation && <p className="text-[#0B5CD5]"><span className="text-[#7386A8]">Translation:</span> {segment.transcript_translation}</p>}
                   </div>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
-                  <div><span className="block text-[9px] uppercase text-slate-500">Original event</span><p className="text-slate-300 mt-1">{segment.original_event?.event_name || 'Not established'}</p></div>
-                  <div><span className="block text-[9px] uppercase text-slate-500">Date</span><p className="text-slate-300 mt-1">{segment.original_event?.date || 'Not established'}</p></div>
-                  <div><span className="block text-[9px] uppercase text-slate-500">Location</span><p className="text-slate-300 mt-1">{segment.original_event?.location || 'Not established'}</p></div>
+                  <div><span className="block text-[9px] uppercase text-[#7386A8]">Original event</span><p className="text-[#2C4E86] mt-1 font-semibold">{segment.original_event?.event_name || 'Not established'}</p></div>
+                  <div><span className="block text-[9px] uppercase text-[#7386A8]">Date</span><p className="text-[#2C4E86] mt-1 font-semibold">{segment.original_event?.date || 'Not established'}</p></div>
+                  <div><span className="block text-[9px] uppercase text-[#7386A8]">Location</span><p className="text-[#2C4E86] mt-1 font-semibold">{segment.original_event?.location || 'Not established'}</p></div>
                 </div>
-                {segment.omitted_context && <p className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 text-[11px] text-rose-200"><strong>Verified omitted context:</strong> {segment.omitted_context}</p>}
+                {segment.omitted_context && <p className="rounded-xl border border-[#EBC7C2] bg-[#F7E3E0] p-3 text-[11px] text-[#B23F35]"><strong>Verified omitted context:</strong> {segment.omitted_context}</p>}
                 {segment.source_evidence?.url && (
-                  <a href={segment.source_evidence.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-indigo-300 hover:text-indigo-200">
+                  <a href={segment.source_evidence.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[#D97757] hover:text-[#B0512F] font-semibold">
                     {segment.source_evidence.title || segment.source_evidence.domain || 'Open contextual source'} <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
-                {segment.source_evidence?.limitation && <p className="text-[10px] text-amber-300/70">{segment.source_evidence.limitation}</p>}
+                {segment.source_evidence?.limitation && <p className="text-[10px] text-[#B98520]">{segment.source_evidence.limitation}</p>}
               </div>
             ))}
           </div>
@@ -477,23 +477,23 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
       )}
 
       {contextReport && (
-        <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 space-y-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Full truth summary</span>
-          <p className="text-sm leading-relaxed text-slate-300">{contextReport.full_truth_summary}</p>
+        <div className="rounded-2xl border border-[#E88F6B]/40 bg-[#F6E7DF] p-4 space-y-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#B0512F] font-mono">Full truth summary</span>
+          <p className="text-sm leading-relaxed text-[#2C4E86]">{contextReport.full_truth_summary}</p>
           {contextReport.stitching_analysis && (
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-[11px]">
-              <p className="font-mono text-slate-300">Cross-segment context: {String(contextReport.stitching_analysis.status || 'INCONCLUSIVE').replaceAll('_', ' ')}</p>
-              <p className="mt-1 text-slate-500">{contextReport.stitching_analysis.rationale}</p>
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 text-[11px]">
+              <p className="font-mono text-[#0B5CD5] font-bold">Cross-segment context: {String(contextReport.stitching_analysis.status || 'INCONCLUSIVE').replaceAll('_', ' ')}</p>
+              <p className="mt-1 text-[#7386A8]">{contextReport.stitching_analysis.rationale}</p>
             </div>
           )}
           {Array.isArray(contextReport.manipulation_techniques_detected) && contextReport.manipulation_techniques_detected.length > 0 && (
-            <div className="flex flex-wrap gap-2">{contextReport.manipulation_techniques_detected.map((technique, index) => <span key={index} className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[10px] font-mono text-slate-300">{technique}</span>)}</div>
+            <div className="flex flex-wrap gap-2">{contextReport.manipulation_techniques_detected.map((technique, index) => <span key={index} className="rounded-full border border-[#CECECE] bg-white px-2.5 py-1 text-[10px] font-mono text-[#0B5CD5] font-semibold">{technique}</span>)}</div>
           )}
-          {contextReport.reproducibility && <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-[10px]"><summary className="cursor-pointer font-mono text-slate-400">Reproducibility metadata</summary><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-slate-500">{JSON.stringify(contextReport.reproducibility, null, 2)}</pre></details>}
+          {contextReport.reproducibility && <details className="rounded-xl border border-[#CECECE] bg-white p-3 text-[10px]"><summary className="cursor-pointer font-mono text-[#7386A8]">Reproducibility metadata</summary><pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words text-[#7386A8]">{JSON.stringify(contextReport.reproducibility, null, 2)}</pre></details>}
         </div>
       )}
 
-      {limitations.length > 0 && <details className="p-4 bg-amber-950/10 border border-amber-500/20 rounded-2xl text-xs"><summary className="cursor-pointer text-amber-300 font-semibold">Analysis limitations ({limitations.length})</summary><ul className="mt-2 space-y-1 text-slate-400 list-disc pl-5">{limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul></details>}
+      {limitations.length > 0 && <details className="p-4 bg-[#F7EEDA] border border-[#E8D4B0] rounded-2xl text-xs"><summary className="cursor-pointer text-[#B98520] font-bold">Analysis limitations ({limitations.length})</summary><ul className="mt-2 space-y-1 text-[#2C4E86] list-disc pl-5">{limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul></details>}
     </section>
   );
 }

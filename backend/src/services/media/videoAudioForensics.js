@@ -549,6 +549,8 @@ async function performVideoAndAudioForensics(fileInfo = {}, buffer = null, optio
     description: frame.description || 'Sampled video frame'
   }));
 
+  const faceDetectorExecuted = faceManipulation.status === 'AVAILABLE' && faceManipulation.modelExecuted === true;
+  const voiceDetectorExecuted = voiceClone.status === 'AVAILABLE' && voiceClone.modelExecuted === true;
   let verdict = 'NO_MANIPULATION_SIGNAL_FOUND';
   let confidence = 85;
 
@@ -563,7 +565,17 @@ async function performVideoAndAudioForensics(fileInfo = {}, buffer = null, optio
       ? 'MANIPULATION_SIGNAL'
       : 'EDITING_OR_REENCODING_SIGNAL';
     confidence = 75;
+  } else if (!faceDetectorExecuted || !voiceDetectorExecuted) {
+    // Local container, transition, and waveform checks cannot rule out a
+    // face-swap or cloned voice. Report limited coverage instead of presenting
+    // missing specialist models as an 85%-confident clean result.
+    verdict = 'INCONCLUSIVE_LIMITED_ANALYSIS';
+    confidence = 35;
   }
+
+  const coverageLimitations = [];
+  if (!faceDetectorExecuted) coverageLimitations.push('face-manipulation detector did not run');
+  if (!voiceDetectorExecuted) coverageLimitations.push('voice-clone detector did not run');
 
   return {
     status: 'COMPLETED',
@@ -582,7 +594,9 @@ async function performVideoAndAudioForensics(fileInfo = {}, buffer = null, optio
     forensicEvidence,
     rationale: forensicEvidence.length > 0
       ? forensicEvidence.map(e => e.description).join(' ')
-      : 'Video container, keyframe shot transitions, and audio waveform inspected. Clean stream integrity verified.'
+      : coverageLimitations.length > 0
+        ? `Local container, keyframe-transition, and audio-waveform checks found no manipulation signal, but the result is inconclusive because the ${coverageLimitations.join(' and the ')}.`
+        : 'Video container, keyframe shot transitions, audio waveform, face manipulation, and voice-clone checks completed without a manipulation signal.'
   };
 }
 

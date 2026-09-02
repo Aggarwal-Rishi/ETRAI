@@ -255,7 +255,7 @@ export default function NewAnalysisPage() {
         if (urlInput.trim()) formData.append('url', urlInput.trim());
         formData.append('selectedTypes', JSON.stringify(['FACT_CHECKING', 'FAKE_NEWS_DETECTION']));
         formData.append('enableReverseSearch', String(optReverseSearch));
-        formData.append('allowExternalVisualSearch', String(selectedCard === 'VIDEO' && optExternalVisualSearch));
+        formData.append('allowExternalVisualSearch', String((selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && optExternalVisualSearch));
         formData.append('allowExternalTranscriptSearch', String(selectedCard === 'VIDEO' && optExternalTranscriptSearch));
         formData.append('traceProvenance', String(optTraceProvenance));
         formData.append('detectEntities', String(optDetectEntities));
@@ -268,7 +268,7 @@ export default function NewAnalysisPage() {
           text: textInput.trim() || undefined,
           selectedTypes: ['FACT_CHECKING', 'FAKE_NEWS_DETECTION'],
           enableReverseSearch: optReverseSearch,
-          allowExternalVisualSearch: selectedCard === 'VIDEO' && optExternalVisualSearch,
+          allowExternalVisualSearch: (selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && optExternalVisualSearch,
           allowExternalTranscriptSearch: selectedCard === 'VIDEO' && optExternalTranscriptSearch,
           traceProvenance: optTraceProvenance,
           detectEntities: optDetectEntities
@@ -371,19 +371,16 @@ export default function NewAnalysisPage() {
     { id: 'PROVENANCE', label: 'Provenance & Source Authority', desc: 'Queries ranked sources, checks registrar WHOIS and wire archives' },
     { id: 'CLAIMS', label: 'Claim Extraction Engine', desc: 'Decomposes narrative into atomic, verifiable assertions' },
     { id: 'FACT_MATCH', label: 'Cross-Source Fact Match', desc: 'Queries primary web indices and evaluates corroboration signals' },
-    { id: 'FORENSICS', label: 'Media & Forensics Rails', desc: 'ELA pixel analysis, keyframe splice detection, spectral match' },
-    { id: 'SYNTHESIS', label: 'Dossier Sealing & Derivation', desc: 'Calculates trust score and creates a SHA-256 report integrity seal' }
+    { id: 'FORENSICS', label: 'Media & Forensics Rails', desc: 'ELA pixel analysis, keyframe splice detection, spectral match' }
   ];
 
   const getStageStatus = (stageId, index) => {
-    const stageOrder = ['INTAKE', 'PROVENANCE', 'CLAIMS', 'FACT_MATCH', 'FORENSICS', 'SYNTHESIS'];
     let currentIndex = 0;
     if (progress < 25) currentIndex = 0;
-    else if (progress < 45) currentIndex = 1;
-    else if (progress < 65) currentIndex = 2;
-    else if (progress < 80) currentIndex = 3;
-    else if (progress < 95) currentIndex = 4;
-    else currentIndex = 5;
+    else if (progress < 50) currentIndex = 1;
+    else if (progress < 75) currentIndex = 2;
+    else if (progress < 90) currentIndex = 3;
+    else currentIndex = 4;
 
     if (index < currentIndex) return 'COMPLETED';
     if (index === currentIndex) return 'ACTIVE';
@@ -391,13 +388,13 @@ export default function NewAnalysisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#0c1427] border border-indigo-500/50 text-white text-xs font-mono rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs font-mono rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -412,20 +409,20 @@ export default function NewAnalysisPage() {
             
             {/* Header */}
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#131f38] text-blue-300 border border-blue-800/40 text-[11px] font-mono font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3 h-3 text-blue-400" /> Multi-Agent Intake Rail
+              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#F6E7DF] text-[#B0512F] border border-[#E88F6B]/30 text-[11px] font-mono font-bold uppercase tracking-wider mb-2">
+                <Sparkles className="w-3 h-3 text-[#D97757]" /> Multi-Agent Intake Rail
               </div>
-              <h1 className="text-3xl font-extrabold text-white tracking-tight">
+              <h1 className="text-3xl font-extrabold text-[#0B5CD5] tracking-tight">
                 AI Content Verification Studio
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+              <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
                 Select your source asset type to launch the multi-agent evidentiary verification pipeline.
               </p>
             </div>
 
             {errorMessage && (
-              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 flex items-center gap-3">
-                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <div className="p-4 bg-[#F7E3E0] border border-[#EBC7C2] rounded-2xl text-xs text-[#8E2F27] flex items-center gap-3">
+                <AlertCircle className="w-4 h-4 text-[#B23F35] flex-shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
@@ -456,30 +453,30 @@ export default function NewAnalysisPage() {
                     }}
                     className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
                       isSelected
-                        ? 'bg-gradient-to-b from-[#131f38] to-[#0c1427] border-indigo-500 shadow-xl ring-2 ring-indigo-500/20 scale-[1.02]'
-                        : 'bg-[#0c1427] border-[#17233f] hover:border-slate-700'
+                        ? 'bg-white border-[#D97757] shadow-md ring-2 ring-[#D97757]/20 scale-[1.02]'
+                        : 'bg-white border-[#CECECE] hover:border-[#D97757] shadow-xs'
                     }`}
                   >
                     {card.badge && (
-                      <span className="absolute -top-2 right-2 px-1.5 py-0.2 bg-indigo-600 text-white rounded text-[9px] font-mono font-bold">
+                      <span className="absolute -top-2 right-2 px-1.5 py-0.2 bg-[#D97757] text-white rounded text-[9px] font-mono font-bold">
                         {card.badge}
                       </span>
                     )}
 
                     <div className="flex items-center justify-between">
-                      <div className={`p-2 rounded-xl ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      <div className={`p-2 rounded-xl ${isSelected ? 'bg-[#D97757] text-white' : 'bg-[#EFEEE9] text-[#2C4E86]'}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                        isSelected ? 'border-indigo-500 bg-indigo-600' : 'border-slate-700'
+                        isSelected ? 'border-[#D97757] bg-[#D97757]' : 'border-[#CECECE]'
                       }`}>
                         {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                       </div>
                     </div>
 
                     <div>
-                      <span className="font-bold text-xs text-white block truncate">{card.label}</span>
-                      <span className="text-[10px] text-slate-400 font-mono block truncate">{card.sub}</span>
+                      <span className="font-bold text-xs text-[#0B5CD5] block truncate">{card.label}</span>
+                      <span className="text-[10px] text-[#7386A8] font-mono block truncate">{card.sub}</span>
                     </div>
                   </div>
                 );
@@ -487,20 +484,20 @@ export default function NewAnalysisPage() {
             </div>
 
             {/* Conditional Input Field Box */}
-            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-4 shadow-xl">
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm">
               
               {/* URL Input */}
               {(selectedCard === 'NEWS_URL' || selectedCard === 'MIXED_URL') && (
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-white">Article / Source Webpage URL</label>
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">Article / Source Webpage URL</label>
                   <div className="relative">
-                    <Globe className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Globe className="w-4 h-4 text-[#7386A8] absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="url"
                       placeholder="https://news-outlet.com/article/2026/08/policy-notice"
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
+                      className="w-full pl-10 pr-4 py-3 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] font-mono placeholder-[#7386A8]"
                     />
                   </div>
                 </div>
@@ -510,8 +507,8 @@ export default function NewAnalysisPage() {
               {selectedCard === 'TEXT' && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="block text-xs font-semibold text-white">Claim Statement / Article Text</label>
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">Claim Statement / Article Text</label>
+                    <span className="text-[11px] font-mono text-[#7386A8]">
                       {textInput.trim().split(/\s+/).filter(Boolean).length} words
                     </span>
                   </div>
@@ -520,7 +517,7 @@ export default function NewAnalysisPage() {
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
                     placeholder="Paste the statement, press note, or forwarded message here..."
-                    className="w-full p-4 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 leading-relaxed placeholder-slate-500"
+                    className="w-full p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] leading-relaxed placeholder-[#7386A8]"
                   />
                 </div>
               )}
@@ -529,30 +526,30 @@ export default function NewAnalysisPage() {
               {selectedCard === 'IMAGE' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-white">
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">
                       Image Asset Forensics (ELA, EXIF, Duplicate Match)
                     </label>
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <span className="text-[11px] font-mono text-[#7386A8]">
                       Supports PNG, JPG, JPEG, WEBP
                     </span>
                   </div>
 
                   {uploadedFile && imagePreviewUrl ? (
                     /* Attached Image Preview Card */
-                    <div className="p-5 bg-[#070b14] border border-indigo-500/40 rounded-2xl space-y-4 shadow-lg">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
+                    <div className="p-5 bg-[#F8F8F6] border border-[#D97757]/40 rounded-2xl space-y-4 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-[#CECECE] pb-3">
+                        <div className="flex items-center gap-2 text-[#3E7A55] font-mono text-xs">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Image Loaded for Forensic Intake</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded text-[10px] font-mono font-bold uppercase">
+                        <span className="px-2 py-0.5 bg-[#F6E7DF] text-[#B0512F] border border-[#E88F6B]/30 rounded text-[10px] font-mono font-bold uppercase">
                           {uploadedFile.type?.split('/')[1] || 'IMAGE'}
                         </span>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-center gap-5">
                         {/* Thumbnail */}
-                        <div className="relative w-40 h-40 bg-black/60 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+                        <div className="relative w-40 h-40 bg-white border border-[#CECECE] rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
                           <img
                             src={imagePreviewUrl}
                             alt="Uploaded preview"
@@ -563,10 +560,10 @@ export default function NewAnalysisPage() {
                         {/* File Details & Actions */}
                         <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
                           <div className="space-y-1">
-                            <span className="text-sm font-bold text-white block truncate" title={uploadedFile.name}>
+                            <span className="text-sm font-bold text-[#0B5CD5] block truncate" title={uploadedFile.name}>
                               {uploadedFile.name}
                             </span>
-                            <span className="text-xs text-slate-400 font-mono block">
+                            <span className="text-xs text-[#7386A8] font-mono block">
                               {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'image/png'}
                             </span>
                           </div>
@@ -575,7 +572,7 @@ export default function NewAnalysisPage() {
                             <button
                               type="button"
                               onClick={handlePasteFromClipboard}
-                              className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                              className="px-3.5 py-1.5 bg-[#F6E7DF] hover:bg-[#EFD3C6] border border-[#E88F6B]/40 text-[#B0512F] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
                             >
                               <ClipboardPaste className="w-3.5 h-3.5" />
                               <span>Paste Another (Ctrl+V)</span>
@@ -595,7 +592,7 @@ export default function NewAnalysisPage() {
                             />
                             <label
                               htmlFor="studio-file-input-image"
-                              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
+                              className="px-3.5 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
                             >
                               <Upload className="w-3.5 h-3.5" />
                               <span>Replace File</span>
@@ -607,7 +604,7 @@ export default function NewAnalysisPage() {
                                 setUploadedFile(null);
                                 setImagePreviewUrl(null);
                               }}
-                              className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                              className="px-3.5 py-1.5 bg-[#F7E3E0] hover:bg-[#F7D2CC] border border-[#EBC7C2] text-[#8E2F27] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Remove</span>
@@ -630,18 +627,18 @@ export default function NewAnalysisPage() {
                         }
                       }}
                       className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-4 transition-colors ${
-                        isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
+                        isDragOver ? 'border-[#D97757] bg-[#F6E7DF]/30' : 'border-[#CECECE] bg-[#F8F8F6] hover:border-[#D97757]'
                       }`}
                     >
-                      <div className="p-3 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center text-indigo-400">
+                      <div className="p-3 bg-[#F6E7DF] border border-[#E88F6B]/30 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center text-[#D97757]">
                         <ImageIcon className="w-7 h-7" />
                       </div>
 
                       <div className="space-y-1 max-w-md mx-auto">
-                        <p className="text-xs font-semibold text-white">
+                        <p className="text-xs font-semibold text-[#0B5CD5]">
                           Paste from clipboard, drag & drop, or browse your device
                         </p>
-                        <p className="text-[11px] text-slate-400 font-mono">
+                        <p className="text-[11px] text-[#7386A8] font-mono">
                           Max 50MB · Preserves camera EXIF, hash signatures & tamper regions
                         </p>
                       </div>
@@ -651,7 +648,7 @@ export default function NewAnalysisPage() {
                         <button
                           type="button"
                           onClick={handlePasteFromClipboard}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-2 hover:scale-[1.02]"
+                          className="px-4 py-2 bg-[#D97757] hover:bg-[#B0512F] text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-2 hover:scale-[1.02]"
                         >
                           <ClipboardPaste className="w-4 h-4" />
                           <span>Paste Image (Ctrl+V)</span>
@@ -671,7 +668,7 @@ export default function NewAnalysisPage() {
                         />
                         <label
                           htmlFor="studio-file-input-image"
-                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-2"
+                          className="px-4 py-2 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-2"
                         >
                           <Upload className="w-4 h-4" />
                           <span>Browse Local Disk</span>
@@ -679,8 +676,8 @@ export default function NewAnalysisPage() {
                       </div>
 
                       {/* Tip Pill */}
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-full text-[10.5px] font-mono text-slate-400">
-                        <Sparkles className="w-3 h-3 text-indigo-400" />
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#EFEEE9] border border-[#CECECE] rounded-full text-[10.5px] font-mono text-[#2C4E86]">
+                        <Sparkles className="w-3 h-3 text-[#D97757]" />
                         <span>Tip: Take a screenshot (Win+Shift+S or PrtScn) and press Ctrl+V directly</span>
                       </div>
                     </div>
@@ -688,17 +685,17 @@ export default function NewAnalysisPage() {
 
                   {/* Optional Image URL Input */}
                   <div className="pt-2">
-                    <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                    <label className="block text-[11px] font-medium text-[#2C4E86] mb-1.5">
                       Or verify an Image by Direct Web URL
                     </label>
                     <div className="relative">
-                      <Globe className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Globe className="w-4 h-4 text-[#7386A8] absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="url"
                         placeholder="https://example.com/press-photo.jpg"
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-500"
+                        className="w-full pl-10 pr-4 py-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] font-mono placeholder-[#7386A8]"
                       />
                     </div>
                   </div>
@@ -709,30 +706,30 @@ export default function NewAnalysisPage() {
               {selectedCard === 'VIDEO' && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-white">
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">
                       Video Forensics & Speech Analysis
                     </label>
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <span className="text-[11px] font-mono text-[#7386A8]">
                       Direct Video File Upload
                     </span>
                   </div>
 
                   {/* Upload Video File or View Attached Preview */}
                   {uploadedFile && videoPreviewUrl ? (
-                    <div className="p-5 bg-[#070b14] border border-indigo-500/40 rounded-2xl space-y-4 shadow-lg">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
+                    <div className="p-5 bg-[#F8F8F6] border border-[#D97757]/40 rounded-2xl space-y-4 shadow-sm">
+                      <div className="flex items-center justify-between border-b border-[#CECECE] pb-3">
+                        <div className="flex items-center gap-2 text-[#3E7A55] font-mono text-xs">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Video Clip Loaded for Forensic Keyframe Analysis</span>
                         </div>
-                        <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800/60 rounded text-[10px] font-mono font-bold uppercase">
+                        <span className="px-2 py-0.5 bg-[#F6E7DF] text-[#B0512F] border border-[#E88F6B]/30 rounded text-[10px] font-mono font-bold uppercase">
                           {uploadedFile.type?.split('/')[1] || 'VIDEO'}
                         </span>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-center gap-5">
                         {/* Video Player Preview */}
-                        <div className="relative w-48 max-h-32 bg-black border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
+                        <div className="relative w-48 max-h-32 bg-black border border-[#CECECE] rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
                           <video
                             src={videoPreviewUrl}
                             controls
@@ -743,10 +740,10 @@ export default function NewAnalysisPage() {
                         {/* Details & Actions */}
                         <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
                           <div className="space-y-1">
-                            <span className="text-sm font-bold text-white block truncate" title={uploadedFile.name}>
+                            <span className="text-sm font-bold text-[#0B5CD5] block truncate" title={uploadedFile.name}>
                               {uploadedFile.name}
                             </span>
-                            <span className="text-xs text-slate-400 font-mono block">
+                            <span className="text-xs text-[#7386A8] font-mono block">
                               {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'video/mp4'}
                             </span>
                           </div>
@@ -766,7 +763,7 @@ export default function NewAnalysisPage() {
                             />
                             <label
                               htmlFor="studio-file-input-video-replace"
-                              className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
+                              className="px-3.5 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
                             >
                               <Upload className="w-3.5 h-3.5" />
                               <span>Replace Video</span>
@@ -778,7 +775,7 @@ export default function NewAnalysisPage() {
                                 setUploadedFile(null);
                                 setVideoPreviewUrl(null);
                               }}
-                              className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
+                              className="px-3.5 py-1.5 bg-[#F7E3E0] hover:bg-[#F7D2CC] border border-[#EBC7C2] text-[#8E2F27] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Remove</span>
@@ -800,15 +797,15 @@ export default function NewAnalysisPage() {
                         }
                       }}
                       className={`p-7 border-2 border-dashed rounded-2xl text-center space-y-3 transition-colors ${
-                        isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
+                        isDragOver ? 'border-[#D97757] bg-[#F6E7DF]/30' : 'border-[#CECECE] bg-[#F8F8F6] hover:border-[#D97757]'
                       }`}
                     >
-                      <Film className="w-8 h-8 text-blue-400 mx-auto" />
+                      <Film className="w-8 h-8 text-[#D97757] mx-auto" />
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-white">
+                        <p className="text-xs font-semibold text-[#0B5CD5]">
                           Drag and drop video clip here, or click to browse
                         </p>
-                        <p className="text-[11px] text-slate-400 font-mono">
+                        <p className="text-[11px] text-[#7386A8] font-mono">
                           Max 50MB · Supports MP4, WebM, MOV · Keyframe & Voice Splice Forensics
                         </p>
                       </div>
@@ -827,7 +824,7 @@ export default function NewAnalysisPage() {
                       />
                       <label
                         htmlFor="studio-file-input-video"
-                        className="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition"
+                        className="inline-block px-4 py-2 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition"
                       >
                         Browse Video File
                       </label>
@@ -836,7 +833,7 @@ export default function NewAnalysisPage() {
 
                   {/* Optional Transcript / Context */}
                   <div className="pt-2">
-                    <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
+                    <label className="block text-[11px] font-medium text-[#2C4E86] mb-1.5">
                       Optional: Spoken Dialogue / Context Notes
                     </label>
                     <input
@@ -844,7 +841,7 @@ export default function NewAnalysisPage() {
                       placeholder="e.g. Speech by official claiming tax policy change at the conference..."
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#070b14] border border-[#17233f] rounded-2xl text-xs text-white focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+                      className="w-full px-4 py-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] placeholder-[#7386A8]"
                     />
                   </div>
                 </div>
@@ -853,7 +850,7 @@ export default function NewAnalysisPage() {
               {/* PDF Document Drop Zone */}
               {selectedCard === 'PDF' && (
                 <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-white">
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">
                     Upload PDF / DOCX Document
                   </label>
                   
@@ -869,15 +866,15 @@ export default function NewAnalysisPage() {
                       }
                     }}
                     className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-3 transition-colors ${
-                      isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#17233f] bg-[#070b14]/60 hover:border-slate-700'
+                      isDragOver ? 'border-[#D97757] bg-[#F6E7DF]/30' : 'border-[#CECECE] bg-[#F8F8F6] hover:border-[#D97757]'
                     }`}
                   >
-                    <FileText className="w-8 h-8 text-blue-400 mx-auto" />
+                    <FileText className="w-8 h-8 text-[#0B5CD5] mx-auto" />
                     <div>
-                      <p className="text-xs font-semibold text-white">
+                      <p className="text-xs font-semibold text-[#0B5CD5]">
                         {uploadedFile ? uploadedFile.name : 'Drag and drop PDF/DOCX file here, or click to browse'}
                       </p>
-                      <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                      <p className="text-[11px] text-[#7386A8] font-mono mt-0.5">
                         {uploadedFile ? `${(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB` : 'Max 50MB · OCR and digital signature extraction'}
                       </p>
                     </div>
@@ -896,7 +893,7 @@ export default function NewAnalysisPage() {
                     />
                     <label
                       htmlFor="studio-file-input-doc"
-                      className="inline-block px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl cursor-pointer transition"
+                      className="inline-block px-4 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition"
                     >
                       {uploadedFile ? 'Replace File' : 'Browse Local Disk'}
                     </label>
@@ -905,8 +902,8 @@ export default function NewAnalysisPage() {
               )}
 
               {/* "Try One" Real Preset Buttons */}
-              <div className="pt-2 border-t border-[#17233f] space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
+              <div className="pt-2 border-t border-[#CECECE] space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#7386A8] block">
                   1-Click Real Presets:
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -919,9 +916,9 @@ export default function NewAnalysisPage() {
                         setTextInput(preset.text);
                         setErrorMessage(null);
                       }}
-                      className="px-3 py-1.5 bg-[#070b14] hover:bg-slate-800 border border-[#17233f] hover:border-slate-700 rounded-xl text-xs text-slate-300 hover:text-white transition flex items-center gap-2"
+                      className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#E5E3DC] border border-[#CECECE] rounded-xl text-xs text-[#0B5CD5] transition flex items-center gap-2"
                     >
-                      <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded text-[9.5px] font-mono">
+                      <span className="px-1.5 py-0.2 bg-[#F6E7DF] text-[#B0512F] rounded text-[9.5px] font-mono">
                         {preset.tag}
                       </span>
                       <span>{preset.label}</span>
@@ -932,103 +929,92 @@ export default function NewAnalysisPage() {
             </div>
 
             {/* Pipeline Configuration Options */}
-            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-4 shadow-xl">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0B5CD5] font-mono">
                 Verification Pipeline Modules
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 
                 {/* Module 1: Reverse Search */}
-                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-[#D97757]">
                   <input
                     type="checkbox"
                     checked={optReverseSearch}
                     onChange={(e) => setOptReverseSearch(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                    className="mt-0.5 rounded border-[#AAAAAA] bg-white text-[#D97757] focus:ring-0"
                   />
                   <div>
-                    <span className="font-semibold text-white block">Reverse-search media assets</span>
-                    <span className="text-slate-400 text-[11px]">Recovers first original frame from wire archives</span>
+                    <span className="font-semibold text-[#0B5CD5] block">Reverse-search media assets</span>
+                    <span className="text-[#7386A8] text-[11px]">Recovers first original frame from wire archives</span>
                   </div>
                 </label>
 
-                {/* Explicit consent for external video-keyframe lookup */}
-                {selectedCard === 'VIDEO' && (
+                {/* Explicit consent for external image/video lookup */}
+                {(selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && (
                   <>
-                    <label className="p-3.5 bg-indigo-500/5 border border-indigo-500/30 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-indigo-400/60 sm:col-span-2">
+                    <label className="p-3.5 bg-[#F6E7DF]/30 border border-[#E88F6B]/40 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-[#D97757] sm:col-span-2">
                       <input
                         type="checkbox"
                         checked={optExternalVisualSearch}
                         onChange={(e) => setOptExternalVisualSearch(e.target.checked)}
-                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                        className="mt-0.5 rounded border-[#AAAAAA] bg-white text-[#D97757] focus:ring-0"
                       />
                       <div>
-                        <span className="font-semibold text-white block">Search selected video frames externally</span>
-                        <span className="text-slate-400 text-[11px] leading-relaxed block mt-0.5">
-                          With your permission, DeepTrust may upload up to three selected keyframes—not the full video—to the configured Google Lens, Google Vision, or Serper provider to locate matching original footage. Frame bytes are not stored in the report.
+                        <span className="font-semibold text-[#0B5CD5] block">
+                          {selectedCard === 'VIDEO' ? 'Search selected video frames externally' : 'Search this image externally'}
+                        </span>
+                        <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
+                          {selectedCard === 'VIDEO'
+                            ? 'With your permission, DeepTrust may upload up to three selected keyframes—not the full video—and search high-confidence visible entity names using the configured providers. Frame bytes are not stored in the report.'
+                            : 'With your permission, DeepTrust may submit this image and search high-confidence visible entity names using the configured Google Lens, Google Vision, SerpApi, or Serper providers. Image bytes are not stored in the report.'}
                         </span>
                       </div>
                     </label>
-                    <label className="p-3.5 bg-cyan-500/5 border border-cyan-500/30 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-cyan-400/60 sm:col-span-2">
-                      <input
-                        type="checkbox"
-                        checked={optExternalTranscriptSearch}
-                        onChange={(e) => setOptExternalTranscriptSearch(e.target.checked)}
-                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-semibold text-white block">Use transcript excerpts to find the original news</span>
-                        <span className="text-slate-400 text-[11px] leading-relaxed block mt-0.5">
-                          With your permission, DeepTrust may send up to three short, distinctive spoken phrases and high-confidence public-figure names—not the full transcript, audio, or video—to the configured Serper search provider. The phrases and returned source links are recorded in the report for transparency.
-                        </span>
-                      </div>
-                    </label>
+                    {selectedCard === 'VIDEO' && (
+                      <label className="p-3.5 bg-[#E4EFE7]/30 border border-[#C6DFCF] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-[#3E7A55] sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={optExternalTranscriptSearch}
+                          onChange={(e) => setOptExternalTranscriptSearch(e.target.checked)}
+                          className="mt-0.5 rounded border-[#AAAAAA] bg-white text-[#3E7A55] focus:ring-0"
+                        />
+                        <div>
+                          <span className="font-semibold text-[#0B5CD5] block">Use transcript excerpts to find the original news</span>
+                          <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
+                            With your permission, DeepTrust may send up to three short, distinctive spoken phrases and high-confidence public-figure names—not the full transcript, audio, or video—to the configured Serper search provider. The phrases and returned source links are recorded in the report for transparency.
+                          </span>
+                        </div>
+                      </label>
+                    )}
                   </>
                 )}
 
                 {/* Module 2: Provenance */}
-                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-[#D97757]">
                   <input
                     type="checkbox"
                     checked={optTraceProvenance}
                     onChange={(e) => setOptTraceProvenance(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                    className="mt-0.5 rounded border-[#AAAAAA] bg-white text-[#D97757] focus:ring-0"
                   />
                   <div>
-                    <span className="font-semibold text-white block">Trace first appearance</span>
-                    <span className="text-slate-400 text-[11px]">Maps earliest telegram/web propagation timeline</span>
+                    <span className="font-semibold text-[#0B5CD5] block">Trace first appearance</span>
+                    <span className="text-[#7386A8] text-[11px]">Maps earliest telegram/web propagation timeline</span>
                   </div>
                 </label>
 
                 {/* Module 3: Detect Public Figures */}
-                <label className="p-3.5 bg-[#070b14] border border-[#17233f] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-slate-700">
+                <label className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl flex items-start gap-3 cursor-pointer hover:border-[#D97757]">
                   <input
                     type="checkbox"
                     checked={optDetectEntities}
                     onChange={(e) => setOptDetectEntities(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                    className="mt-0.5 rounded border-[#AAAAAA] bg-white text-[#D97757] focus:ring-0"
                   />
                   <div>
-                    <span className="font-semibold text-white block">Detect public figures &amp; entities</span>
-                    <span className="text-slate-400 text-[11px]">NER extraction and official statement reconciliation</span>
-                  </div>
-                </label>
-
-                {/* Module 4: Deep Archive (Coming Soon) */}
-                <label className="p-3.5 bg-[#070b14]/40 border border-[#17233f]/60 rounded-2xl flex items-start gap-3 opacity-60 cursor-not-allowed">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={optDeepArchive}
-                    className="mt-0.5 rounded border-slate-800 bg-slate-900 text-slate-600"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-300">Deep historical archive search</span>
-                      <span className="px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9px] font-mono">Phase 2</span>
-                    </div>
-                    <span className="text-slate-500 text-[11px]">Indexed gazette &amp; registrar repositories (2000–2020)</span>
+                    <span className="font-semibold text-[#0B5CD5] block">Detect public figures &amp; entities</span>
+                    <span className="text-[#7386A8] text-[11px]">NER extraction and official statement reconciliation</span>
                   </div>
                 </label>
               </div>
@@ -1037,7 +1023,7 @@ export default function NewAnalysisPage() {
             {/* Launch CTA */}
             <button
               onClick={handleLaunchVerification}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-indigo-600/30 transition flex items-center justify-center gap-2 group"
+              className="w-full py-4 bg-[#D97757] hover:bg-[#B0512F] text-white font-extrabold rounded-2xl text-sm shadow-xl shadow-[#D97757]/25 transition flex items-center justify-center gap-2 group"
             >
               <Zap className="w-4 h-4 fill-white" />
               <span>Launch 4-Agent Verification Pipeline</span>
@@ -1052,47 +1038,47 @@ export default function NewAnalysisPage() {
           <div className="space-y-6 animate-fadeIn">
             
             {/* Top Running Banner */}
-            <div className="p-6 sm:p-8 bg-[#0b1329] border border-[#17233f] rounded-3xl space-y-4 shadow-2xl relative overflow-hidden">
+            <div className="p-6 sm:p-8 bg-[#000D59] border border-[rgba(240,237,233,0.16)] rounded-3xl space-y-4 shadow-xl relative overflow-hidden text-[#EDE7DC]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">
+                    <span className="w-2 h-2 rounded-full bg-[#3E7A55] animate-ping" />
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E88F6B]">
                       Running Multi-Agent Rail
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">
+                  <h2 className="text-xl sm:text-2xl font-bold text-[#F0EDE9]">
                     Verifying Subject Matter...
                   </h2>
-                  <p className="text-xs text-slate-300 font-mono max-w-xl truncate">
+                  <p className="text-xs text-[#A7B0D4] font-mono max-w-xl truncate">
                     {currentStep}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4 flex-shrink-0 self-end sm:self-center">
                   <div className="text-right font-mono">
-                    <span className="text-2xl font-bold text-white block">{elapsedSeconds}s</span>
-                    <span className="text-[10px] text-slate-400 uppercase">Execution Time</span>
+                    <span className="text-2xl font-bold text-[#F0EDE9] block">{elapsedSeconds}s</span>
+                    <span className="text-[10px] text-[#A7B0D4] uppercase">Execution Time</span>
                   </div>
                   <div className="w-14 h-14 relative flex items-center justify-center">
-                    <div className="w-full h-full rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin" />
-                    <span className="absolute font-mono font-bold text-xs text-white">{progress}%</span>
+                    <div className="w-full h-full rounded-full border-4 border-[rgba(240,237,233,0.2)] border-t-[#D97757] animate-spin" />
+                    <span className="absolute font-mono font-bold text-xs text-[#F0EDE9]">{progress}%</span>
                   </div>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full h-2 bg-[#070b14] rounded-full overflow-hidden relative z-10">
+              <div className="w-full h-2 bg-[#031246] rounded-full overflow-hidden relative z-10">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-[#0033C4] to-[#D97757] transition-all duration-500"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             {/* Vertical Timeline of Stages */}
-            <div className="p-6 bg-[#0c1427] border border-[#17233f] rounded-3xl space-y-6 shadow-xl">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0B5CD5] font-mono">
                 Pipeline Stage Execution
               </h3>
 
@@ -1104,38 +1090,38 @@ export default function NewAnalysisPage() {
                       key={stage.id}
                       className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
                         status === 'ACTIVE'
-                          ? 'bg-[#131f38] border-indigo-500 shadow-md ring-1 ring-indigo-500/20'
+                          ? 'bg-[#FFF6E3] border-[#D97757] shadow-sm ring-1 ring-[#D97757]/30'
                           : status === 'COMPLETED'
-                          ? 'bg-[#070b14]/80 border-[#17233f]'
-                          : 'bg-[#070b14]/30 border-[#17233f]/50 opacity-40'
+                          ? 'bg-[#F8F8F6] border-[#CECECE]'
+                          : 'bg-[#F8F8F6]/40 border-[#CECECE]/50 opacity-50'
                       }`}
                     >
                       <div className="flex items-start gap-3.5">
                         <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold font-mono flex-shrink-0 mt-0.5 ${
-                          status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                          status === 'ACTIVE' ? 'bg-indigo-600 text-white animate-pulse' :
-                          'bg-slate-800 text-slate-500'
+                          status === 'COMPLETED' ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF]' :
+                          status === 'ACTIVE' ? 'bg-[#D97757] text-white animate-pulse' :
+                          'bg-[#EFEEE9] text-[#7386A8]'
                         }`}>
                           {status === 'COMPLETED' ? <Check className="w-4 h-4 stroke-[3]" /> : `0${idx + 1}`}
                         </div>
 
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-white">{stage.label}</h4>
+                            <h4 className="font-bold text-sm text-[#0B5CD5]">{stage.label}</h4>
                             {status === 'ACTIVE' && (
-                              <span className="px-2 py-0.2 bg-indigo-500/20 text-indigo-300 rounded font-mono text-[9px] font-bold uppercase">
+                              <span className="px-2 py-0.2 bg-[#F6E7DF] text-[#B0512F] rounded font-mono text-[9px] font-bold uppercase">
                                 In Progress
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">{stage.desc}</p>
+                          <p className="text-xs text-[#2C4E86] mt-0.5">{stage.desc}</p>
                         </div>
                       </div>
 
                       <div className="flex-shrink-0 font-mono text-[11px]">
-                        {status === 'COMPLETED' && <span className="text-emerald-400 font-bold">Passed</span>}
-                        {status === 'ACTIVE' && <span className="text-blue-400 font-bold">Executing...</span>}
-                        {status === 'PENDING' && <span className="text-slate-600">Pending</span>}
+                        {status === 'COMPLETED' && <span className="text-[#3E7A55] font-bold">Passed</span>}
+                        {status === 'ACTIVE' && <span className="text-[#D97757] font-bold">Executing...</span>}
+                        {status === 'PENDING' && <span className="text-[#7386A8]">Pending</span>}
                       </div>
                     </div>
                   );

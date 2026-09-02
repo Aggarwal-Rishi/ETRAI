@@ -256,44 +256,44 @@ export default function Navbar() {
                     setIsNotifOpen(!isNotifOpen);
                     setIsUserMenuOpen(false);
                   }}
-                  className="w-11 h-11 inline-flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition relative"
+                  className="w-11 h-11 inline-flex items-center justify-center rounded-xl text-[#A7B0D4] hover:text-white hover:bg-[rgba(240,237,233,0.10)] transition relative"
                   title="Notifications & Activity"
                 >
                   <Bell className="w-4 h-4" />
                   {navStats.notifications.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full ring-2 ring-[#070b14]" />
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-[#D97757] rounded-full ring-2 ring-[#000D59]" />
                   )}
                 </button>
 
                 {/* Notifications Flyout */}
                 {isNotifOpen && (
-                  <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-3 z-50 animate-scaleUp text-xs text-slate-200">
-                    <div className="flex items-center justify-between px-4 pb-2 border-b border-[#17233f]">
-                      <span className="font-bold text-white uppercase font-mono text-[11px]">Recent Activity</span>
-                      <span className="text-[10px] text-slate-400 font-mono">Live Database</span>
+                  <div className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white border border-[#CECECE] rounded-2xl shadow-2xl py-3 z-50 animate-scaleUp text-xs text-[#2C4E86]">
+                    <div className="flex items-center justify-between px-4 pb-2 border-b border-[#CECECE]">
+                      <span className="font-bold text-[#0B5CD5] uppercase font-mono text-[11px]">Recent Activity</span>
+                      <span className="text-[10px] text-[#7386A8] font-mono">Live Database</span>
                     </div>
 
-                    <div className="max-h-64 overflow-y-auto divide-y divide-[#17233f]/60 custom-scrollbar">
+                    <div className="max-h-64 overflow-y-auto divide-y divide-[#CECECE]/60 custom-scrollbar">
                       {navStats.notifications.length > 0 ? (
                         navStats.notifications.map((n) => (
                           <div
                             key={n.id}
-                            className="p-3 hover:bg-[#101a33] transition flex items-start gap-2.5 cursor-pointer"
+                            className="p-3 hover:bg-[#F8F8F6] transition flex items-start gap-2.5 cursor-pointer"
                             onClick={() => {
                               setIsNotifOpen(false);
                               if (n.reportId) navigate(`/results/${n.reportId}`);
                             }}
                           >
-                            <span className="w-2 h-2 rounded-full bg-blue-400 mt-1 flex-shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-[#D97757] mt-1 flex-shrink-0" />
                             <div className="space-y-0.5 min-w-0">
-                              <p className="font-medium text-white truncate">{n.title}</p>
-                              <p className="text-[11px] text-slate-400 line-clamp-2">{n.message}</p>
-                              <span className="text-[10px] text-slate-500 font-mono block">{n.time}</span>
+                              <p className="font-bold text-[#0B5CD5] truncate">{n.title}</p>
+                              <p className="text-[11px] text-[#7386A8] line-clamp-2">{n.message}</p>
+                              <span className="text-[10px] text-[#7386A8] font-mono block">{n.time}</span>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="py-6 px-4 text-center text-slate-400 text-xs">
+                        <div className="py-6 px-4 text-center text-[#7386A8] text-xs">
                           No recent system alerts
                         </div>
                       )}
@@ -309,49 +309,49 @@ export default function Navbar() {
                     setIsUserMenuOpen(!isUserMenuOpen);
                     setIsNotifOpen(false);
                   }}
-                  className="min-h-11 flex items-center gap-2 p-1 pl-2 rounded-xl hover:bg-slate-800/50 transition border border-transparent hover:border-[#17233f]"
+                  className="min-h-11 flex items-center gap-2 p-1 pl-2 rounded-xl hover:bg-[rgba(240,237,233,0.10)] transition border border-transparent"
                   aria-label="User account menu"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#0033C4] to-[#D97757] flex items-center justify-center text-xs font-bold text-white shadow-sm">
                     {getInitials(user?.fullName, user?.email)}
                   </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-[#A7B0D4]" />
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] bg-[#0c1427] border border-[#17233f] rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
+                  <div className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] bg-white border border-[#CECECE] rounded-2xl shadow-2xl py-2 z-50 animate-scaleUp text-xs">
                     
                     {/* User Profile Header */}
-                    <div className="px-4 py-2.5 border-b border-[#17233f] flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-xs font-bold text-white">
+                    <div className="px-4 py-2.5 border-b border-[#CECECE] flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0033C4] to-[#D97757] flex items-center justify-center text-xs font-bold text-white">
                         {getInitials(user?.fullName, user?.email)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="font-bold text-white block truncate">{user?.fullName || 'Active Analyst'}</span>
-                        <span className="text-[11px] text-slate-400 block truncate">{user?.email || 'rishiaggarwal7862@gmail.com'}</span>
+                        <span className="font-bold text-[#0B5CD5] block truncate">{user?.fullName || 'Active Analyst'}</span>
+                        <span className="text-[11px] text-[#7386A8] block truncate">{user?.email || 'rishiaggarwal7862@gmail.com'}</span>
                       </div>
                     </div>
 
                     {/* Real Usage Meter Card */}
-                    <div className="p-3 m-2 bg-[#070b14] border border-[#17233f] rounded-xl space-y-1.5">
+                    <div className="p-3 m-2 bg-[#F8F8F6] border border-[#CECECE] rounded-xl space-y-1.5">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-slate-400 uppercase font-mono font-semibold">
+                        <span className="text-[#7386A8] uppercase font-mono font-semibold">
                           {navStats.usage.plan} Quota
                         </span>
-                        <span className="font-mono text-blue-400 font-bold">
+                        <span className="font-mono text-[#0B5CD5] font-bold">
                           {navStats.usage.used} / {navStats.usage.limit}
                         </span>
                       </div>
                       
                       {/* Proportional Usage Progress Bar */}
-                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-[#EFEEE9] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+                          className="h-full bg-gradient-to-r from-[#0033C4] to-[#D97757] transition-all duration-500"
                           style={{ width: `${usagePercent}%` }}
                         />
                       </div>
                       
-                      <div className="flex justify-between items-center text-[10px] text-slate-500">
+                      <div className="flex justify-between items-center text-[10px] text-[#7386A8]">
                         <span>{usagePercent}% utilized</span>
                         <span>Resets {navStats.usage.resetDate}</span>
                       </div>
@@ -364,52 +364,52 @@ export default function Navbar() {
                           setIsUserMenuOpen(false);
                           setIsSearchOpen(true);
                         }}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-[#101a33] flex items-center justify-between"
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center justify-between"
                       >
-                        <span className="flex items-center gap-2"><Search className="w-3.5 h-3.5 text-blue-400" /> Search Command</span>
-                        <span className="font-mono text-[10px] text-slate-500">{shortcutKey}</span>
+                        <span className="flex items-center gap-2"><Search className="w-3.5 h-3.5 text-[#0B5CD5]" /> Search Command</span>
+                        <span className="font-mono text-[10px] text-[#7386A8]">{shortcutKey}</span>
                       </button>
                       <Link
                         to="/billing"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-[#101a33] flex items-center gap-2 block"
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center gap-2 block"
                       >
-                        <CreditCard className="w-3.5 h-3.5 text-indigo-400" /> My Subscription
+                        <CreditCard className="w-3.5 h-3.5 text-[#D97757]" /> My Subscription
                       </Link>
                       <Link
                         to="/billing"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-amber-400 hover:bg-[#101a33] flex items-center gap-2 block font-medium"
+                        className="w-full text-left px-4 py-2 text-[#B98520] hover:bg-[#F8F8F6] flex items-center gap-2 block font-medium"
                       >
                         <Gem className="w-3.5 h-3.5" /> Upgrade Plan
                       </Link>
                       <Link
                         to="/settings"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-[#101a33] flex items-center gap-2 block"
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center gap-2 block"
                       >
-                        <Settings className="w-3.5 h-3.5 text-indigo-400" /> My Account &amp; Beats
+                        <Settings className="w-3.5 h-3.5 text-[#D97757]" /> My Account &amp; Beats
                       </Link>
                       <Link
                         to="/workspace"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-[#101a33] flex items-center gap-2 block"
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center gap-2 block"
                       >
-                        <Users className="w-3.5 h-3.5 text-indigo-400" /> My Team &amp; Seats
+                        <Users className="w-3.5 h-3.5 text-[#D97757]" /> My Team &amp; Seats
                       </Link>
                       <Link
                         to="/settings?tab=algo"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="w-full text-left px-4 py-2 text-slate-300 hover:text-white hover:bg-[#101a33] flex items-center gap-2 block"
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center gap-2 block"
                       >
-                        <Sliders className="w-3.5 h-3.5 text-indigo-400" /> Scoring Algorithm
+                        <Sliders className="w-3.5 h-3.5 text-[#D97757]" /> Scoring Algorithm
                       </Link>
                     </div>
 
-                    <div className="pt-1 border-t border-[#17233f]">
+                    <div className="pt-1 border-t border-[#CECECE]">
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-[#B23F35] hover:bg-[#F7E3E0] flex items-center gap-2 font-semibold"
                       >
                         <LogOut className="w-3.5 h-3.5" /> Sign Out
                       </button>
@@ -423,7 +423,7 @@ export default function Navbar() {
 
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div id="app-mobile-navigation" className="md:hidden max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[#17233f] bg-[#070b14] px-4 py-4 space-y-2 animate-fadeIn">
+          <div id="app-mobile-navigation" className="md:hidden max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[rgba(240,237,233,0.16)] bg-[#000D59] px-4 py-4 space-y-2 animate-fadeIn">
             {navLinks.map((item) => {
               const active = isActive(item.to);
               const Icon = item.icon;
@@ -433,7 +433,7 @@ export default function Navbar() {
                   to={item.to}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`min-h-11 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition ${
-                    active ? 'bg-[#131f38] text-white font-bold border border-blue-900/50' : 'text-slate-400 hover:text-white'
+                    active ? 'bg-[rgba(240,237,233,0.15)] text-white font-bold border border-[rgba(240,237,233,0.26)]' : 'text-[#A7B0D4] hover:text-white'
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
@@ -441,7 +441,7 @@ export default function Navbar() {
                     {item.label}
                   </span>
                   {item.badge && (
-                    <span className="px-1.5 py-0.2 bg-rose-600 text-white rounded-full text-[10px] font-mono font-bold">
+                    <span className="px-1.5 py-0.2 bg-[#B23F35] text-white rounded-full text-[10px] font-mono font-bold">
                       {item.badge}
                     </span>
                   )}
@@ -449,11 +449,11 @@ export default function Navbar() {
               );
             })}
 
-            <div className="pt-2 border-t border-[#17233f] flex flex-col gap-2">
+            <div className="pt-2 border-t border-[rgba(240,237,233,0.16)] flex flex-col gap-2">
               <Link
                 to="/analysis"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full min-h-11 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
+                className="w-full min-h-11 py-2.5 bg-[#0033C4] hover:bg-[#0A45E4] text-white rounded-xl text-xs font-bold text-center flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Analysis</span>
@@ -461,7 +461,7 @@ export default function Navbar() {
               <Link
                 to="/billing"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full min-h-11 py-2 bg-[#0c1427] border border-amber-500/40 text-amber-400 rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
+                className="w-full min-h-11 py-2 bg-[rgba(242,196,107,0.14)] border border-[rgba(242,196,107,0.42)] text-[#F2C46B] rounded-xl text-xs font-semibold text-center flex items-center justify-center gap-1.5"
               >
                 <Gem className="w-3.5 h-3.5" />
                 <span>Upgrade Plan</span>

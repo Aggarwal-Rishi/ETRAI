@@ -143,15 +143,15 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center pt-20 p-4 animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center pt-20 p-4 animate-fadeIn"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-scaleUp"
+        className="w-full max-w-2xl bg-white border border-[#CECECE] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-scaleUp"
       >
         {/* Search Input */}
-        <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950">
-          <Search className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+        <div className="p-4 border-b border-[#CECECE] flex items-center gap-3 bg-[#F8F8F6]">
+          <Search className="w-5 h-5 text-[#D97757] flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -162,17 +162,17 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none font-medium"
+            className="flex-1 bg-transparent text-sm text-[#0B5CD5] placeholder-[#7386A8] focus:outline-none font-medium"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+              className="p-1 hover:bg-[#EFEEE9] rounded-lg text-[#7386A8] hover:text-[#0B5CD5]"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-          <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 rounded text-[10px] font-mono">
+          <kbd className="px-2 py-0.5 bg-[#EFEEE9] border border-[#CECECE] text-[#7386A8] rounded text-[10px] font-mono">
             ESC
           </kbd>
         </div>
@@ -180,8 +180,8 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
         {/* Results List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar text-xs">
           {loading ? (
-            <div className="p-8 text-center text-slate-400 font-mono flex items-center justify-center gap-2">
-              <Search className="w-4 h-4 animate-spin text-[#E88F6B]" />
+            <div className="p-8 text-center text-[#7386A8] font-mono flex items-center justify-center gap-2">
+              <Search className="w-4 h-4 animate-spin text-[#D97757]" />
               <span>Searching real database indices...</span>
             </div>
           ) : allItems.length > 0 ? (
@@ -195,17 +195,17 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={`p-3 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition ${
                     isSelected
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'hover:bg-slate-850 text-slate-300'
+                      ? 'bg-[#D97757] text-white shadow-md'
+                      : 'hover:bg-[#F8F8F6] text-[#2C4E86]'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`p-2 rounded-xl flex-shrink-0 ${isSelected ? 'bg-white/20' : 'bg-slate-800 text-slate-400'}`}>
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${isSelected ? 'bg-white/20' : 'bg-[#EFEEE9] text-[#0B5CD5]'}`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <span className="font-bold block truncate text-xs">{highlightMatch(item.t)}</span>
-                      <span className={`text-[11px] block truncate ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                      <span className={`text-[11px] block truncate ${isSelected ? 'text-white/90' : 'text-[#7386A8]'}`}>
                         {item.m}
                       </span>
                     </div>
@@ -214,15 +214,15 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {item.score !== undefined && (
                       <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[10px] ${
-                        item.score >= 75 ? 'bg-emerald-500/20 text-emerald-300' :
-                        item.score >= 40 ? 'bg-amber-500/20 text-amber-300' :
-                        'bg-rose-500/20 text-rose-300'
+                        item.score >= 75 ? 'bg-[#E4EFE7] text-[#2C5B3E]' :
+                        item.score >= 40 ? 'bg-[#F7EEDA] text-[#B98520]' :
+                        'bg-[#F7E3E0] text-[#B23F35]'
                       }`}>
                         {item.score}/100
                       </span>
                     )}
                     <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-950 text-slate-400'
+                      isSelected ? 'bg-white/20 text-white' : 'bg-[#EFEEE9] text-[#7386A8]'
                     }`}>
                       {item.group}
                     </span>
@@ -232,14 +232,14 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
               );
             })
           ) : (
-            <div className="p-8 text-center text-slate-500 text-xs">
+            <div className="p-8 text-center text-[#7386A8] text-xs">
               No matching records found across your active database.
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+        <div className="p-3 border-t border-[#CECECE] bg-[#F8F8F6] flex items-center justify-between text-[11px] text-[#7386A8] font-mono">
           <span>Navigate with ↑ ↓ · Select with ↵</span>
           <span>Global Search Engine</span>
         </div>

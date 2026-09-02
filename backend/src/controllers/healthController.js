@@ -8,8 +8,25 @@ const os = require('os');
 const { checkDatabaseHealth } = require('../utils/prisma');
 const { getProviderStatus } = require('../services/providerManager');
 const { activeJobs } = require('../services/sseManager');
+const { config } = require('../config/env');
 
 const startTime = Date.now();
+
+function buildProviderReadiness(providers = {}) {
+  const geminiConfigured = providers.gemini === 'AVAILABLE';
+  const serperConfigured = providers.webSearch === 'AVAILABLE';
+  return {
+    geminiProvider: {
+      configured: geminiConfigured,
+      model: config.gemini.model,
+      status: geminiConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'
+    },
+    serperProvider: {
+      configured: serperConfigured,
+      status: serperConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'
+    }
+  };
+}
 
 /**
  * Liveness Probe: GET /api/v1/health
@@ -43,6 +60,7 @@ const getHealthStatus = (req, res) => {
 const getReadinessStatus = async (req, res) => {
   const dbHealth = await checkDatabaseHealth();
   const providers = getProviderStatus();
+  const providerReadiness = buildProviderReadiness(providers);
 
   const isReady = dbHealth.healthy;
   const statusCode = isReady ? 200 : 503;
@@ -57,15 +75,7 @@ const getReadinessStatus = async (req, res) => {
         latencyMs: dbHealth.latencyMs,
         message: dbHealth.message
       },
-      geminiProvider: {
-        configured: providers.geminiConfigured,
-        model: providers.geminiModel,
-        status: providers.geminiConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'
-      },
-      serperProvider: {
-        configured: providers.serperConfigured,
-        status: providers.serperConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'
-      },
+      ...providerReadiness,
       concurrency: {
         activeJobsCount: activeJobs ? activeJobs.size : 0
       }
@@ -75,5 +85,6 @@ const getReadinessStatus = async (req, res) => {
 
 module.exports = {
   getHealthStatus,
-  getReadinessStatus
+  getReadinessStatus,
+  buildProviderReadiness
 };

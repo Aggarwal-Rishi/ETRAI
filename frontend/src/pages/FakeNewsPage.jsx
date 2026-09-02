@@ -87,13 +87,13 @@ export default function FakeNewsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-rose-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -103,11 +103,11 @@ export default function FakeNewsPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-              <ShieldAlert className="w-6 h-6 text-rose-500" />
+            <h1 className="text-2xl font-bold text-[#0B5CD5] flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-[#B23F35]" />
               Fake News Desk
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
               Live repository of debunked, fabricated, and low-trust stories scored below 40.
             </p>
           </div>
@@ -115,14 +115,14 @@ export default function FakeNewsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => showToast('Daily digest preference saved — you will receive the 8:00 AM briefing via email')}
-              className="px-3.5 py-2 text-xs font-medium bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl transition flex items-center gap-2"
+              className="px-3.5 py-2 text-xs font-medium bg-white hover:bg-[#F8F8F6] border border-[#CECECE] text-[#0B5CD5] rounded-xl transition flex items-center gap-2 shadow-xs"
             >
-              <Mail className="w-3.5 h-3.5 text-[#E88F6B]" />
+              <Mail className="w-3.5 h-3.5 text-[#D97757]" />
               <span>Daily 8am Digest</span>
             </button>
             <button
               onClick={() => setIsFetchModalOpen(true)}
-              className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-[#D97757] hover:from-rose-500 hover:to-[#B0512F] rounded-xl shadow-lg shadow-rose-500/20 transition flex items-center gap-2"
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#D97757] hover:bg-[#B0512F] rounded-xl shadow-md transition flex items-center gap-2"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Fetch News</span>
@@ -131,24 +131,24 @@ export default function FakeNewsPage() {
         </div>
 
         {/* Active Narrative Cluster Warning Banner */}
-        <div className="p-5 bg-rose-950/40 border border-rose-500/40 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl shadow-rose-950/20">
+        <div className="p-5 bg-white border border-[#B23F35]/40 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start sm:items-center gap-3.5">
-            <div className="p-2.5 bg-rose-500/20 border border-rose-500/30 rounded-2xl text-rose-400 flex-shrink-0">
+            <div className="p-2.5 bg-[#F7E3E0] border border-[#EBC7C2] rounded-2xl text-[#B23F35] flex-shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 bg-rose-500 text-white rounded text-[10px] font-mono font-bold">
+                <span className="px-2 py-0.5 bg-[#B23F35] text-white rounded text-[10px] font-mono font-bold">
                   ACTIVE NARRATIVE CLUSTER
                 </span>
-                <span className="font-bold text-white text-sm">
+                <span className="font-bold text-[#0B5CD5] text-sm">
                   {leadCluster?.topic || leadCluster?.narrativeSummary || 'Currency & Banking Withdrawal Rumour'}
                 </span>
-                <span className="px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded text-[9.5px] font-mono">
+                <span className="px-1.5 py-0.2 bg-[#EFEEE9] text-[#7386A8] rounded text-[9.5px] font-mono">
                   Preliminary Grouping
                 </span>
               </div>
-              <p className="text-xs text-rose-200/80 mt-1">
+              <p className="text-xs text-[#2C4E86] mt-1">
                 {leadCluster?.description || 'Multiple circulating forwards and manipulated screenshots tracing back to unverified viral broadcasts.'}
               </p>
             </div>
@@ -162,7 +162,7 @@ export default function FakeNewsPage() {
                 navigate(`/results/${filteredFeed[0].id}`);
               }
             }}
-            className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl shadow-md shadow-rose-600/30 transition flex items-center gap-1.5 flex-shrink-0 self-end sm:self-auto"
+            className="px-4 py-2 text-xs font-bold text-white bg-[#B23F35] hover:bg-[#8E2F27] rounded-xl shadow-md shadow-[#B23F35]/20 transition flex items-center gap-1.5 flex-shrink-0 self-end sm:self-auto"
           >
             <span>Open Lead Dossier</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -170,15 +170,15 @@ export default function FakeNewsPage() {
         </div>
 
         {/* Filter Control Bar */}
-        <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl flex flex-wrap items-center gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-400 font-medium">
+        <div className="p-3.5 bg-white border border-[#CECECE] rounded-2xl flex flex-wrap items-center gap-3 text-xs shadow-sm">
+          <div className="flex items-center gap-2 text-[#2C4E86] font-medium">
             <Filter className="w-3.5 h-3.5" /> Filters:
           </div>
 
           <select
             value={selectedCat}
             onChange={(e) => setSelectedCat(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-rose-500"
+            className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
           >
             {categories.map(c => (
               <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>
@@ -188,7 +188,7 @@ export default function FakeNewsPage() {
           <select
             value={selectedSrc}
             onChange={(e) => setSelectedSrc(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-rose-500"
+            className="px-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
           >
             {sources.map(s => (
               <option key={s} value={s}>{s === 'All' ? 'All Sources' : s}</option>
@@ -196,13 +196,13 @@ export default function FakeNewsPage() {
           </select>
 
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-[#7386A8] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search debunked headlines or narrative keywords..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-rose-500"
+              className="w-full pl-9 pr-3 py-1.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
             />
           </div>
 
@@ -213,13 +213,13 @@ export default function FakeNewsPage() {
                 setSelectedSrc('All');
                 setSearchQuery('');
               }}
-              className="text-slate-400 hover:text-white font-medium"
+              className="text-[#7386A8] hover:text-[#0B5CD5] font-medium"
             >
               Clear
             </button>
           )}
 
-          <span className="text-slate-500 font-mono text-[11px] ml-auto">
+          <span className="text-[#7386A8] font-mono text-[11px] ml-auto">
             {filteredFeed.length} debunked stories
           </span>
         </div>
@@ -227,8 +227,8 @@ export default function FakeNewsPage() {
         {/* Low-Trust Stories Feed */}
         <div className="space-y-3">
           {loading ? (
-            <div className="py-16 text-center text-xs text-slate-400 font-mono flex items-center justify-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin text-rose-400" />
+            <div className="py-16 text-center text-xs text-[#7386A8] font-mono flex items-center justify-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-[#B23F35]" />
               <span>Querying verified low-trust records...</span>
             </div>
           ) : filteredFeed.length > 0 ? (
@@ -238,27 +238,27 @@ export default function FakeNewsPage() {
                 <div
                   key={item.id || idx}
                   onClick={() => navigate(`/results/${item.id}`)}
-                  className="p-4 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-rose-500/40 rounded-2xl cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  className="p-4 bg-white hover:bg-[#F8F8F6] border border-[#CECECE] hover:border-[#B23F35] rounded-2xl cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 group shadow-sm"
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
-                      <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded font-mono font-bold text-[10px]">
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-[#7386A8]">
+                      <span className="px-2 py-0.5 bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2] rounded font-mono font-bold text-[10px]">
                         FLAGGED FAKE
                       </span>
-                      <span className="font-semibold text-slate-200">{item.source || item.s || 'Unverified Source'}</span>
+                      <span className="font-semibold text-[#0B5CD5]">{item.source || item.s || 'Unverified Source'}</span>
                       <span>·</span>
-                      <span className="text-slate-500">{item.publishedAt || item.tm || 'Debunked'}</span>
+                      <span className="text-[#7386A8]">{item.publishedAt || item.tm || 'Debunked'}</span>
                       <span>·</span>
-                      <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">
+                      <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-mono text-[10px]">
                         {item.category || item.cat || 'General'}
                       </span>
                       {item.cluster && (
-                        <span className="text-indigo-400 font-mono text-[11px]">
+                        <span className="text-[#D97757] font-mono text-[11px]">
                           Cluster: {item.cluster}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-sm font-semibold text-white group-hover:text-rose-300 transition line-clamp-2">
+                    <h3 className="text-sm font-semibold text-[#0B5CD5] group-hover:text-[#B23F35] transition line-clamp-2">
                       {item.title || item.t}
                     </h3>
                   </div>
@@ -266,20 +266,20 @@ export default function FakeNewsPage() {
                   <div className="flex items-center gap-4 flex-shrink-0 self-end sm:self-center">
                     <VerdictBadge status="fake" size="sm" />
                     <div className="text-right">
-                      <span className="font-mono text-base font-bold text-rose-400 block">
+                      <span className="font-mono text-base font-bold text-[#B23F35] block">
                         {score}
                       </span>
-                      <span className="text-[9px] uppercase font-mono text-slate-500">Trust / 100</span>
+                      <span className="text-[9px] uppercase font-mono text-[#7386A8]">Trust / 100</span>
                     </div>
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="py-16 text-center bg-slate-900/40 rounded-3xl border border-dashed border-slate-800 text-xs text-slate-400 space-y-2">
-              <ShieldAlert className="w-6 h-6 text-rose-500 mx-auto" />
-              <p className="font-bold text-white text-sm">No flagged stories below 40 matching filter</p>
-              <p className="text-slate-400 max-w-sm mx-auto">
+            <div className="py-16 text-center bg-white rounded-3xl border border-dashed border-[#CECECE] text-xs text-[#7386A8] space-y-2 shadow-sm">
+              <ShieldAlert className="w-6 h-6 text-[#B23F35] mx-auto" />
+              <p className="font-bold text-[#0B5CD5] text-sm">No flagged stories below 40 matching filter</p>
+              <p className="text-[#2C4E86] max-w-sm mx-auto">
                 All claims in your database currently meet or exceed minimum verification thresholds.
               </p>
             </div>

@@ -10,6 +10,10 @@ const { getProviderStatus } = require('./providerManager');
 const { incrementVerificationUsage } = require('./subscriptionBillingService');
 const { operationalIntelligence } = require('./operationalIntelligenceService');
 const { compactReportMediaPayload } = require('../utils/reportMediaPayload');
+const {
+  performEntityAndIntentAnalysis,
+  extractVisualEntityCandidates
+} = require('./entityIntentService');
 
 const MIN_JOB_TIMEOUT_MS = 60 * 1000;
 const MAX_JOB_TIMEOUT_MS = 30 * 60 * 1000;
@@ -328,9 +332,16 @@ async function runVerificationPipeline({
     // Article-Level Deep Research & Related News Search
     // ----------------------------------------------------
     const { performArticleDeepResearch } = require('./articleResearch');
-    const mediaTopicStr = isMediaJob 
+    const visualEntityNames = isMediaJob && allowExternalVisualSearch === true
+      ? extractVisualEntityCandidates(mediaAnalysis)
+        .filter(entity => entity.prominent)
+        .slice(0, 5)
+        .map(entity => entity.normalizedName || entity.name)
+      : [];
+    const mediaTopicBase = isMediaJob
       ? (hasAttachedNews ? text.trim().substring(0, 100) : (mediaAnalysis?.visualDescription || mediaAnalysis?.ocrText || mediaAnalysis?.transcript || contentRes.sourceTitle))
       : contentRes.sourceTitle;
+    const mediaTopicStr = [mediaTopicBase, ...visualEntityNames].filter(Boolean).join(' ').slice(0, 500);
 
     sseManager.emitProgress(jobId, {
       status: 'PROCESSING',
@@ -341,7 +352,10 @@ async function runVerificationPipeline({
       stage: 'ARTICLE_DEEP_RESEARCH'
     });
 
-    const firstArticleCtx = claims[0]?.articleContext || { mainTopic: mediaTopicStr };
+    const firstArticleCtx = {
+      ...(claims[0]?.articleContext || {}),
+      mainTopic: [claims[0]?.articleContext?.mainTopic || mediaTopicBase, ...visualEntityNames].filter(Boolean).join(' ').slice(0, 500)
+    };
     const articleResearchContext = observationOnlyImage
       ? buildImageSourceResearchContext(mediaAnalysis, mediaTopicStr)
       : await performArticleDeepResearch(firstArticleCtx, claims);
@@ -405,15 +419,29 @@ async function runVerificationPipeline({
     });
 
     // Perform Entity, Attribution & Framing Analysis
-    const { performEntityAndIntentAnalysis } = require('./entityIntentService');
     const allDiscoveredSources = [];
     (verifiedClaims || []).forEach(c => {
       if (Array.isArray(c.sources)) c.sources.forEach(s => allDiscoveredSources.push(s));
     });
+    const entityAnalysisText = [
+      contentRes.extractedText,
+      mediaAnalysis?.transcript,
+      mediaAnalysis?.translatedTranscript,
+      mediaAnalysis?.ocrText,
+      mediaAnalysis?.visualDescription,
+      text
+    ].filter(Boolean).join('\n').slice(0, 12000);
     const entityIntentRes = detectEntities
       ? await performEntityAndIntentAnalysis(
-        contentRes.extractedText || mediaAnalysis?.transcript || '',
-        { claims: verifiedClaims, sources: allDiscoveredSources }
+        entityAnalysisText,
+        {
+          claims: verifiedClaims,
+          sources: allDiscoveredSources,
+          mediaAnalysis,
+          inputType,
+          userClaim: text || '',
+          allowExternalEntitySearch: allowExternalVisualSearch === true
+        }
       )
       : {
         entities: [],
@@ -421,6 +449,17 @@ async function runVerificationPipeline({
         quotes: [],
         entityClaimConnections: [],
         entityInconsistencies: [],
+        entityVerification: {
+          visuallyDetectedCount: 0,
+          searchedCount: 0,
+          verifiedCount: 0,
+          probableCount: 0,
+          ambiguousCount: 0,
+          unverifiedCount: 0,
+          providerStatus: 'DISABLED'
+        },
+        entitySearches: [],
+        entityEvidenceSources: [],
         intentAnalysis: { primaryIntent: 'DISABLED', confidence: 0 },
         framingAnalysis: { status: 'DISABLED' }
       };
@@ -463,6 +502,8 @@ async function runVerificationPipeline({
       framingAnalysis: entityIntentRes.framingAnalysis,
       quotes: entityIntentRes.quotes,
       entityClaimConnections: entityIntentRes.entityClaimConnections,
+      entityVerification: entityIntentRes.entityVerification,
+      entitySearches: entityIntentRes.entitySearches,
       numericalAnalysis: numericalRes,
       textAnalysis: textAnalysisRes,
       linkIntelligence: linkAssetRes.linkIntelligence,
@@ -476,6 +517,14 @@ async function runVerificationPipeline({
     reportData.quotes = entityIntentRes.quotes;
     reportData.entityClaimConnections = entityIntentRes.entityClaimConnections;
     reportData.entityInconsistencies = entityIntentRes.entityInconsistencies;
+    reportData.entityVerification = entityIntentRes.entityVerification;
+    reportData.entitySearches = entityIntentRes.entitySearches;
+    if (entityIntentRes.entityEvidenceSources?.length) {
+      reportData.sources = Array.from(new Map([
+        ...(reportData.sources || []),
+        ...entityIntentRes.entityEvidenceSources
+      ].filter(source => source?.url).map(source => [source.url, source])).values());
+    }
     reportData.numericalAnalysis = numericalRes;
     reportData.numericalFacts = numericalRes.facts;
     reportData.textAnalysis = textAnalysisRes;

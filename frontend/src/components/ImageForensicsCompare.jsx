@@ -208,16 +208,16 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
   return (
     <section id="image-forensics" className="space-y-6 scroll-mt-24">
       {/* 1. ASSET LISTING (Matching deepTrust Reference Design) */}
-      <div className="card pad p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div className="card pad p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
+        <div className="flex items-center justify-between border-b border-[#CECECE] pb-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-[#E88F6B]">04 ·</span>
-            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-white flex items-center gap-2">
-              <Camera className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-mono font-bold text-[#D97757]">04 ·</span>
+            <h2 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5] flex items-center gap-2">
+              <Camera className="w-4 h-4 text-[#D97757]" />
               Image: Provided vs. Original Forensics
             </h2>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
+          <span className="text-xs text-[#7386A8] font-mono">
             {hasOriginal
               ? `${selectedAsset.originalFoundStatus === 'CANDIDATE' ? 'Comparison candidate' : 'Original recovered'}: ${selectedAsset.originalFound}`
               : 'Reverse search index & metadata'}
@@ -225,83 +225,83 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
         </div>
 
         <div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-amber-300">
+          <div className="rounded-2xl border border-[#CECECE] bg-[#F8F8F6] p-4 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#B98520]">
               <Search className="w-4 h-4" /> Reverse-image evidence
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div><span className="block text-[10px] uppercase text-slate-500">Provider</span><strong className="text-slate-200">{primaryItem.reverseSearchProvider || 'Unavailable'}</strong></div>
-              <div><span className="block text-[10px] uppercase text-slate-500">Status</span><strong className="text-slate-200">{primaryItem.originalFoundStatus || 'UNVERIFIED'}</strong></div>
+              <div><span className="block text-[10px] uppercase text-[#7386A8]">Provider</span><strong className="text-[#0B5CD5]">{primaryItem.reverseSearchProvider || 'Unavailable'}</strong></div>
+              <div><span className="block text-[10px] uppercase text-[#7386A8]">Status</span><strong className="text-[#0B5CD5]">{primaryItem.originalFoundStatus || 'UNVERIFIED'}</strong></div>
             </div>
-            {primaryItem.reverseSearchQuery && <div><span className="block text-[10px] uppercase text-slate-500">Search based on</span><p className="text-xs text-slate-300 mt-1">{primaryItem.reverseSearchQuery}</p></div>}
-            <p className="text-[11px] text-slate-500 leading-relaxed">Only a downloadable image that was compared locally can appear as an original or candidate. Ordinary keyword-result pages are excluded.</p>
+            {primaryItem.reverseSearchQuery && <div><span className="block text-[10px] uppercase text-[#7386A8]">Search based on</span><p className="text-xs text-[#2C4E86] mt-1">{primaryItem.reverseSearchQuery}</p></div>}
+            <p className="text-[11px] text-[#7386A8] leading-relaxed">Only a downloadable image that was compared locally can appear as an original or candidate. Ordinary keyword-result pages are excluded.</p>
           </div>
         </div>
 
         {sourceComparison && sourceComparison.status !== 'UNAVAILABLE' && (
-          <div className={`rounded-2xl border p-4 space-y-4 ${comparisonTone}`}>
+          <div className={`rounded-2xl border border-[#CECECE] p-4 space-y-4 bg-[#F8F8F6]`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#0B5CD5]">
                   {sourceComparison.status === 'MATCHED'
-                    ? <ShieldCheck className="w-4 h-4" />
+                    ? <ShieldCheck className="w-4 h-4 text-[#3E7A55]" />
                     : sourceComparison.status === 'CONTRADICTED'
-                      ? <ShieldAlert className="w-4 h-4" />
-                      : <AlertTriangle className="w-4 h-4" />}
+                      ? <ShieldAlert className="w-4 h-4 text-[#B23F35]" />
+                      : <AlertTriangle className="w-4 h-4 text-[#B98520]" />}
                   Source context vs. AI visual summary
                 </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Context verdict: <strong className="text-current">{sourceComparison.contextualVerdict || sourceComparison.status}</strong>
+                <p className="mt-1 text-[11px] text-[#7386A8]">
+                  Context verdict: <strong className="text-[#0B5CD5]">{sourceComparison.contextualVerdict || sourceComparison.status}</strong>
                   {Number.isFinite(sourceComparison.confidence) ? ` · ${sourceComparison.confidence}% confidence` : ''}
                 </p>
               </div>
-              <span className="rounded-full border border-current/30 px-2.5 py-1 text-[10px] font-mono font-bold uppercase">
+              <span className="rounded-full border border-[#CECECE] bg-white px-2.5 py-1 text-[10px] font-mono font-bold uppercase text-[#0B5CD5]">
                 {sourceComparison.status}
               </span>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <span className="block text-[10px] uppercase tracking-wider text-slate-500">AI visual summary</span>
-                <p className="mt-1.5 leading-relaxed text-slate-300">{sourceComparison.visualSummary || 'No visual summary was generated.'}</p>
+              <div className="rounded-xl border border-[#CECECE] bg-white p-3">
+                <span className="block text-[10px] uppercase tracking-wider text-[#7386A8]">AI visual summary</span>
+                <p className="mt-1.5 leading-relaxed text-[#2C4E86]">{sourceComparison.visualSummary || 'No visual summary was generated.'}</p>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <span className="block text-[10px] uppercase tracking-wider text-slate-500">What the matched source says</span>
-                <p className="mt-1.5 leading-relaxed text-slate-300">{sourceComparison.sourceSummary || sourceComparison.source?.description || 'The page did not expose enough readable context.'}</p>
+              <div className="rounded-xl border border-[#CECECE] bg-white p-3">
+                <span className="block text-[10px] uppercase tracking-wider text-[#7386A8]">What the matched source says</span>
+                <p className="mt-1.5 leading-relaxed text-[#2C4E86]">{sourceComparison.sourceSummary || sourceComparison.source?.description || 'The page did not expose enough readable context.'}</p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 space-y-2">
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <strong className="text-xs text-slate-200">{sourceComparison.source?.title || sourceComparison.source?.domain || 'Matched source page'}</strong>
-                {sourceComparison.source?.publishedAt && <span className="text-[10px] font-mono text-slate-500">{new Date(sourceComparison.source.publishedAt).toLocaleDateString()}</span>}
+                <strong className="text-xs text-[#0B5CD5]">{sourceComparison.source?.title || sourceComparison.source?.domain || 'Matched source page'}</strong>
+                {sourceComparison.source?.publishedAt && <span className="text-[10px] font-mono text-[#7386A8]">{new Date(sourceComparison.source.publishedAt).toLocaleDateString()}</span>}
                 {sourceComparison.source?.url && (
-                  <a href={sourceComparison.source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-indigo-300 hover:text-indigo-200">
+                  <a href={sourceComparison.source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[#D97757] hover:text-[#B0512F]">
                     Open source <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-400">{sourceComparison.rationale}</p>
+              <p className="text-[11px] leading-relaxed text-[#7386A8]">{sourceComparison.rationale}</p>
               {Array.isArray(sourceComparison.matchingDetails) && sourceComparison.matchingDetails.length > 0 && (
-                <ul className="space-y-1 text-[11px] text-emerald-300/90">
+                <ul className="space-y-1 text-[11px] text-[#3E7A55]">
                   {sourceComparison.matchingDetails.slice(0, 4).map((detail, index) => <li key={`match-${index}`}>✓ {detail}</li>)}
                 </ul>
               )}
               {Array.isArray(sourceComparison.contradictions) && sourceComparison.contradictions.length > 0 && (
-                <ul className="space-y-1 text-[11px] text-rose-300/90">
+                <ul className="space-y-1 text-[11px] text-[#B23F35]">
                   {sourceComparison.contradictions.slice(0, 4).map((detail, index) => <li key={`contradiction-${index}`}>× {detail}</li>)}
                 </ul>
               )}
             </div>
 
             {!sourceComparison.decisive && (
-              <p className="text-[10px] leading-relaxed text-slate-500">This result cannot change the dossier verdict because the visual match or page context is not strong enough.</p>
+              <p className="text-[10px] leading-relaxed text-[#7386A8]">This result cannot change the dossier verdict because the visual match or page context is not strong enough.</p>
             )}
           </div>
         )}
 
         {/* Assets Container (.asset) */}
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-[#CECECE]">
           {(imageList.length > 0 ? imageList : [primaryItem]).map((asset, idx) => {
             const isFake = asset.chipVerdict === 'v-fake' || (parseFloat(asset.manipulationLikelihood) >= 0.70);
             const isSusp = asset.chipVerdict === 'v-susp' || (parseFloat(asset.manipulationLikelihood) >= 0.40 && !isFake);
@@ -313,7 +313,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
             return (
               <div key={idx} className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-6 py-5 items-start">
                 {/* Left side: .asset-th (Thumbnail Preview) */}
-                <div className="w-full md:w-40 h-28 bg-slate-950 border border-slate-700/80 rounded-xl overflow-hidden shadow-inner flex-shrink-0">
+                <div className="w-full md:w-40 h-28 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl overflow-hidden shadow-inner flex-shrink-0">
                   {renderThumbnail(asset)}
                 </div>
 
@@ -321,13 +321,13 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                 <div className="space-y-2.5 min-w-0">
                   {/* Top row (.between wrap) */}
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <b className="text-sm font-bold text-white font-mono truncate">{asset.filename}</b>
+                    <b className="text-sm font-bold text-[#0B5CD5] font-mono truncate">{asset.filename}</b>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold border flex items-center gap-1.5 ${
                       isFake
-                        ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                        ? 'bg-[#F7E3E0] text-[#B23F35] border-[#EBC7C2]'
                         : isSusp
-                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                        : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        ? 'bg-[#F7EEDA] text-[#B98520] border-[#E8D4B0]'
+                        : 'bg-[#E4EFE7] text-[#2C5B3E] border-[#C5DEC9]'
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                       {asset.chipText || (isFake ? `${asset.changesCount || 3} edited regions` : 'No manipulation signal found')}
@@ -336,41 +336,41 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
                   {/* Key-Value rows (.kv) */}
                   <div className="space-y-1.5 text-xs font-mono">
-                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-slate-800">
-                      <span className="text-slate-400">Dimensions · size</span>
-                      <b className="text-slate-200 font-semibold text-right">{asset.dimensions} · {asset.fileSize} · {asset.formatQuality}</b>
+                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
+                      <span className="text-[#7386A8]">Dimensions · size</span>
+                      <b className="text-[#2C4E86] font-semibold text-right">{asset.dimensions} · {asset.fileSize} · {asset.formatQuality}</b>
                     </div>
 
-                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-slate-800">
-                      <span className="text-slate-400">{isCandidate ? 'Closest indexed candidate' : asset.originalFoundStatus === 'FOUND' ? 'Original found' : 'Reverse-image result'}</span>
-                      <b className={`font-semibold text-right ${asset.originalFoundStatus === 'FOUND' ? 'text-emerald-400' : isFound ? 'text-amber-300' : 'text-rose-400'}`}>
+                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
+                      <span className="text-[#7386A8]">{isCandidate ? 'Closest indexed candidate' : asset.originalFoundStatus === 'FOUND' ? 'Original found' : 'Reverse-image result'}</span>
+                      <b className={`font-semibold text-right ${asset.originalFoundStatus === 'FOUND' ? 'text-[#2C5B3E]' : isFound ? 'text-[#B98520]' : 'text-[#B23F35]'}`}>
                         {originalFoundText}
                       </b>
                     </div>
 
-                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-slate-800">
-                      <span className="text-slate-400">EXIF / C2PA</span>
-                      <b className={`font-semibold text-right ${asset.exifState === 'VALID' ? 'text-emerald-400' : asset.exifState === 'EDITED' ? 'text-amber-400' : 'text-rose-400'}`}>
+                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
+                      <span className="text-[#7386A8]">EXIF / C2PA</span>
+                      <b className={`font-semibold text-right ${asset.exifState === 'VALID' ? 'text-[#2C5B3E]' : asset.exifState === 'EDITED' ? 'text-[#B98520]' : 'text-[#B23F35]'}`}>
                         {asset.exifStatus}
                       </b>
                     </div>
 
-                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-slate-800">
-                      <span className="text-slate-400">Changes</span>
-                      <b className="text-slate-200 font-semibold text-right">
+                    <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
+                      <span className="text-[#7386A8]">Changes</span>
+                      <b className="text-[#2C4E86] font-semibold text-right">
                         {Array.isArray(asset.changes) ? asset.changes.join(', ') : (asset.changes || 'None')}
                       </b>
                     </div>
 
                     {asset.manipulationLikelihood && (
-                      <div className="flex justify-between gap-4 py-1 border-b border-dashed border-slate-800">
-                        <span className="text-slate-400">Manipulation likelihood</span>
+                      <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
+                        <span className="text-[#7386A8]">Manipulation likelihood</span>
                         <b className={`font-semibold text-right ${
                           parseFloat(asset.manipulationLikelihood) >= 0.70
-                            ? 'text-rose-400'
+                            ? 'text-[#B23F35]'
                             : parseFloat(asset.manipulationLikelihood) >= 0.40
-                            ? 'text-amber-400'
-                            : 'text-emerald-400'
+                            ? 'text-[#B98520]'
+                            : 'text-[#2C5B3E]'
                         }`}>
                           {asset.manipulationLikelihood}
                         </b>
@@ -394,11 +394,11 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                       }}
                       className={`px-4 py-2 rounded-xl text-xs font-semibold font-mono border transition flex items-center gap-2 ${
                         hasProvided
-                          ? 'bg-slate-950 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-indigo-500 shadow-md cursor-pointer'
-                          : 'bg-slate-950/40 text-slate-600 border-slate-800 cursor-not-allowed opacity-60'
+                          ? 'bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] border-[#CECECE] hover:border-[#AAAAAA] shadow-xs cursor-pointer'
+                          : 'bg-[#F8F8F6] text-[#7386A8] border-[#CECECE] cursor-not-allowed opacity-60'
                       }`}
                     >
-                      <Split className="w-3.5 h-3.5 text-indigo-400" />
+                      <Split className="w-3.5 h-3.5 text-[#D97757]" />
                       <span>{isCandidate ? 'Compare closest indexed candidate' : isFound ? 'Open the side-by-side compare' : 'Open compare & add original'}</span>
                     </button>
                   </div>
@@ -412,28 +412,28 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
       {/* 2. FULL-PAGE / MODAL SIDE-BY-SIDE INTERACTIVE COMPARISON VIEW */}
       {isModalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsModalOpen(false);
           }}
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full p-4 sm:p-6 space-y-6 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col relative z-10"
+            className="bg-white border border-[#CECECE] rounded-3xl max-w-5xl w-full p-4 sm:p-6 space-y-6 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col relative z-10 text-xs"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 flex-shrink-0">
+            <div className="flex items-center justify-between border-b border-[#CECECE] pb-4 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono font-bold text-[#E88F6B]">04 ·</span>
+                <span className="text-xs font-mono font-bold text-[#D97757]">04 ·</span>
                 <div>
-                  <h3 className="text-base font-bold text-white font-mono">
+                  <h3 className="text-base font-bold text-[#0B5CD5] font-mono">
                     {selectedAsset.originalFoundStatus === 'CANDIDATE'
                       ? 'Image: Provided vs. Indexed Candidate'
                       : 'Image: Provided vs. Original Compare'}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-[#7386A8] mt-0.5">
                     {originalSrc
-                      ? <>{selectedAsset.originalFoundStatus === 'CANDIDATE' ? 'Comparison candidate from' : 'Original recovered from'}: <strong className="text-slate-200">{manualOriginalSrc ? 'manually supplied file' : (selectedAsset.originalFound || 'indexed source')}</strong></>
+                      ? <>{selectedAsset.originalFoundStatus === 'CANDIDATE' ? 'Comparison candidate from' : 'Original recovered from'}: <strong className="text-[#0B5CD5]">{manualOriginalSrc ? 'manually supplied file' : (selectedAsset.originalFound || 'indexed source')}</strong></>
                       : <>No indexed original was recovered. Add a known original below to compare it locally.</>}
                   </p>
                 </div>
@@ -442,7 +442,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                className="p-2 rounded-xl bg-[#EFEEE9] hover:bg-[#CECECE] text-[#7386A8] hover:text-[#0B5CD5] transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -456,17 +456,17 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                     <button
                       type="button"
                       onClick={() => setShowBoxes(!showBoxes)}
-                      className={`px-3 py-1.5 rounded-lg border font-medium font-mono text-[11px] transition flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl border font-medium font-mono text-[11px] transition flex items-center gap-1.5 ${
                         showBoxes
-                          ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          ? 'bg-[#F7E3E0] border-[#EBC7C2] text-[#B23F35]'
+                          : 'bg-[#EFEEE9] border-[#CECECE] text-[#7386A8] hover:text-[#0B5CD5]'
                       }`}
                     >
                       {showBoxes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       <span>{showBoxes ? 'Hide Change Markers' : 'Show Change Markers'}</span>
                     </button>
                   ) : (
-                    <span className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-slate-400 font-mono text-[11px]">
+                    <span className="px-3 py-1.5 rounded-xl border border-[#CECECE] bg-[#F8F8F6] text-[#7386A8] font-mono text-[11px]">
                       No verified edit markers
                     </span>
                   )}
@@ -474,7 +474,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   <button
                     type="button"
                     onClick={() => setSliderPos(50)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono text-[11px] transition"
+                    className="px-3 py-1.5 rounded-xl bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] font-mono text-[11px] transition font-semibold"
                   >
                     Center Split
                   </button>
@@ -482,7 +482,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   <button
                     type="button"
                     onClick={() => setSliderPos(100)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono text-[11px] transition"
+                    className="px-3 py-1.5 rounded-xl bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] font-mono text-[11px] transition font-semibold"
                   >
                     Show Provided
                   </button>
@@ -491,22 +491,22 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                     type="button"
                     onClick={() => setSliderPos(0)}
                     disabled={!originalSrc}
-                    className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono text-[11px] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 rounded-xl bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] font-mono text-[11px] transition font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {selectedAsset.originalFoundStatus === 'CANDIDATE' ? 'Show Candidate' : 'Show Original'}
                   </button>
                 </div>
 
-                <span className="text-[11px] font-mono text-slate-400">Drag the handle to compare</span>
+                <span className="text-[11px] font-mono text-[#7386A8]">Drag the handle to compare</span>
               </div>
 
               {!originalSrc && (
-                <label className="flex items-center justify-between gap-4 rounded-xl border border-dashed border-indigo-500/40 bg-indigo-500/5 px-4 py-3 cursor-pointer hover:border-indigo-400 transition">
+                <label className="flex items-center justify-between gap-4 rounded-2xl border border-dashed border-[#D97757] bg-[#F6E7DF]/30 px-4 py-3 cursor-pointer hover:bg-[#F6E7DF]/50 transition">
                   <span>
-                    <strong className="block text-xs text-slate-200 font-mono">Add the known original image</strong>
-                    <span className="block text-[11px] text-slate-400 mt-0.5">The file stays in this browser and is used only for this comparison view.</span>
+                    <strong className="block text-xs text-[#0B5CD5] font-mono">Add the known original image</strong>
+                    <span className="block text-[11px] text-[#7386A8] mt-0.5">The file stays in this browser and is used only for this comparison view.</span>
                   </span>
-                  <span className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-200 text-xs font-semibold whitespace-nowrap">Choose image</span>
+                  <span className="px-3 py-1.5 rounded-xl bg-[#D97757] text-white text-xs font-bold whitespace-nowrap shadow-xs">Choose image</span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -532,7 +532,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                 ref={containerRef}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
-                className="relative w-full aspect-[16/10] bg-black rounded-2xl overflow-hidden border border-slate-800 select-none cursor-ew-resize shadow-2xl group flex items-center justify-center"
+                className="relative w-full aspect-[16/10] bg-black rounded-2xl overflow-hidden border border-[#CECECE] select-none cursor-ew-resize shadow-2xl group flex items-center justify-center"
               >
                 {/* Base Layer: PROVIDED (Left/Bottom) */}
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/90">
@@ -649,7 +649,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
               {/* Diffs List (.diffs) */}
               {diffList.length > 0 && (
-                <div className="divide-y divide-slate-800 bg-slate-950 rounded-2xl border border-slate-800 p-4">
+                <div className="divide-y divide-[#CECECE] bg-[#F8F8F6] rounded-2xl border border-[#CECECE] p-4">
                   {diffList.map((d) => {
                     const isActive = activeDiff === d.id.toLowerCase() || activeDiff === d.id;
 
@@ -659,17 +659,17 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                         onMouseEnter={() => setActiveDiff(d.id.toLowerCase())}
                         onMouseLeave={() => setActiveDiff(null)}
                         className={`flex items-start gap-3 py-3 px-2 rounded-xl transition ${
-                          isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-900/60'
+                          isActive ? 'bg-white text-[#0B5CD5] shadow-xs' : 'hover:bg-white/60 text-[#2C4E86]'
                         }`}
                       >
                         <span className="w-5 h-5 rounded bg-[#D97757] text-white font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                           {d.id}
                         </span>
                         <div className="space-y-1 text-xs">
-                          <p className="text-slate-200 leading-relaxed font-medium">
+                          <p className="text-[#0B5CD5] leading-relaxed font-bold">
                             {d.desc || d.title}
                           </p>
-                          <span className="text-[11px] text-slate-400 font-mono block">
+                          <span className="text-[11px] text-[#7386A8] font-mono block">
                             {d.detail || d.meta}
                           </span>
                         </div>
@@ -681,23 +681,23 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
               {/* 3-Card Summary Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-1 font-mono text-xs">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
+                <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-1 font-mono text-xs">
+                  <span className="text-[10px] text-[#7386A8] uppercase tracking-wider block">
                     {selectedAsset.originalFoundStatus === 'CANDIDATE' ? 'Closest indexed candidate' : 'Reverse-search first seen'}
                   </span>
-                  <div className="text-slate-200 font-semibold">{selectedAsset.originalFound}</div>
+                  <div className="text-[#0B5CD5] font-bold">{selectedAsset.originalFound}</div>
                 </div>
 
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-1 font-mono text-xs">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">EXIF / C2PA</span>
-                  <div className="text-slate-200 font-semibold">{selectedAsset.exifStatus}</div>
+                <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-1 font-mono text-xs">
+                  <span className="text-[10px] text-[#7386A8] uppercase tracking-wider block">EXIF / C2PA</span>
+                  <div className="text-[#0B5CD5] font-bold">{selectedAsset.exifStatus}</div>
                 </div>
 
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-1 font-mono text-xs">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Manipulation likelihood</span>
+                <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-1 font-mono text-xs">
+                  <span className="text-[10px] text-[#7386A8] uppercase tracking-wider block">Manipulation likelihood</span>
                   <div className={`font-bold ${
-                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.70 ? 'text-rose-400' :
-                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.40 ? 'text-amber-400' : 'text-emerald-400'
+                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.70 ? 'text-[#B23F35]' :
+                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.40 ? 'text-[#B98520]' : 'text-[#3E7A55]'
                   }`}>
                     {selectedAsset.manipulationLikelihood} · {parseFloat(selectedAsset.manipulationLikelihood) >= 0.40 ? 'edited' : 'unaltered'}
                   </div>

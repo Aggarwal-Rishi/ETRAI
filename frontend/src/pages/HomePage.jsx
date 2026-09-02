@@ -265,59 +265,6 @@ function VerificationGlobe() {
   return <canvas ref={canvasRef} className="home3d-scene" aria-hidden="true" />;
 }
 
-function CustomCursor({ rootRef }) {
-  const dotRef = useRef(null);
-  const ringRef = useRef(null);
-
-  useEffect(() => {
-    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return undefined;
-    const root = rootRef.current;
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    if (!root || !dot || !ring) return undefined;
-    let x = window.innerWidth / 2;
-    let y = window.innerHeight / 2;
-    let ringX = x;
-    let ringY = y;
-    let frame = 0;
-    const handleMove = event => {
-      x = event.clientX;
-      y = event.clientY;
-      dot.style.left = `${x}px`;
-      dot.style.top = `${y}px`;
-    };
-    const handleOver = event => {
-      if (event.target.closest('a, button, [data-interactive]')) ring.classList.add('is-hovering');
-    };
-    const handleOut = event => {
-      if (event.target.closest('a, button, [data-interactive]')) ring.classList.remove('is-hovering');
-    };
-    const follow = () => {
-      ringX += (x - ringX) * 0.16;
-      ringY += (y - ringY) * 0.16;
-      ring.style.left = `${ringX}px`;
-      ring.style.top = `${ringY}px`;
-      frame = window.requestAnimationFrame(follow);
-    };
-    window.addEventListener('pointermove', handleMove, { passive: true });
-    root.addEventListener('pointerover', handleOver);
-    root.addEventListener('pointerout', handleOut);
-    follow();
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('pointermove', handleMove);
-      root.removeEventListener('pointerover', handleOver);
-      root.removeEventListener('pointerout', handleOut);
-    };
-  }, [rootRef]);
-
-  return (
-    <>
-      <span ref={ringRef} className="home3d-cursor-ring" aria-hidden="true" />
-      <span ref={dotRef} className="home3d-cursor-dot" aria-hidden="true" />
-    </>
-  );
-}
 
 function TiltCard({ className = '', children, ...props }) {
   const handleMove = event => {
@@ -453,7 +400,6 @@ export default function HomePage() {
       <VerificationGlobe />
       <div className="home3d-glow home3d-glow-a" aria-hidden="true" />
       <div className="home3d-glow home3d-glow-b" aria-hidden="true" />
-      <CustomCursor rootRef={rootRef} />
 
       <div className="home3d-content">
         <nav className="home3d-nav" aria-label="Primary navigation">

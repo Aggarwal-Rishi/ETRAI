@@ -9,63 +9,63 @@ export function getStatusStyle(status = 'neutral') {
 
   if (['verified', 'real', 'true', 'supported'].includes(norm)) {
     return {
-      bg: 'bg-emerald-950/60',
-      text: 'text-emerald-400',
-      border: 'border-emerald-800/40',
-      dot: 'bg-emerald-400',
+      bg: 'bg-[#E4EFE7]',
+      text: 'text-[#2C5B3E]',
+      border: 'border-[#C5DEC9]',
+      dot: 'bg-[#2C5B3E]',
       label: 'Verified'
     };
   }
 
   if (norm === 'completed') {
-    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Completed' };
+    return { bg: 'bg-[#E4EFE7]', text: 'text-[#2C5B3E]', border: 'border-[#C5DEC9]', dot: 'bg-[#2C5B3E]', label: 'Completed' };
   }
   if (norm === 'active') {
-    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Active' };
+    return { bg: 'bg-[#E4EFE7]', text: 'text-[#2C5B3E]', border: 'border-[#C5DEC9]', dot: 'bg-[#2C5B3E]', label: 'Active' };
   }
   if (norm === 'paid') {
-    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Paid' };
+    return { bg: 'bg-[#E4EFE7]', text: 'text-[#2C5B3E]', border: 'border-[#C5DEC9]', dot: 'bg-[#2C5B3E]', label: 'Paid' };
   }
   if (norm === 'clean') {
-    return { bg: 'bg-emerald-950/60', text: 'text-emerald-400', border: 'border-emerald-800/40', dot: 'bg-emerald-400', label: 'Clean' };
+    return { bg: 'bg-[#E4EFE7]', text: 'text-[#2C5B3E]', border: 'border-[#C5DEC9]', dot: 'bg-[#2C5B3E]', label: 'Clean' };
   }
 
   if (['partly true', 'partially_verified'].includes(norm)) {
     return {
-      bg: 'bg-amber-950/60',
-      text: 'text-amber-400',
-      border: 'border-amber-800/40',
-      dot: 'bg-amber-400',
+      bg: 'bg-[#F7EEDA]',
+      text: 'text-[#B98520]',
+      border: 'border-[#E8D4B0]',
+      dot: 'bg-[#B98520]',
       label: 'Partially Verified'
     };
   }
 
   if (['suspicious', 'susp', 'questionable', 'caution', 'warn'].includes(norm)) {
     return {
-      bg: 'bg-amber-950/60',
-      text: 'text-amber-400',
-      border: 'border-amber-800/40',
-      dot: 'bg-amber-400',
+      bg: 'bg-[#F7EEDA]',
+      text: 'text-[#B98520]',
+      border: 'border-[#E8D4B0]',
+      dot: 'bg-[#B98520]',
       label: 'Suspicious'
     };
   }
 
   if (['fake', 'false', 'refuted', 'fabricated', 'manipulated', 'flagged', 'danger'].includes(norm)) {
     return {
-      bg: 'bg-rose-950/60',
-      text: 'text-rose-400',
-      border: 'border-rose-800/40',
-      dot: 'bg-rose-400',
+      bg: 'bg-[#F7E3E0]',
+      text: 'text-[#B23F35]',
+      border: 'border-[#EBC7C2]',
+      dot: 'bg-[#B23F35]',
       label: 'Flagged Fake'
     };
   }
 
   // Default: Neutral / Unverified
   return {
-    bg: 'bg-slate-900/80',
-    text: 'text-slate-300',
-    border: 'border-slate-800',
-    dot: 'bg-slate-400',
+    bg: 'bg-[#EFEEE9]',
+    text: 'text-[#0B5CD5]',
+    border: 'border-[#CECECE]',
+    dot: 'bg-[#7386A8]',
     label: 'Unverified'
   };
 }

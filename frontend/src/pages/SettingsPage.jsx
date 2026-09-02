@@ -174,13 +174,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
       <Navbar />
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-slate-800 border border-slate-700 text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -190,18 +190,18 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2.5">
-              <Sliders className="w-6 h-6 text-indigo-400" />
+            <h1 className="text-2xl font-bold text-[#0B5CD5] flex items-center gap-2.5">
+              <Sliders className="w-6 h-6 text-[#D97757]" />
               Settings & Intelligence Configuration
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-[#2C4E86] mt-1">
               Configure personal profile, custom source whitelists, and inspect scoring algorithm sensitivity.
             </p>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-2 border-b border-[#CECECE] pb-2">
           {[
             { k: 'profile', label: 'My Account & Beats', icon: User },
             { k: 'sources', label: 'Source Authority Whitelist', icon: Shield },
@@ -217,8 +217,8 @@ export default function SettingsPage() {
                 }}
                 className={`px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
                   activeTab === tab.k
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-850'
+                    ? 'bg-[#D97757] text-white shadow-md'
+                    : 'bg-[#EFEEE9] text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#CECECE]'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -233,73 +233,73 @@ export default function SettingsPage() {
         {/* ========================================================================= */}
         {activeTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="max-w-3xl space-y-6">
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-6 shadow-xl text-xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-white border-b border-slate-800 pb-2">
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm text-xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-[#0B5CD5] border-b border-[#CECECE] pb-2">
                 Personal & Organization Identity
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 mb-1">Full Legal Name</label>
+                  <label className="block text-[#2C4E86] mb-1">Full Legal Name</label>
                   <input
                     type="text"
                     value={profile.name}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Email Address</label>
+                  <label className="block text-[#2C4E86] mb-1">Email Address</label>
                   <input
                     type="email"
                     disabled
                     value={profile.email}
-                    className="w-full p-3 bg-slate-950/60 border border-slate-850 rounded-xl text-slate-500 font-mono"
+                    className="w-full p-3 bg-[#EFEEE9] border border-[#CECECE] rounded-xl text-[#7386A8] font-mono cursor-not-allowed"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Phone Contact</label>
+                  <label className="block text-[#2C4E86] mb-1">Phone Contact</label>
                   <input
                     type="tel"
                     value={profile.phone}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Newsroom / Organization</label>
+                  <label className="block text-[#2C4E86] mb-1">Newsroom / Organization</label>
                   <input
                     type="text"
                     value={profile.company}
                     onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Followed Coverage Beats</label>
+                <label className="block text-[#2C4E86] mb-1">Followed Coverage Beats</label>
                 <input
                   type="text"
                   value={profile.beats}
                   onChange={(e) => setProfile({ ...profile, beats: e.target.value })}
                   placeholder="e.g. National Policy, Currency, Defence Tenders"
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                 />
               </div>
 
               {/* Alert Checkboxes */}
-              <div className="pt-4 border-t border-slate-800 space-y-3">
-                <h4 className="font-bold text-white font-mono text-[11px] uppercase">Notification Routing</h4>
+              <div className="pt-4 border-t border-[#CECECE] space-y-3">
+                <h4 className="font-bold text-[#0B5CD5] font-mono text-[11px] uppercase">Notification Routing</h4>
                 
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={profile.alertLowScore}
                     onChange={(e) => setProfile({ ...profile, alertLowScore: e.target.checked })}
-                    className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                    className="rounded border-[#CECECE] bg-[#F8F8F6] text-[#D97757] focus:ring-0"
                   />
-                  <span className="text-slate-300">Dispatch immediate alert when a beat story is flagged under 40 trust score</span>
+                  <span className="text-[#2C4E86]">Dispatch immediate alert when a beat story is flagged under 40 trust score</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer">
@@ -307,16 +307,16 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={profile.alertDailyDigest}
                     onChange={(e) => setProfile({ ...profile, alertDailyDigest: e.target.checked })}
-                    className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+                    className="rounded border-[#CECECE] bg-[#F8F8F6] text-[#D97757] focus:ring-0"
                   />
-                  <span className="text-slate-300">Receive morning 8:00 AM briefing email with daily verification volume</span>
+                  <span className="text-[#2C4E86]">Receive morning 8:00 AM briefing email with daily verification volume</span>
                 </label>
               </div>
 
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md transition flex items-center gap-2"
+                  className="px-5 py-2.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-bold rounded-xl shadow-md transition flex items-center gap-2"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Profile Preferences</span>
@@ -333,17 +333,17 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-bold uppercase font-mono text-white">
+                <h3 className="text-sm font-bold uppercase font-mono text-[#0B5CD5]">
                   Ranked Source Authority Ledger ({sources.length})
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[#2C4E86] mt-0.5">
                   Sources directly queried and weighted by Agent 3 during multi-agent corroboration.
                 </p>
               </div>
 
               <button
                 onClick={() => setIsAddingSource(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-2 flex-shrink-0 self-start sm:self-auto"
+                className="px-4 py-2 bg-[#D97757] hover:bg-[#B0512F] text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-2 flex-shrink-0 self-start sm:self-auto"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Source Domain</span>
@@ -352,63 +352,63 @@ export default function SettingsPage() {
 
             {/* Add Source Form */}
             {isAddingSource && (
-              <form onSubmit={handleCreateSource} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 text-xs shadow-xl animate-scaleUp">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <h4 className="font-bold text-white font-mono uppercase text-xs">Add New Authoritative Source</h4>
-                  <button type="button" onClick={() => setIsAddingSource(false)} className="text-slate-400 hover:text-white">✕</button>
+              <form onSubmit={handleCreateSource} className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 text-xs shadow-md animate-scaleUp">
+                <div className="flex justify-between items-center border-b border-[#CECECE] pb-2">
+                  <h4 className="font-bold text-[#0B5CD5] font-mono uppercase text-xs">Add New Authoritative Source</h4>
+                  <button type="button" onClick={() => setIsAddingSource(false)} className="text-[#7386A8] hover:text-[#0B5CD5]">✕</button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-400 mb-1">Source Name *</label>
+                    <label className="block text-[#2C4E86] mb-1">Source Name *</label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. National Gazette Portal"
                       value={newSourceName}
                       onChange={(e) => setNewSourceName(e.target.value)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full p-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Domain URL *</label>
+                    <label className="block text-[#2C4E86] mb-1">Domain URL *</label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. egazette.gov.in"
                       value={newSourceDomain}
                       onChange={(e) => setNewSourceDomain(e.target.value)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Authority Score (0–100)</label>
+                    <label className="block text-[#2C4E86] mb-1">Authority Score (0–100)</label>
                     <input
                       type="number"
                       min={0}
                       max={100}
                       value={newSourceAuthority}
                       onChange={(e) => setNewSourceAuthority(parseInt(e.target.value, 10) || 50)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full p-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Pipeline Purpose</label>
+                    <label className="block text-[#2C4E86] mb-1">Pipeline Purpose</label>
                     <input
                       type="text"
                       placeholder="e.g. Official Gazette & Regulatory Notices"
                       value={newSourcePurpose}
                       onChange={(e) => setNewSourcePurpose(e.target.value)}
-                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full p-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[#0B5CD5] focus:outline-none focus:border-[#D97757]"
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-2 justify-end pt-2">
-                  <button type="button" onClick={() => setIsAddingSource(false)} className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl">
+                  <button type="button" onClick={() => setIsAddingSource(false)} className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] rounded-xl">
                     Cancel
                   </button>
-                  <button type="submit" className="px-4 py-1.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
+                  <button type="submit" className="px-4 py-1.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-bold rounded-xl shadow-md">
                     Insert Source
                   </button>
                 </div>
@@ -416,11 +416,11 @@ export default function SettingsPage() {
             )}
 
             {/* Sources Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="bg-white border border-[#CECECE] rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px] bg-slate-950">
+                    <tr className="border-b border-[#CECECE] text-[#2C4E86] uppercase font-mono text-[10px] bg-[#EFEEE9]">
                       <th className="px-4 py-3">Source Name</th>
                       <th className="px-4 py-3">Domain</th>
                       <th className="px-4 py-3">Rank Tier</th>
@@ -430,26 +430,26 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  <tbody className="divide-y divide-[#CECECE] text-[#2C4E86]">
                     {sources.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-850 transition">
-                        <td className="px-4 py-3 font-bold text-white">{s.name}</td>
-                        <td className="px-4 py-3 font-mono text-slate-400 text-[11px]">{s.domain}</td>
-                        <td className="px-4 py-3 font-mono text-indigo-400 font-bold">Tier {s.rank || 1}</td>
+                      <tr key={s.id} className="hover:bg-[#F8F8F6] transition">
+                        <td className="px-4 py-3 font-bold text-[#0B5CD5]">{s.name}</td>
+                        <td className="px-4 py-3 font-mono text-[#7386A8] text-[11px]">{s.domain}</td>
+                        <td className="px-4 py-3 font-mono text-[#0B5CD5] font-bold">Tier {s.rank || 1}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="w-16 h-1.5 bg-[#EFEEE9] rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-emerald-400"
+                                className="h-full bg-[#3E7A55]"
                                 style={{ width: `${s.authorityScore || 90}%` }}
                               />
                             </div>
-                            <span className="font-mono font-bold text-white text-[11px]">{s.authorityScore || 90}</span>
+                            <span className="font-mono font-bold text-[#0B5CD5] text-[11px]">{s.authorityScore || 90}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-400 max-w-xs truncate">{s.purpose || 'General Corroboration'}</td>
+                        <td className="px-4 py-3 text-[#2C4E86] max-w-xs truncate">{s.purpose || 'General Corroboration'}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full font-mono text-[10px] font-bold">
+                          <span className="px-2 py-0.5 bg-[#E4EFE7] text-[#2C5B3E] rounded-full font-mono text-[10px] font-bold">
                             {s.status || 'ACTIVE'}
                           </span>
                         </td>
@@ -469,11 +469,11 @@ export default function SettingsPage() {
           <div className="space-y-6">
             
             {/* Honest Sandbox Scope Banner */}
-            <div className="p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl flex items-start gap-3 text-xs">
-              <Info className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-white border border-[#CECECE] rounded-2xl flex items-start gap-3 text-xs shadow-sm">
+              <Info className="w-5 h-5 text-[#D97757] flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold text-white block">Simulation Sandbox Mode Active</span>
-                <span className="text-indigo-200/80 text-[11px]">
+                <span className="font-bold text-[#0B5CD5] block">Simulation Sandbox Mode Active</span>
+                <span className="text-[#2C4E86] text-[11px]">
                   Allows newsroom analysts to test "what-if" weighting sensitivity models in real time without corrupting canonical production scoring.
                 </span>
               </div>
@@ -482,14 +482,14 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               
               {/* Left: Factor Sliders */}
-              <div className="lg:col-span-8 p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-6 shadow-xl text-xs">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="lg:col-span-8 p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm text-xs">
+                <div className="flex justify-between items-center border-b border-[#CECECE] pb-3">
                   <div>
-                    <h3 className="font-bold uppercase font-mono text-white text-xs">Factor Weight Breakdown</h3>
-                    <p className="text-slate-400 text-[11px]">Weights must sum to exactly 100%.</p>
+                    <h3 className="font-bold uppercase font-mono text-[#0B5CD5] text-xs">Factor Weight Breakdown</h3>
+                    <p className="text-[#2C4E86] text-[11px]">Weights must sum to exactly 100%.</p>
                   </div>
                   <div className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs ${
-                    totalWeight === 100 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300 animate-pulse'
+                    totalWeight === 100 ? 'bg-[#E4EFE7] text-[#2C5B3E]' : 'bg-[#F7E3E0] text-[#B23F35] animate-pulse'
                   }`}>
                     Total: {totalWeight}%
                   </div>
@@ -499,8 +499,8 @@ export default function SettingsPage() {
                   {weights.map((w, idx) => (
                     <div key={w.k} className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="font-medium text-white">{w.n}</span>
-                        <span className="font-mono text-indigo-400 font-bold">{w.w}%</span>
+                        <span className="font-medium text-[#0B5CD5]">{w.n}</span>
+                        <span className="font-mono text-[#D97757] font-bold">{w.w}%</span>
                       </div>
                       <input
                         type="range"
@@ -508,9 +508,9 @@ export default function SettingsPage() {
                         max={50}
                         value={w.w}
                         onChange={(e) => updateWeight(idx, e.target.value)}
-                        className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        className="w-full h-1.5 bg-[#EFEEE9] rounded-lg appearance-none cursor-pointer accent-[#D97757]"
                       />
-                      <span className="text-[10px] text-slate-500 block">{w.d}</span>
+                      <span className="text-[10px] text-[#7386A8] block">{w.d}</span>
                     </div>
                   ))}
                 </div>
@@ -522,7 +522,7 @@ export default function SettingsPage() {
                       setWeights(DEFAULT_WEIGHTS);
                       showToast('Weights reset to system baseline');
                     }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold flex items-center gap-1.5"
+                    className="px-4 py-2 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#0B5CD5] rounded-xl font-semibold flex items-center gap-1.5 transition"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset to Baseline</span>
@@ -531,27 +531,27 @@ export default function SettingsPage() {
               </div>
 
               {/* Right: Live Recalculation Preview Dial */}
-              <div className="lg:col-span-4 p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-6 shadow-xl text-center flex flex-col justify-between">
+              <div className="lg:col-span-4 p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm text-center flex flex-col justify-between">
                 <div className="space-y-3">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#7386A8] font-bold block">
                     Simulated Trust Score Dial
                   </span>
 
                   <div className={`text-5xl font-black font-mono my-4 ${
-                    previewScore >= 75 ? 'text-emerald-400' : previewScore >= 40 ? 'text-amber-400' : 'text-rose-400'
+                    previewScore >= 75 ? 'text-[#3E7A55]' : previewScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'
                   }`}>
                     {previewScore}
                   </div>
 
                   <span className={`px-3 py-1 rounded-full font-mono text-xs font-bold uppercase inline-block ${
-                    previewVerdict === 'Real' ? 'bg-emerald-500/20 text-emerald-300' :
-                    previewVerdict === 'Suspicious' ? 'bg-amber-500/20 text-amber-300' :
-                    'bg-rose-500/20 text-rose-300'
+                    previewVerdict === 'Real' ? 'bg-[#E4EFE7] text-[#2C5B3E]' :
+                    previewVerdict === 'Suspicious' ? 'bg-[#F7EEDA] text-[#B98520]' :
+                    'bg-[#F7E3E0] text-[#B23F35]'
                   }`}>
                     Simulated: {previewVerdict}
                   </span>
 
-                  <p className="text-[11px] text-slate-400 leading-relaxed pt-2">
+                  <p className="text-[11px] text-[#2C4E86] leading-relaxed pt-2">
                     Recalculates active dossier scores live as weights adjust.
                   </p>
                 </div>
@@ -559,7 +559,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => showToast('Calibration model simulation saved to analyst scratchpad')}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md text-xs"
+                  className="w-full py-2.5 bg-[#D97757] hover:bg-[#B0512F] text-white font-bold rounded-xl shadow-md text-xs transition"
                 >
                   Save Sandbox Model
                 </button>

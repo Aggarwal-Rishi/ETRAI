@@ -2,67 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import './AppExperience.css';
 
-function GlobalCursor() {
-  const dotRef = useRef(null);
-  const ringRef = useRef(null);
-
-  useEffect(() => {
-    const supportsPointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    if (!supportsPointer) return undefined;
-    const dot = dotRef.current;
-    const ring = ringRef.current;
-    if (!dot || !ring) return undefined;
-
-    let pointerX = window.innerWidth / 2;
-    let pointerY = window.innerHeight / 2;
-    let ringX = pointerX;
-    let ringY = pointerY;
-    let animationFrame = 0;
-
-    const handleMove = event => {
-      pointerX = event.clientX;
-      pointerY = event.clientY;
-      dot.style.left = `${pointerX}px`;
-      dot.style.top = `${pointerY}px`;
-    };
-    const handleOver = event => {
-      const interactive = event.target.closest('a, button, input, textarea, select, [role="button"], [data-interactive]');
-      ring.classList.toggle('is-interactive', Boolean(interactive));
-      ring.classList.toggle('is-text', Boolean(event.target.closest('input, textarea, [contenteditable="true"]')));
-    };
-    const handleOut = event => {
-      if (!event.relatedTarget) {
-        ring.classList.remove('is-interactive', 'is-text');
-      }
-    };
-    const follow = () => {
-      ringX += (pointerX - ringX) * 0.16;
-      ringY += (pointerY - ringY) * 0.16;
-      ring.style.left = `${ringX}px`;
-      ring.style.top = `${ringY}px`;
-      animationFrame = window.requestAnimationFrame(follow);
-    };
-
-    window.addEventListener('pointermove', handleMove, { passive: true });
-    document.addEventListener('pointerover', handleOver);
-    document.addEventListener('pointerout', handleOut);
-    follow();
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      window.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerover', handleOver);
-      document.removeEventListener('pointerout', handleOut);
-    };
-  }, []);
-
-  return (
-    <>
-      <span ref={ringRef} className="etrai-global-cursor-ring" aria-hidden="true" />
-      <span ref={dotRef} className="etrai-global-cursor-dot" aria-hidden="true" />
-    </>
-  );
-}
 
 function AmbientVerificationNetwork() {
   const canvasRef = useRef(null);
@@ -236,13 +175,10 @@ export default function AppExperience() {
   const location = useLocation();
   if (location.pathname === '/') return null;
   return (
-    <>
-      <div className="etrai-global-experience" aria-hidden="true">
-        <AmbientVerificationNetwork />
-        <span className="etrai-global-glow etrai-global-glow-a" />
-        <span className="etrai-global-glow etrai-global-glow-b" />
-      </div>
-      <GlobalCursor />
-    </>
+    <div className="etrai-global-experience" aria-hidden="true">
+      <AmbientVerificationNetwork />
+      <span className="etrai-global-glow etrai-global-glow-a" />
+      <span className="etrai-global-glow etrai-global-glow-b" />
+    </div>
   );
 }

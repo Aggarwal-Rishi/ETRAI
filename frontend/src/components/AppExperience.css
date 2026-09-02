@@ -44,57 +44,7 @@
   background: #0B5CD5;
 }
 
-.etrai-global-cursor-dot,
-.etrai-global-cursor-ring {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2147483000;
-  border-radius: 999px;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  will-change: left, top, width, height;
-}
 
-.etrai-global-cursor-dot {
-  width: 9px;
-  height: 9px;
-  background: #D97757;
-  box-shadow: 0 0 5px 1px #D97757, 0 0 16px 5px rgba(217, 119, 87, 0.7);
-}
-
-.etrai-global-cursor-ring {
-  width: 38px;
-  height: 38px;
-  border: 2px solid rgba(217, 119, 87, 0.85);
-  background: rgba(217, 119, 87, 0.08);
-  box-shadow: 0 0 10px rgba(217, 119, 87, 0.5), inset 0 0 9px rgba(217, 119, 87, 0.12);
-  transition: width 0.22s ease, height 0.22s ease, border-color 0.22s ease, background 0.22s ease, border-radius 0.22s ease;
-}
-
-.etrai-global-cursor-ring.is-interactive {
-  width: 62px;
-  height: 62px;
-  border-color: #0B5CD5;
-  background: rgba(11, 92, 213, 0.1);
-  box-shadow: 0 0 12px rgba(11, 92, 213, 0.6), 0 0 24px rgba(217, 119, 87, 0.2);
-}
-
-.etrai-global-cursor-ring.is-text {
-  width: 5px;
-  height: 32px;
-  border-radius: 3px;
-  border-color: #D97757;
-  background: rgba(217, 119, 87, 0.65);
-  box-shadow: 0 0 12px rgba(217, 119, 87, 0.6);
-}
-
-@media (hover: none), (pointer: coarse) {
-  .etrai-global-cursor-dot,
-  .etrai-global-cursor-ring {
-    display: none;
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .etrai-global-scene {

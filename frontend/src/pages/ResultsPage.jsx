@@ -240,16 +240,16 @@ export default function ResultsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
         <Navbar />
         <main className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
-          <div className="w-16 h-16 rounded-full border-4 border-indigo-500/20 border-t-[#D97757] animate-spin" />
+          <div className="w-16 h-16 rounded-full border-4 border-[#D97757]/20 border-t-[#D97757] animate-spin" />
           <div className="text-center space-y-2 max-w-md">
-            <h2 className="text-xl font-bold text-white">Synthesizing DeepTrust Dossier...</h2>
-            <p className="text-xs text-slate-400 font-mono">{progressState.step}</p>
-            <div className="w-64 h-1.5 bg-slate-900 rounded-full overflow-hidden mx-auto mt-2">
+            <h2 className="text-xl font-bold text-[#0B5CD5]">Synthesizing DeepTrust Dossier...</h2>
+            <p className="text-xs text-[#7386A8] font-mono">{progressState.step}</p>
+            <div className="w-64 h-1.5 bg-[#EFEEE9] rounded-full overflow-hidden mx-auto mt-2">
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 to-[#D97757] transition-all duration-300"
+                className="h-full bg-gradient-to-r from-[#0B5CD5] to-[#D97757] transition-all duration-300"
                 style={{ width: `${progressState.progress || 20}%` }}
               />
             </div>
@@ -261,26 +261,26 @@ export default function ResultsPage() {
 
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
         <Navbar />
         <main className="flex-1 flex flex-col items-center justify-center p-6 space-y-4">
-          <div className="p-3 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+          <div className="p-3 bg-[#F7E3E0] text-[#B23F35] rounded-2xl border border-[#EBC7C2]">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-white">Dossier Unavailable</h2>
-          <p className="text-xs text-slate-400 max-w-md text-center">{error || 'Verification report could not be found.'}</p>
+          <h2 className="text-xl font-bold text-[#0B5CD5]">Dossier Unavailable</h2>
+          <p className="text-xs text-[#7386A8] max-w-md text-center">{error || 'Verification report could not be found.'}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-500 inline-flex items-center gap-1.5"
+              className="px-4 py-2 bg-[#D97757] text-white text-xs font-semibold rounded-xl hover:bg-[#B0512F] inline-flex items-center gap-1.5 shadow-sm"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Retry Loading
             </button>
-            <Link to="/dashboard" className="px-4 py-2 bg-slate-800 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-700">
+            <Link to="/dashboard" className="px-4 py-2 bg-[#EFEEE9] text-[#2C4E86] text-xs font-semibold rounded-xl hover:bg-[#CECECE]">
               Return to Dashboard
             </Link>
-            <Link to="/analysis" className="px-4 py-2 bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-800">
+            <Link to="/analysis" className="px-4 py-2 bg-white border border-[#CECECE] text-[#0B5CD5] text-xs font-semibold rounded-xl hover:border-[#D97757]">
               Start New Analysis
             </Link>
           </div>
@@ -289,7 +289,6 @@ export default function ResultsPage() {
     );
   }
 
-  // Parse report properties safely (Canonical Single Source of Truth)
   const trustScore = report.explainableScoring?.finalTrustScore !== undefined
     ? Math.round(report.explainableScoring.finalTrustScore)
     : (report.scores?.overallTrustScore !== undefined
@@ -307,6 +306,15 @@ export default function ResultsPage() {
   const evidenceCount = claims.reduce((sum, c) => sum + (c.sources ? c.sources.length : 0), 0);
   const contradictionsCount = claims.filter(c => c.verdict === 'FALSE' || c.status === 'FABRICATED').length;
   const entities = report.entities || [];
+  const entityVerification = report.entityVerification || {};
+  const entityStatusStyles = {
+    VERIFIED: 'bg-[#E7F4EC] text-[#2C5B3E] border-[#B9D8C5]',
+    PROBABLE: 'bg-[#FFF6DD] text-[#8A6414] border-[#E8D4B0]',
+    AMBIGUOUS: 'bg-[#FFF0E8] text-[#A34E2E] border-[#E8C2B2]',
+    UNVERIFIED: 'bg-[#F5E9ED] text-[#9F2D4A] border-[#E3BCC8]',
+    DETECTED: 'bg-[#EAF1FC] text-[#2C4E86] border-[#C7D5EB]',
+    TEXT_ONLY: 'bg-[#EFEEE9] text-[#52627D] border-[#CECECE]'
+  };
   const numericalFacts = report.numericalFacts || [];
   const links = report.discoveredAssets?.links || [];
   const mediaType = (report.inputType || report.mediaAnalysis?.mediaType || 'TEXT').toUpperCase();
@@ -384,15 +392,15 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans print:bg-white print:text-black">
+    <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans print:bg-white print:text-black">
       <div className="print:hidden">
         <Navbar />
       </div>
 
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#0c1427] border border-[#17233f] text-white text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp print:hidden">
-          <Sparkles className="w-4 h-4 text-blue-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#000D59] border border-[#D97757] text-[#EDE7DC] text-xs rounded-full shadow-2xl flex items-center gap-2 animate-slideUp print:hidden">
+          <Sparkles className="w-4 h-4 text-[#E88F6B]" />
           <span>{toastMsg}</span>
         </div>
       )}
@@ -408,21 +416,23 @@ export default function ResultsPage() {
           </div>
           <div className="text-right font-mono text-xs text-neutral-700">
             <div><strong>RUN ID:</strong> {id}</div>
+          </div>
+          <div className="text-right font-mono text-xs text-neutral-700">
+            <div><strong>RUN ID:</strong> {id}</div>
             <div><strong>SEALED:</strong> {new Date().toISOString()}</div>
             <div><strong>TRUST SCORE:</strong> {trustScore}/100 ({verdict.toUpperCase()})</div>
           </div>
         </div>
       </div>
-
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
         
         {/* Navigation & Action Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
           <Link
             to="/history"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-[#2C4E86] hover:text-[#0B5CD5] transition"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5 text-[#D97757]" />
             <span>Back to History Ledger</span>
           </Link>
 
@@ -432,14 +442,14 @@ export default function ResultsPage() {
                 navigator.clipboard.writeText(window.location.href);
                 showToast('Dossier URL copied to clipboard');
               }}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium rounded-xl transition flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="w-3.5 h-3.5 text-[#D97757]" />
               <span>Share</span>
             </button>
             <button
               onClick={handlePrintPdf}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-[#0033C4] hover:bg-[#0A45E4] text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-1.5 border border-[rgba(240,237,233,0.28)]"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Export PDF</span>
@@ -450,43 +460,43 @@ export default function ResultsPage() {
         {/* ========================================================================= */}
         {/* 2. VERDICT HERO CARD                                                      */}
         {/* ========================================================================= */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-6 relative overflow-hidden">
+        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#CECECE] shadow-sm space-y-6 relative overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             
             {/* Left: Title + Source + Verdict Wash */}
             <div className="space-y-3 max-w-2xl">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <VerdictBadge status={verdict} size="lg" />
-                <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px] font-bold">
+                <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-mono text-[10px] font-bold border border-[#CECECE]">
                   {mediaType}
                 </span>
-                <span className="text-xs text-slate-500 font-mono">Dossier {id.slice(0, 12)}</span>
+                <span className="text-xs text-[#7386A8] font-mono">Dossier {id.slice(0, 12)}</span>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#0B5CD5] leading-snug">
                 {report.sourceTitle || report.title || 'Verification Investigation'}
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#2C4E86] leading-relaxed">
                 {report.summary || 'Evidentiary investigation conducted across primary web and news archives.'}
               </p>
             </div>
 
             {/* Right: Circular SVG Trust Dial + Telemetry Stats */}
-            <div className="flex items-center gap-6 flex-shrink-0 bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-6 flex-shrink-0 bg-[#F8F8F6] p-5 rounded-2xl border border-[#CECECE]">
               
               {/* Dial */}
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                   <path
-                    className="text-slate-800"
+                    className="text-[#EFEEE9]"
                     strokeWidth="3.5"
                     stroke="currentColor"
                     fill="none"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                   <path
-                    className={trustScore >= 75 ? 'text-emerald-500' : trustScore >= 40 ? 'text-amber-500' : 'text-rose-500'}
+                    className={trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'}
                     strokeDasharray={`${trustScore}, 100`}
                     strokeWidth="3.5"
                     strokeLinecap="round"
@@ -496,28 +506,28 @@ export default function ResultsPage() {
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-black font-mono text-white leading-none">{trustScore}</span>
-                  <span className="text-[9px] uppercase font-mono text-slate-400 mt-0.5">Trust</span>
+                  <span className="text-xl font-black font-mono text-[#0B5CD5] leading-none">{trustScore}</span>
+                  <span className="text-[9px] uppercase font-mono text-[#7386A8] mt-0.5">Trust</span>
                 </div>
               </div>
 
               {/* Telemetry Stats Grid */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-mono">
                 <div>
-                  <span className="text-slate-500 text-[10px] block">Confidence</span>
-                  <span className="font-bold text-white">{confidencePct}%</span>
+                  <span className="text-[#7386A8] text-[10px] block">Confidence</span>
+                  <span className="font-bold text-[#0B5CD5]">{confidencePct}%</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] block">Evidence Items</span>
-                  <span className="font-bold text-indigo-400">{evidenceCount}</span>
+                  <span className="text-[#7386A8] text-[10px] block">Evidence Items</span>
+                  <span className="font-bold text-[#D97757]">{evidenceCount}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] block">Sources Checked</span>
-                  <span className="font-bold text-white">{sources.length}</span>
+                  <span className="text-[#7386A8] text-[10px] block">Sources Checked</span>
+                  <span className="font-bold text-[#0B5CD5]">{sources.length}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 text-[10px] block">Contradictions</span>
-                  <span className={`font-bold ${contradictionsCount > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  <span className="text-[#7386A8] text-[10px] block">Contradictions</span>
+                  <span className={`font-bold ${contradictionsCount > 0 ? 'text-[#B23F35]' : 'text-[#2C5B3E]'}`}>
                     {contradictionsCount}
                   </span>
                 </div>
@@ -529,7 +539,7 @@ export default function ResultsPage() {
         {/* ========================================================================= */}
         {/* 3. REPORT SUB-TABS NAVIGATION                                             */}
         {/* ========================================================================= */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2 print:hidden">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#CECECE] pb-2 print:hidden">
           {[
             { key: 'full', label: 'Full Dossier', icon: Layers },
             { key: 'text', label: 'Text & Language', icon: FileText },
@@ -545,8 +555,8 @@ export default function ResultsPage() {
                 onClick={() => setActiveReportTab(tab.key)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
                   activeReportTab === tab.key
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                    ? 'bg-[#0033C4] text-white shadow-sm font-bold'
+                    : 'bg-white border border-[#CECECE] text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6]'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -562,33 +572,33 @@ export default function ResultsPage() {
         
         {/* TEXT & LANGUAGE TAB */}
         {activeReportTab === 'text' && (
-          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+          <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
               Text & Language Audit
             </h3>
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-              <div className="p-3 bg-slate-950 rounded-xl">
-                <span className="text-slate-500 block">Word Count</span>
-                <span className="text-lg font-bold text-white">{report.extractedText?.split(/\s+/).filter(Boolean).length || 0}</span>
+              <div className="p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl">
+                <span className="text-[#7386A8] block">Word Count</span>
+                <span className="text-lg font-bold text-[#0B5CD5]">{report.extractedText?.split(/\s+/).filter(Boolean).length || 0}</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl">
-                <span className="text-slate-500 block">Urgency Cues</span>
-                <span className="text-lg font-bold text-amber-400">{report.articleSentiment?.urgencyCuesCount || 0}</span>
+              <div className="p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl">
+                <span className="text-[#7386A8] block">Urgency Cues</span>
+                <span className="text-lg font-bold text-[#B98520]">{report.articleSentiment?.urgencyCuesCount || 0}</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl">
-                <span className="text-slate-500 block">Unnamed Attribution</span>
-                <span className="text-lg font-bold text-indigo-400">{report.articleSentiment?.vagueSourcingCount || 0}</span>
+              <div className="p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl">
+                <span className="text-[#7386A8] block">Unnamed Attribution</span>
+                <span className="text-lg font-bold text-[#D97757]">{report.articleSentiment?.vagueSourcingCount || 0}</span>
               </div>
-              <div className="p-3 bg-slate-950 rounded-xl">
-                <span className="text-slate-500 block">Sentiment Tone</span>
-                <span className="text-lg font-bold text-white capitalize">{report.articleSentiment?.tone || 'Neutral'}</span>
+              <div className="p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl">
+                <span className="text-[#7386A8] block">Sentiment Tone</span>
+                <span className="text-lg font-bold text-[#0B5CD5] capitalize">{report.articleSentiment?.tone || 'Neutral'}</span>
               </div>
             </div>
 
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-              <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Raw Extracted Text</span>
-              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+            <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-2">
+              <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">Raw Extracted Text</span>
+              <p className="text-xs text-[#2C4E86] leading-relaxed whitespace-pre-wrap">
                 {report.extractedText || 'No raw document text available.'}
               </p>
             </div>
@@ -597,32 +607,32 @@ export default function ResultsPage() {
 
         {/* LINKS TAB */}
         {activeReportTab === 'links' && (
-          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
+          <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Outbound Link Analysis</h3>
-                <p className="text-xs text-slate-400">HTTP status and heuristic domain classification.</p>
+                <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Outbound Link Analysis</h3>
+                <p className="text-xs text-[#7386A8]">HTTP status and heuristic domain classification.</p>
               </div>
-              <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-[10px] font-mono">Heuristic Classification</span>
+              <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded text-[10px] font-mono border border-[#CECECE]">Heuristic Classification</span>
             </div>
 
             {links.length > 0 ? (
-              <div className="divide-y divide-slate-800 border border-slate-800 rounded-2xl overflow-hidden bg-slate-950 text-xs">
+              <div className="divide-y divide-[#CECECE] border border-[#CECECE] rounded-2xl overflow-hidden bg-white text-xs">
                 {links.map((link, idx) => (
-                  <div key={idx} className="p-3.5 flex items-center justify-between gap-4">
+                  <div key={idx} className="p-3.5 flex items-center justify-between gap-4 hover:bg-[#F8F8F6] transition">
                     <div className="space-y-1 truncate flex-1">
-                      <span className="font-mono text-white block truncate">{link.url || link.u}</span>
-                      <span className="text-[11px] text-slate-500">{link.anchor || link.a || 'Direct Link'}</span>
+                      <span className="font-mono text-[#0B5CD5] font-bold block truncate">{link.url || link.u}</span>
+                      <span className="text-[11px] text-[#7386A8]">{link.anchor || link.a || 'Direct Link'}</span>
                     </div>
                     <div className="flex items-center gap-2 font-mono text-[10px]">
-                      <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded">{link.type || link.t || 'Citation'}</span>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded">200 OK</span>
+                      <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded border border-[#CECECE]">{link.type || link.t || 'Citation'}</span>
+                      <span className="px-2 py-0.5 bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9] rounded font-bold">200 OK</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-8 text-center bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 text-xs text-slate-400">
+              <div className="p-8 text-center bg-[#F8F8F6] rounded-2xl border border-dashed border-[#CECECE] text-xs text-[#7386A8]">
                 No outbound links extracted from source text.
               </div>
             )}
@@ -631,8 +641,8 @@ export default function ResultsPage() {
 
         {/* NUMBERS TAB */}
         {activeReportTab === 'numbers' && (
-          <div className="p-6 bg-slate-900/90 border border-slate-800 rounded-3xl space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+          <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
+            <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
               Numerical & Quantitative Fact Reconciler
             </h3>
             
@@ -640,22 +650,22 @@ export default function ResultsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase text-[10px]">
-                      <th className="pb-2">Claimed Value</th>
-                      <th className="pb-2">Context / Entity</th>
-                      <th className="pb-2">Evidence Finding</th>
-                      <th className="pb-2 text-right">Status</th>
+                    <tr className="border-b border-[#CECECE] text-[#7386A8] font-mono uppercase text-[10px] bg-[#EFEEE9]">
+                      <th className="p-3">Claimed Value</th>
+                      <th className="p-3">Context / Entity</th>
+                      <th className="p-3">Evidence Finding</th>
+                      <th className="p-3 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                  <tbody className="divide-y divide-[#CECECE] text-[#2C4E86]">
                     {numericalFacts.map((fact, idx) => (
-                      <tr key={idx} className="py-2.5">
-                        <td className="py-2.5 font-mono font-bold text-white">{fact.asPrinted}</td>
-                        <td className="py-2.5 text-slate-400">{fact.refersTo}</td>
-                        <td className="py-2.5 text-slate-300">{fact.actualFinding || 'Matches recorded index'}</td>
-                        <td className="py-2.5 text-right font-mono font-bold">
+                      <tr key={idx} className="hover:bg-[#F8F8F6] transition">
+                        <td className="p-3 font-mono font-bold text-[#0B5CD5]">{fact.asPrinted}</td>
+                        <td className="p-3 text-[#7386A8]">{fact.refersTo}</td>
+                        <td className="p-3 text-[#2C4E86]">{fact.actualFinding || 'Matches recorded index'}</td>
+                        <td className="p-3 text-right font-mono font-bold">
                           <span className={`px-2 py-0.5 rounded text-[10px] ${
-                            fact.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                            fact.status === 'VERIFIED' ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9]' : 'bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2]'
                           }`}>
                             {fact.status || 'VERIFIED'}
                           </span>
@@ -666,7 +676,7 @@ export default function ResultsPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-8 text-center bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 text-xs text-slate-400">
+              <div className="p-8 text-center bg-[#F8F8F6] rounded-2xl border border-dashed border-[#CECECE] text-xs text-[#7386A8]">
                 No quantitative figures or numerical assertions identified in this text.
               </div>
             )}
@@ -695,19 +705,19 @@ export default function ResultsPage() {
             <div className="lg:col-span-8 space-y-8">
               
               {/* 01 · TOP HIGHLIGHTS */}
-              <section id="highlights" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
+              <section id="highlights" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#E88F6B]">01 ·</span>
-                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Top Highlights</h3>
+                  <span className="text-xs font-mono font-bold text-[#D97757]">01 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Top Highlights</h3>
                 </div>
-                <ul className="space-y-2.5 text-xs text-slate-300">
+                <ul className="space-y-2.5 text-xs text-[#2C4E86]">
                   {claims.slice(0, 4).map((claim, idx) => (
                     <li key={idx} className="flex items-start gap-2.5">
                       <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
-                        claim.verdict === 'TRUE' || claim.status === 'TRUSTED' ? 'bg-emerald-400' : 'bg-rose-400'
+                        claim.verdict === 'TRUE' || claim.status === 'TRUSTED' ? 'bg-[#2C5B3E]' : 'bg-[#B23F35]'
                       }`} />
                       <span>
-                        <strong>{claim.claimText || claim.claim}</strong> — {claim.explanation || (claim.verdict === 'FALSE' ? 'Directly contradicted by public record.' : 'Supported by authoritative reporting.')}
+                        <strong className="text-[#0B5CD5]">{claim.claimText || claim.claim}</strong> — {claim.explanation || (claim.verdict === 'FALSE' ? 'Directly contradicted by public record.' : 'Supported by authoritative reporting.')}
                       </span>
                     </li>
                   ))}
@@ -715,10 +725,10 @@ export default function ResultsPage() {
               </section>
 
               {/* 02 · SCORE DERIVATION */}
-              <section id="derivation" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
+              <section id="derivation" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#E88F6B]">02 ·</span>
-                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Score Derivation & Factors</h3>
+                  <span className="text-xs font-mono font-bold text-[#D97757]">02 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Score Derivation & Factors</h3>
                 </div>
                 <ScoreDerivationView
                   factors={report.explainableScoring?.factorBreakdown || report.explainableScoring?.factors}
@@ -733,15 +743,15 @@ export default function ResultsPage() {
               </section>
 
               {/* 03 · CLAIM BY CLAIM AUDIT ACCORDION */}
-              <section id="claims" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
+              <section id="claims" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#E88F6B]">03 ·</span>
-                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">
+                    <span className="text-xs font-mono font-bold text-[#D97757]">03 ·</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
                       Atomic Claim Decomposition ({claims.length})
                     </h3>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-mono">
+                  <span className="text-[11px] text-[#7386A8] font-mono">
                     Click any claim to expand full statement & real news summary
                   </span>
                 </div>
@@ -769,8 +779,8 @@ export default function ResultsPage() {
                         key={idx}
                         className={`border rounded-2xl overflow-hidden transition-all ${
                           isOpen
-                            ? 'bg-slate-950/90 border-indigo-500/50 shadow-2xl ring-1 ring-indigo-500/20'
-                            : 'bg-slate-950 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/40'
+                            ? 'bg-[#F8F8F6] border-[#0B5CD5]/40 shadow-md ring-1 ring-[#0B5CD5]/20'
+                            : 'bg-white border-[#CECECE] hover:border-[#0B5CD5]/40 hover:bg-[#F8F8F6]'
                         }`}
                       >
                         {/* Collapsed Header Bar */}
@@ -779,15 +789,15 @@ export default function ResultsPage() {
                           className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none"
                         >
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                            <span className="font-mono text-slate-500 text-xs font-bold px-2 py-0.5 bg-slate-900 border border-slate-800 rounded-lg flex-shrink-0">
+                            <span className="font-mono text-[#0B5CD5] text-xs font-bold px-2 py-0.5 bg-[#EFEEE9] border border-[#CECECE] rounded-lg flex-shrink-0">
                               #{idx + 1}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <span className={`text-xs sm:text-sm font-medium text-white block ${!isOpen ? 'truncate' : ''}`}>
+                              <span className={`text-xs sm:text-sm font-semibold text-[#0B5CD5] block ${!isOpen ? 'truncate' : ''}`}>
                                 {fullClaimText}
                               </span>
                               {!isOpen && (
-                                <span className="text-[11px] text-slate-400 font-mono truncate block mt-0.5">
+                                <span className="text-[11px] text-[#7386A8] font-mono truncate block mt-0.5">
                                   {c.category || c.claimType || 'Factual Proposition'} · {c.sources?.length || 0} source(s) · {claimConfidence}% confidence
                                 </span>
                               )}
@@ -796,7 +806,7 @@ export default function ResultsPage() {
 
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <VerdictBadge status={cVerdict} size="sm" />
-                            <div className="p-1 rounded-lg bg-slate-900 text-slate-400">
+                            <div className="p-1 rounded-lg bg-[#EFEEE9] text-[#2C4E86]">
                               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </div>
                           </div>
@@ -804,26 +814,26 @@ export default function ResultsPage() {
 
                         {/* Expanded Content View */}
                         {isOpen && (
-                          <div className="px-5 pb-5 pt-2 border-t border-slate-800/80 space-y-4 text-xs animate-fadeIn">
+                          <div className="px-5 pb-5 pt-2 border-t border-[#CECECE] space-y-4 text-xs animate-fadeIn">
                             
                             {/* 1. FULL UNTRUNCATED STATEMENT */}
-                            <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2">
+                            <div className="p-4 bg-white border border-[#CECECE] rounded-xl space-y-2 shadow-sm">
                               <div className="flex items-center justify-between flex-wrap gap-2">
-                                <span className="text-[10px] font-mono uppercase text-indigo-400 font-bold flex items-center gap-1.5">
-                                  <Layers className="w-3.5 h-3.5 text-indigo-400" /> Full Claim Statement
+                                <span className="text-[10px] font-mono uppercase text-[#0B5CD5] font-bold flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-[#D97757]" /> Full Claim Statement
                                 </span>
                                 <div className="flex items-center gap-2 font-mono text-[10px] flex-wrap">
-                                  <span className="px-2 py-0.5 bg-indigo-950/80 text-indigo-300 border border-indigo-800/50 rounded">
+                                  <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE] rounded">
                                     {c.category || c.claimType || 'Factual Assertion'}
                                   </span>
-                                  <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-bold">
+                                  <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#0B5CD5] rounded font-bold border border-[#CECECE]">
                                     Confidence: {claimConfidence}%
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => handleClaimResearch(c, idx)}
                                     disabled={researchingClaimIdx !== null}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-sans text-[10px] font-bold text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97757]/40 bg-[#F6E7DF] px-2.5 py-1 font-sans text-[10px] font-bold text-[#B0512F] transition hover:bg-[#D97757] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     {researchingClaimIdx === idx
                                       ? <RefreshCw className="h-3 w-3 animate-spin" />
@@ -834,28 +844,28 @@ export default function ResultsPage() {
                                   </button>
                                 </div>
                               </div>
-                              <p className="text-white font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                              <p className="text-[#2C4E86] font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
                                 {fullClaimText}
                               </p>
                             </div>
 
                             {claimSearchErrors[idx] && (
-                              <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-200">
+                              <div className="rounded-xl border border-[#EBC7C2] bg-[#F7E3E0] p-3 text-xs text-[#B23F35]">
                                 <span className="font-bold">Individual claim search failed:</span> {claimSearchErrors[idx]}
                               </div>
                             )}
 
                             {c.deepResearch?.triggerType === 'MANUAL' && (
-                              <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs text-cyan-100">
+                              <div className="rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3 text-xs text-[#2C4E86]">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-bold">Individual claim research completed</span>
-                                  <span className="font-mono text-[10px] text-cyan-300">
+                                  <span className="font-bold text-[#0B5CD5]">Individual claim research completed</span>
+                                  <span className="font-mono text-[10px] text-[#7386A8]">
                                     {c.deepResearch.decomposedQueries?.length || 0} queries · {c.deepResearch.evaluatedSources?.length || 0} sources · {c.deepResearch.fullPagesFetchedCount || 0} pages read
                                   </span>
                                 </div>
-                                <p className="mt-1.5 leading-relaxed text-slate-300">{c.deepResearch.reasoning}</p>
+                                <p className="mt-1.5 leading-relaxed text-[#2C4E86]">{c.deepResearch.reasoning}</p>
                                 {c.deepResearch.limitations?.length > 0 && (
-                                  <p className="mt-1.5 text-[10px] text-amber-300">{c.deepResearch.limitations.join(' ')}</p>
+                                  <p className="mt-1.5 text-[10px] text-[#B98520]">{c.deepResearch.limitations.join(' ')}</p>
                                 )}
                               </div>
                             )}
@@ -863,50 +873,56 @@ export default function ResultsPage() {
                             {/* 2. REAL NEWS & EVIDENTIARY FINDING SYNTHESIS */}
                             <div className={`p-4 rounded-xl border space-y-2.5 ${
                               cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                ? 'bg-emerald-950/20 border-emerald-500/30'
+                                ? 'bg-[#E4EFE7] border-[#C5DEC9]'
                                 : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                ? 'bg-rose-950/20 border-rose-500/30'
-                                : 'bg-amber-950/20 border-amber-500/30'
+                                ? 'bg-[#F7E3E0] border-[#EBC7C2]'
+                                : 'bg-[#F7EEDA] border-[#E8D4B0]'
                             }`}>
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <span className={`text-[10px] font-mono uppercase font-bold flex items-center gap-1.5 ${
                                   cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                    ? 'text-emerald-400'
+                                    ? 'text-[#2C5B3E]'
                                     : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                    ? 'text-rose-400'
-                                    : 'text-amber-400'
+                                    ? 'text-[#B23F35]'
+                                    : 'text-[#B98520]'
                                 }`}>
                                   <Sparkles className="w-3.5 h-3.5" />
                                   Verified Real News Summary & Evidentiary Findings
                                 </span>
                                 <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
                                   cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9]'
                                     : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    ? 'bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2]'
+                                    : 'bg-[#F7EEDA] text-[#B98520] border border-[#E8D4B0]'
                                 }`}>
                                   {cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED' ? 'CORROBORATED BY REAL NEWS' : (cVerdict === 'Fake' || cVerdict === 'FALSE' ? 'CONTRADICTED BY REAL NEWS' : 'AMBIGUOUS / UNCORROBORATED')}
                                 </span>
                               </div>
-                              <p className="text-slate-200 text-xs sm:text-[13px] leading-relaxed">
+                              <p className={`text-xs sm:text-[13px] leading-relaxed font-medium ${
+                                cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
+                                  ? 'text-[#2C5B3E]'
+                                  : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
+                                  ? 'text-[#B23F35]'
+                                  : 'text-[#B98520]'
+                              }`}>
                                 {realFindingSummary}
                               </p>
                             </div>
 
                             {/* 3. ORIGINAL NEWS PASSAGE / SOURCE CONTEXT (If present in text) */}
                             {originalExcerpt && (
-                              <div className="p-3.5 bg-slate-900/60 border border-slate-800 rounded-xl space-y-1.5">
-                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold flex items-center gap-1.5">
-                                  <FileText className="w-3.5 h-3.5 text-slate-400" />
+                              <div className="p-3.5 bg-white border border-[#CECECE] rounded-xl space-y-1.5">
+                                <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold flex items-center gap-1.5">
+                                  <FileText className="w-3.5 h-3.5 text-[#D97757]" />
                                   Original Text Passage (Analyzed Input)
                                 </span>
-                                <p className="text-slate-300 text-xs italic font-serif leading-relaxed pl-2.5 border-l-2 border-slate-700">
+                                <p className="text-[#2C4E86] text-xs italic font-serif leading-relaxed pl-2.5 border-l-2 border-[#D97757]">
                                   "{originalExcerpt}"
                                 </p>
                                 {c.attribution && (
-                                  <span className="text-[10px] text-slate-400 font-mono block pt-0.5">
-                                    Attributed speaker / source: <strong className="text-slate-200">{c.attribution}</strong>
+                                  <span className="text-[10px] text-[#7386A8] font-mono block pt-0.5">
+                                    Attributed speaker / source: <strong className="text-[#0B5CD5]">{c.attribution}</strong>
                                   </span>
                                 )}
                               </div>
@@ -914,8 +930,8 @@ export default function ResultsPage() {
 
                             {/* 4. CROSS-REFERENCED EVIDENCE SOURCES WITH ACTIVE CLICKABLE LINKS */}
                             {c.sources && c.sources.length > 0 && (
-                              <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                              <div className="space-y-2 pt-2 border-t border-[#CECECE]">
+                                <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">
                                   Cited Evidence & Authoritative Source Ledger ({c.sources.length})
                                 </span>
                                 <div className="space-y-2">
@@ -924,29 +940,29 @@ export default function ResultsPage() {
                                     const sDomain = s.domain || (sUrl ? (() => { try { return new URL(sUrl).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; } })() : 'web source');
                                     
                                     return (
-                                      <div key={sIdx} className="bg-slate-900/80 border border-slate-800/90 hover:border-indigo-500/50 p-3 rounded-xl transition space-y-1.5">
+                                      <div key={sIdx} className="bg-white border border-[#CECECE] hover:border-[#0B5CD5] p-3 rounded-xl transition space-y-1.5 shadow-sm">
                                         <div className="flex items-center justify-between gap-2 flex-wrap">
                                           {sUrl ? (
                                             <a
                                               href={sUrl}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="font-semibold text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-1.5 truncate max-w-md group"
+                                              className="font-bold text-[#0B5CD5] hover:text-[#0033C4] hover:underline flex items-center gap-1.5 truncate max-w-md group"
                                               onClick={(e) => e.stopPropagation()}
                                             >
                                               <span className="truncate">{s.title || s.publication || sDomain}</span>
-                                              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-indigo-300" />
+                                              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-[#D97757] group-hover:text-[#B0512F]" />
                                             </a>
                                           ) : (
-                                            <span className="font-semibold text-slate-300 truncate max-w-md">{s.title || s.publication || 'Authoritative Source'}</span>
+                                            <span className="font-bold text-[#0B5CD5] truncate max-w-md">{s.title || s.publication || 'Authoritative Source'}</span>
                                           )}
 
                                           <div className="flex items-center gap-1.5 flex-shrink-0 font-mono text-[10px]">
-                                            <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-medium">{sDomain}</span>
+                                            <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-medium border border-[#CECECE]">{sDomain}</span>
                                             <span className={`px-2 py-0.5 rounded font-bold ${
-                                              s.stance === 'SUPPORTS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                                              s.stance === 'REFUTES' || s.stance === 'CONTRADICTS' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
-                                              'bg-slate-800 text-slate-300'
+                                              s.stance === 'SUPPORTS' ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9]' :
+                                              s.stance === 'REFUTES' || s.stance === 'CONTRADICTS' ? 'bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2]' :
+                                              'bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE]'
                                             }`}>
                                               {s.stance || 'SUPPORT'}
                                             </span>
@@ -954,7 +970,7 @@ export default function ResultsPage() {
                                         </div>
 
                                         {(s.snippet || s.excerpt || s.reason) && (
-                                          <p className="text-[11px] text-slate-400 leading-relaxed pl-2.5 border-l-2 border-slate-800">
+                                          <p className="text-[11px] text-[#2C4E86] leading-relaxed pl-2.5 border-l-2 border-[#CECECE]">
                                             {s.snippet || s.excerpt || s.reason}
                                           </p>
                                         )}
@@ -965,7 +981,7 @@ export default function ResultsPage() {
                                               href={sUrl}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="text-[10px] text-slate-500 hover:text-slate-300 font-mono truncate block hover:underline"
+                                              className="text-[10px] text-[#7386A8] hover:text-[#0B5CD5] font-mono truncate block hover:underline"
                                               onClick={(e) => e.stopPropagation()}
                                             >
                                               {sUrl}
@@ -1000,36 +1016,36 @@ export default function ResultsPage() {
               )}
 
               {/* 06 · SOURCE LEDGER & CROSS REFERENCE */}
-              <section id="sources" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
+              <section id="sources" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#E88F6B]">06 ·</span>
-                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Cross-Reference Evidence & Source Ledger</h3>
+                    <span className="text-xs font-mono font-bold text-[#D97757]">06 ·</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Cross-Reference Evidence & Source Ledger</h3>
                   </div>
-                  <span className="text-xs text-slate-500 font-mono">{sources.length} sources indexed</span>
+                  <span className="text-xs text-[#7386A8] font-mono">{sources.length} sources indexed</span>
                 </div>
 
                 {sources.length > 0 ? (
-                  <div className="divide-y divide-slate-800 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden text-xs">
+                  <div className="divide-y divide-[#CECECE] bg-white rounded-2xl border border-[#CECECE] overflow-hidden text-xs">
                     {sources.map((src, idx) => {
                       const srcUrl = src.url || src.link || (src.domain ? `https://${src.domain}` : null);
                       const domainName = src.domain || (srcUrl ? (() => { try { return new URL(srcUrl).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; } })() : 'web source');
 
                       return (
-                        <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-900/40 transition">
+                        <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#F8F8F6] transition">
                           <div className="space-y-1 min-w-0 flex-1">
                             {srcUrl ? (
                               <a
                                 href={srcUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-bold text-white hover:text-indigo-300 transition flex items-center gap-1.5 truncate group"
+                                className="font-bold text-[#0B5CD5] hover:text-[#0033C4] transition flex items-center gap-1.5 truncate group"
                               >
                                 <span className="truncate">{src.title || src.publication || domainName}</span>
-                                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 group-hover:text-indigo-300" />
+                                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-[#D97757] group-hover:text-[#B0512F]" />
                               </a>
                             ) : (
-                              <span className="font-bold text-white block truncate">{src.title || src.publication || domainName}</span>
+                              <span className="font-bold text-[#0B5CD5] block truncate">{src.title || src.publication || domainName}</span>
                             )}
 
                             {srcUrl && (
@@ -1037,7 +1053,7 @@ export default function ResultsPage() {
                                 href={srcUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[11px] text-slate-400 hover:text-slate-200 font-mono truncate block hover:underline"
+                                className="text-[11px] text-[#7386A8] hover:text-[#0B5CD5] font-mono truncate block hover:underline"
                               >
                                 {srcUrl}
                               </a>
@@ -1045,10 +1061,10 @@ export default function ResultsPage() {
                           </div>
 
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded font-mono text-[10px] font-semibold">
+                            <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE] rounded font-mono text-[10px] font-semibold">
                               {domainName}
                             </span>
-                            <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold ${src.sourceRole === 'IMAGE_PROVENANCE' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-300'}`}>
+                            <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold ${src.sourceRole === 'IMAGE_PROVENANCE' ? 'bg-[#F7EEDA] text-[#B98520] border border-[#E8D4B0]' : 'bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE]'}`}>
                               {src.evidenceType?.replaceAll('_', ' ') || src.tier || 'CLAIM EVIDENCE'}
                             </span>
                           </div>
@@ -1057,62 +1073,154 @@ export default function ResultsPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="p-6 text-center text-xs text-slate-500">
+                  <div className="p-6 text-center text-xs text-[#7386A8]">
                     Direct input analysis — no external query citations registered.
                   </div>
                 )}
               </section>
 
               {/* 07 · INTENT & ENTITIES */}
-              <section id="entities" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#E88F6B]">07 ·</span>
-                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Named Entities & Intent</h3>
+              <section id="entities" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-[#D97757]">07 ·</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Named Entities & Intent</h3>
+                  </div>
+                  {entityVerification.visuallyDetectedCount > 0 && (
+                    <div className="flex flex-wrap gap-1.5 text-[9px] font-mono uppercase">
+                      <span className="rounded-full border border-[#C7D5EB] bg-[#EAF1FC] px-2 py-1 text-[#2C4E86]">
+                        {entityVerification.visuallyDetectedCount} visual
+                      </span>
+                      <span className="rounded-full border border-[#B9D8C5] bg-[#E7F4EC] px-2 py-1 text-[#2C5B3E]">
+                        {entityVerification.verifiedCount || 0} verified
+                      </span>
+                      <span className="rounded-full border border-[#E8D4B0] bg-[#FFF6DD] px-2 py-1 text-[#8A6414]">
+                        {entityVerification.probableCount || 0} probable
+                      </span>
+                    </div>
+                  )}
                 </div>
 
+                {entityVerification.providerStatus === 'WITHHELD' && (
+                  <div className="p-3 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-[11px] leading-relaxed text-[#52627D]">
+                    Visual entities were detected locally. External identity corroboration was withheld because external visual search was not enabled for this analysis.
+                  </div>
+                )}
+
                 {report.analysisOptions?.detectEntities === false ? (
-                  <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-400">
+                  <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#7386A8]">
                     Entity detection was disabled for this analysis.
                   </div>
                 ) : entities.length === 0 ? (
-                  <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-400">
+                  <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-xl text-xs text-[#7386A8]">
                     No named entities were confidently extracted.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {entities.slice(0, 6).map((ent, idx) => (
-                    <div key={idx} className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-white text-xs">{ent.name}</span>
-                        <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 rounded font-mono text-[9px] uppercase">
-                          {ent.type || 'Entity'}
-                        </span>
+                    {entities.slice(0, 12).map((ent, idx) => {
+                      const status = ent.verificationStatus || (ent.visuallyDetected ? 'DETECTED' : 'TEXT_ONLY');
+                      const timestamps = Array.isArray(ent.frameTimestamps) ? ent.frameTimestamps.slice(0, 5) : [];
+                      const evidenceSources = Array.isArray(ent.sources) ? ent.sources.slice(0, 3) : [];
+                      return (
+                      <div key={`${ent.normalizedName || ent.name || 'entity'}-${idx}`} className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl space-y-2 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="block font-bold text-[#0B5CD5] text-xs break-words">{ent.normalizedName || ent.name}</span>
+                            <span className="mt-0.5 block font-mono text-[9px] uppercase text-[#7386A8]">
+                              {ent.type || 'Entity'}{ent.visuallyDetected ? ' · visible in media' : ' · text evidence'}
+                            </span>
+                          </div>
+                          <span className={`shrink-0 px-2 py-1 border rounded-full font-mono text-[9px] font-bold uppercase ${entityStatusStyles[status] || entityStatusStyles.DETECTED}`}>
+                            {status.replaceAll('_', ' ')}
+                          </span>
+                        </div>
+
+                        {(ent.verificationConfidence !== undefined || ent.visualConfidence !== undefined) && (
+                          <div className="flex flex-wrap gap-1.5 text-[9px] font-mono text-[#52627D]">
+                            {ent.visualConfidence !== undefined && <span>Visual {Math.round(ent.visualConfidence)}%</span>}
+                            {ent.verificationConfidence !== undefined && <span>· Verification {Math.round(ent.verificationConfidence)}%</span>}
+                            {ent.crossModalConfirmation && <span className="text-[#2C5B3E]">· Transcript/OCR match</span>}
+                          </div>
+                        )}
+
+                        {ent.detectionMethods?.length > 0 && (
+                          <p className="text-[10px] text-[#7386A8] break-words">
+                            Methods: {ent.detectionMethods.map(method => String(method).replaceAll('_', ' ').toLowerCase()).join(', ')}
+                          </p>
+                        )}
+                        {timestamps.length > 0 && (
+                          <p className="text-[10px] font-mono text-[#52627D]">
+                            Seen at {timestamps.map(value => `${Number(value).toFixed(1)}s`).join(', ')}
+                          </p>
+                        )}
+                        <p className="text-[11px] leading-relaxed text-[#2C4E86]">
+                          {ent.finding || ent.visualBasis || 'Extracted from the submitted content; no independent identity claim was made.'}
+                        </p>
+
+                        {evidenceSources.length > 0 && (
+                          <div className="space-y-1 border-t border-[#DEDEDA] pt-2">
+                            {evidenceSources.map((source, sourceIdx) => (
+                              <a
+                                key={`${source.url}-${sourceIdx}`}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-1.5 text-[10px] text-[#0B5CD5] hover:underline"
+                              >
+                                <ExternalLink size={10} className="mt-0.5 shrink-0" />
+                                <span className="break-words">{source.title || source.domain || 'Corroborating source'}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        {ent.search?.error && ent.search.status !== 'WITHHELD' && (
+                          <p className="text-[10px] text-[#9F2D4A]">Search limitation: {ent.search.error}</p>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-400">{ent.finding || 'Reconciled in primary index'}</p>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {report.intentAnalysis && (
+                  <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-xl space-y-2">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-[10px] font-mono font-bold uppercase text-[#7386A8]">Framing / likely intent</span>
+                      <span className="text-[10px] font-mono font-bold uppercase text-[#D97757]">
+                        {String(report.intentAnalysis.primaryIntent || 'Not established').replaceAll('_', ' ')}
+                        {report.intentAnalysis.confidence !== undefined ? ` · ${Math.round(report.intentAnalysis.confidence)}%` : ''}
+                      </span>
                     </div>
-                    ))}
+                    {report.intentAnalysis.reasoning && (
+                      <p className="text-[11px] leading-relaxed text-[#2C4E86]">{report.intentAnalysis.reasoning}</p>
+                    )}
+                    {report.intentAnalysis.misinformationTargeting?.targetedEntities?.length > 0 && (
+                      <p className="text-[10px] text-[#52627D] break-words">
+                        Potentially targeted entities: {report.intentAnalysis.misinformationTargeting.targetedEntities.join(', ')}
+                      </p>
+                    )}
                   </div>
                 )}
               </section>
 
               {/* 08 · PROVENANCE TIMELINE */}
-              <section id="provenance" className="p-6 bg-slate-900/80 border border-slate-800 rounded-3xl space-y-4 shadow-lg scroll-mt-24">
+              <section id="provenance" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#E88F6B]">08 ·</span>
-                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-white">Provenance & Integrity Seal</h3>
+                  <span className="text-xs font-mono font-bold text-[#D97757]">08 ·</span>
+                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Provenance & Integrity Seal</h3>
                 </div>
                 <div className="space-y-3 text-xs">
-                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
-                    <span className="text-slate-300">Origin status</span>
-                    <span className="font-mono text-slate-500">
+                  <div className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl flex items-center justify-between">
+                    <span className="text-[#2C4E86]">Origin status</span>
+                    <span className="font-mono text-[#7386A8]">
                       {report.analysisOptions?.traceProvenance === false
                         ? 'Tracing disabled'
                         : String(report.provenance?.originAnalysis?.originStatus || 'Not established').replaceAll('_', ' ')}
                     </span>
                   </div>
-                  <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
-                    <span className="text-slate-300">Report integrity</span>
-                    <span className="font-mono text-emerald-400 font-bold text-right">
+                  <div className="p-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-xl flex items-center justify-between">
+                    <span className="text-[#2C4E86]">Report integrity</span>
+                    <span className="font-mono text-[#2C5B3E] font-bold text-right">
                       {report.integritySeal
                         ? `${report.integritySeal.algorithm} · ${report.integritySeal.digest.slice(0, 16)}… · ${new Date(report.integritySeal.sealedAt).toLocaleString()}`
                         : `Generated ${new Date(report.generatedAt || report.createdAt || 0).toLocaleString()}`}
@@ -1127,10 +1235,10 @@ export default function ResultsPage() {
               <div className="sticky top-20 space-y-6">
                 
                 {/* Mini Verdict Dial */}
-                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-center">
-                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold">Dossier Confidence</span>
+                <div className="p-5 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-center shadow-sm">
+                  <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold">Dossier Confidence</span>
                   <div className={`text-3xl font-black font-mono ${
-                    trustScore >= 75 ? 'text-emerald-400' : trustScore >= 40 ? 'text-amber-400' : 'text-rose-400'
+                    trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'
                   }`}>
                     {trustScore} / 100
                   </div>
@@ -1138,27 +1246,27 @@ export default function ResultsPage() {
                 </div>
 
                 {/* Jump TOC Navigation */}
-                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-xs">
-                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Sections</span>
+                <div className="p-5 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-xs shadow-sm">
+                  <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">Sections</span>
                   <div className="space-y-1.5 font-medium">
                     <a
                       href="#highlights"
                       onClick={(e) => { e.preventDefault(); document.getElementById('highlights')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       01 · Highlights
                     </a>
                     <a
                       href="#derivation"
                       onClick={(e) => { e.preventDefault(); document.getElementById('derivation')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       02 · Score Derivation
                     </a>
                     <a
                       href="#claims"
                       onClick={(e) => { e.preventDefault(); document.getElementById('claims')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       03 · Claims Audit
                     </a>
@@ -1166,7 +1274,7 @@ export default function ResultsPage() {
                       <a
                         href="#image-forensics"
                         onClick={(e) => { e.preventDefault(); document.getElementById('image-forensics')?.scrollIntoView({ behavior: 'smooth' }); }}
-                        className="block text-indigo-400 hover:text-indigo-300 transition cursor-pointer font-semibold"
+                        className="block text-[#D97757] hover:text-[#B0512F] transition cursor-pointer font-semibold"
                       >
                         04 · Image Forensics
                       </a>
@@ -1175,7 +1283,7 @@ export default function ResultsPage() {
                       <a
                         href="#video-forensics"
                         onClick={(e) => { e.preventDefault(); document.getElementById('video-forensics')?.scrollIntoView({ behavior: 'smooth' }); }}
-                        className="block text-indigo-400 hover:text-indigo-300 transition cursor-pointer font-semibold"
+                        className="block text-[#D97757] hover:text-[#B0512F] transition cursor-pointer font-semibold"
                       >
                         05 · Video Forensics
                       </a>
@@ -1183,21 +1291,21 @@ export default function ResultsPage() {
                     <a
                       href="#sources"
                       onClick={(e) => { e.preventDefault(); document.getElementById('sources')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       06 · Sources
                     </a>
                     <a
                       href="#entities"
                       onClick={(e) => { e.preventDefault(); document.getElementById('entities')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       07 · Entities
                     </a>
                     <a
                       href="#provenance"
                       onClick={(e) => { e.preventDefault(); document.getElementById('provenance')?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className="block text-slate-400 hover:text-white transition cursor-pointer"
+                      className="block text-[#2C4E86] hover:text-[#0B5CD5] transition cursor-pointer"
                     >
                       08 · Provenance
                     </a>
@@ -1205,13 +1313,13 @@ export default function ResultsPage() {
                 </div>
 
                 {/* Active Agents Checklist */}
-                <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 text-xs">
-                  <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Active Agents</span>
-                  <div className="space-y-2 text-slate-300">
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 1: Ingestion & OCR</div>
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 2: Claim Extraction</div>
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 3: Fact Match Engine</div>
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Agent 4: Dossier Synthesis</div>
+                <div className="p-5 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-xs shadow-sm">
+                  <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">Active Agents</span>
+                  <div className="space-y-2 text-[#2C4E86]">
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 1: Ingestion & OCR</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 2: Claim Extraction</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 3: Fact Match Engine</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 4: Dossier Synthesis</div>
                   </div>
                 </div>
               </div>
