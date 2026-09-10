@@ -346,78 +346,78 @@ export default function ForensicLoadingConsole({
       </div>
 
       {/* ========================================================================= */}
-      {/* 2-COLUMN COMMAND CONSOLE                                                  */}
+      {/* 2-COLUMN COMMAND CONSOLE (EXPANSIVE FULL-SCREEN HUD)                      */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* ----------------------------------------------------------------------- */}
-        {/* LEFT COLUMN: Visual Stage, Telemetry & Actions (7 Cols)                 */}
+        {/* LEFT COLUMN: Visual Stage, Telemetry & Actions                          */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 xl:col-span-7 2xl:col-span-8 space-y-4">
           
           {/* Main Visual Stage Panel */}
-          <div className="bg-white border border-[#CECECE] rounded-3xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-[#CECECE] rounded-3xl overflow-hidden shadow-md">
             
             <div className="px-5 py-3.5 border-b border-[#EFEEE9] flex items-center justify-between bg-[#F8F8F6]">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-[#D97757]" />
                 <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-[#0B5CD5]">
-                  Forensic Scan Stage
+                  Forensic Visualizer Stage
                 </h3>
               </div>
               <span className="text-[11px] font-mono text-[#7386A8]">
-                Pass 1 · Real-Time Visualizer
+                Pass 1 · High-DPI Neural Scanner
               </span>
             </div>
 
             {/* Interactive Canvas Frame */}
-            <div className="p-4 bg-[#F8F8F6]">
-              <div className="relative rounded-2xl overflow-hidden border border-[#000D59] shadow-xl bg-[#000D59]">
+            <div className="p-4 sm:p-5 bg-[#F8F8F6]">
+              <div className="relative rounded-2xl overflow-hidden border border-[#000D59] shadow-2xl bg-[#000D59]">
                 
                 {/* Corner HUD Reticles */}
-                <span className="absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 border-[#D97757] z-20 pointer-events-none" />
-                <span className="absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 border-[#D97757] z-20 pointer-events-none" />
-                <span className="absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 border-[#D97757] z-20 pointer-events-none" />
-                <span className="absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 border-[#D97757] z-20 pointer-events-none" />
+                <span className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-[#D97757] z-20 pointer-events-none" />
+                <span className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-[#D97757] z-20 pointer-events-none" />
+                <span className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-[#D97757] z-20 pointer-events-none" />
+                <span className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-[#D97757] z-20 pointer-events-none" />
 
                 {/* Tags */}
-                <div className="absolute top-3 left-10 z-20 px-2.5 py-0.5 bg-[#000D59]/80 border border-[#D97757]/40 rounded text-[10px] font-mono text-[#F6E7DF] tracking-wider uppercase backdrop-blur-sm">
+                <div className="absolute top-3.5 left-11 z-20 px-3 py-1 bg-[#000D59]/85 border border-[#D97757]/50 rounded-lg text-[10.5px] font-mono text-[#F6E7DF] tracking-wider uppercase backdrop-blur-md shadow-sm">
                   Deep Scan Active
                 </div>
-                <div className="absolute top-3 right-10 z-20 px-2.5 py-0.5 bg-[#000D59]/80 border border-[#CECECE]/30 rounded text-[10px] font-mono text-[#A7B0D4] tracking-wider backdrop-blur-sm">
+                <div className="absolute top-3.5 right-11 z-20 px-3 py-1 bg-[#000D59]/85 border border-[#CECECE]/30 rounded-lg text-[10.5px] font-mono text-[#A7B0D4] tracking-wider backdrop-blur-md shadow-sm">
                   {displayId}
                 </div>
 
                 {/* Canvas */}
                 <canvas
                   ref={canvasRef}
-                  width={640}
-                  height={320}
-                  className="w-full h-64 sm:h-72 object-cover block"
+                  width={1280}
+                  height={640}
+                  className="w-full h-80 sm:h-96 md:h-[430px] lg:h-[480px] xl:h-[520px] object-cover block"
                 />
 
                 {/* Bottom Frame Readout Foot */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#000836] via-[#000D59]/90 to-transparent z-20 space-y-2 pointer-events-none">
+                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 bg-gradient-to-t from-[#000836] via-[#000D59]/95 to-transparent z-20 space-y-3 pointer-events-none">
                   <div className="flex items-end justify-between gap-4">
-                    <div className="space-y-0.5 min-w-0 flex-1">
-                      <div className="text-xs font-mono font-semibold text-[#F6E7DF] truncate">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="text-sm font-mono font-bold text-[#F6E7DF] truncate">
                         {currentStep}
                       </div>
-                      <div className="text-[11px] font-mono text-[#A7B0D4]">
-                        Estimated time remaining: <b className="text-[#F0EDE9]">{estRemaining}s</b> · 4 agents in parallel
+                      <div className="text-xs font-mono text-[#A7B0D4]">
+                        Estimated time remaining: <b className="text-[#F0EDE9]">{estRemaining}s</b> · 4 agents running in parallel
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 font-mono">
-                      <span className="text-2xl font-black text-white leading-none">{progress}</span>
-                      <span className="text-xs font-bold text-[#E88F6B] ml-0.5">%</span>
-                      <div className="text-[9px] text-[#A7B0D4] uppercase tracking-wider">Analyzed</div>
+                      <span className="text-3xl sm:text-4xl font-black text-white leading-none">{progress}</span>
+                      <span className="text-sm font-bold text-[#E88F6B] ml-1">%</span>
+                      <div className="text-[10px] text-[#A7B0D4] uppercase tracking-wider font-semibold">Analyzed</div>
                     </div>
                   </div>
 
                   {/* Glowing Progress Track */}
-                  <div className="w-full h-1.5 bg-[rgba(240,237,233,0.18)] rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-[rgba(240,237,233,0.18)] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-[#0033C4] via-[#D97757] to-[#3E7A55] transition-all duration-300 rounded-full shadow-[0_0_12px_rgba(217,119,87,0.8)]"
+                      className="h-full bg-gradient-to-r from-[#0033C4] via-[#D97757] to-[#3E7A55] transition-all duration-300 rounded-full shadow-[0_0_16px_rgba(217,119,87,0.9)]"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -526,12 +526,12 @@ export default function ForensicLoadingConsole({
         </div>
 
         {/* ----------------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: Agent Cluster & Live Log Terminal (5 Cols)                */}
+        {/* RIGHT COLUMN: Agent Cluster & Live Log Terminal                         */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-5 xl:col-span-5 2xl:col-span-4 space-y-4">
           
           {/* Agent Cluster Card */}
-          <div className="bg-white border border-[#CECECE] rounded-3xl p-5 space-y-4 shadow-sm">
+          <div className="bg-white border border-[#CECECE] rounded-3xl p-5 space-y-4 shadow-md">
             <div className="flex items-center justify-between pb-3 border-b border-[#EFEEE9]">
               <div className="flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-[#0B5CD5]" />
@@ -592,7 +592,7 @@ export default function ForensicLoadingConsole({
                     </p>
 
                     {/* Agent Micro Progress Bar */}
-                    <div className="w-full h-1 bg-[#CECECE]/40 rounded-full overflow-hidden">
+                    <div className="w-full h-1.5 bg-[#CECECE]/40 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 rounded-full ${
                           status.state === 'COMPLETED'
@@ -611,8 +611,8 @@ export default function ForensicLoadingConsole({
           </div>
 
           {/* Live Terminal Log Stream */}
-          <div className="bg-[#000D59] border border-[rgba(240,237,233,0.16)] rounded-3xl p-4 space-y-3 shadow-xl text-[#EDE7DC]">
-            <div className="flex items-center justify-between pb-2 border-b border-[rgba(240,237,233,0.12)]">
+          <div className="bg-[#000D59] border border-[rgba(240,237,233,0.16)] rounded-3xl p-5 space-y-3 shadow-2xl text-[#EDE7DC]">
+            <div className="flex items-center justify-between pb-2.5 border-b border-[rgba(240,237,233,0.12)]">
               <div className="flex items-center gap-2 text-xs font-mono text-[#E88F6B]">
                 <Zap className="w-3.5 h-3.5 text-[#D97757]" />
                 <span className="uppercase font-bold tracking-wider">Live System Stream</span>
@@ -620,7 +620,7 @@ export default function ForensicLoadingConsole({
               <span className="text-[10px] font-mono text-[#A7B0D4]">SSE Connected</span>
             </div>
 
-            <div className="h-44 overflow-y-auto space-y-1.5 font-mono text-[11px] pr-1 scrollbar-thin">
+            <div className="h-56 sm:h-64 lg:h-72 xl:h-80 overflow-y-auto space-y-2 font-mono text-[11px] pr-1.5 scrollbar-thin">
               {logs.map((log, i) => (
                 <div
                   key={i}
@@ -629,7 +629,7 @@ export default function ForensicLoadingConsole({
                   }`}
                 >
                   <span className="text-[#D97757] select-none flex-shrink-0">[{log.time}]</span>
-                  <span className="truncate">{log.text}</span>
+                  <span className="break-words leading-relaxed">{log.text}</span>
                 </div>
               ))}
             </div>

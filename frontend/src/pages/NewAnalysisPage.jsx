@@ -373,7 +373,9 @@ export default function NewAnalysisPage() {
         </div>
       )}
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
+      <main className={`flex-1 w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-fadeIn ${
+        isRunning ? 'max-w-[1720px]' : 'max-w-5xl'
+      }`}>
         
         {/* ========================================================================= */}
         {/* MODE 1: INTAKE STUDIO (FORM VIEW)                                         */}
