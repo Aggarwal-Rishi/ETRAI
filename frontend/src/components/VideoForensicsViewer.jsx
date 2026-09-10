@@ -186,6 +186,8 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
   const transcriptSourceMatches = Array.isArray(transcriptSearch?.matches) ? transcriptSearch.matches : [];
   const transcriptQueries = Array.isArray(transcriptSearch?.queries) ? transcriptSearch.queries : [];
   const contextSegments = Array.isArray(contextReport?.segments) ? contextReport.segments : [];
+  const relatedVideoNews = analysis.relatedVideoNews || contextReport?.relatedNews || reportData?.relatedVideoNews || null;
+  const relatedVideoArticles = Array.isArray(relatedVideoNews?.articles) ? relatedVideoNews.articles : [];
   const limitations = Array.isArray(analysis.limitations) ? analysis.limitations : [];
   const duration = Number(metadata.durationSeconds || audio.durationSeconds || 0);
   const contextVerdict = contextReport?.verdict || 'Inconclusive';
@@ -238,6 +240,21 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
             <p className="text-[11px] text-[#7386A8] font-mono">Context verdict: {contextVerdict} · authenticity score {contextReport ? Math.round(Number(contextReport.authenticity_score || 0) * 100) : '—'} / 100 · technical signal: {String(forensics.verdict || 'ANALYSIS_LIMITED').replaceAll('_', ' ')}</p>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+        {[
+          ['Technical integrity', String(forensics.verdict || 'INCONCLUSIVE').replaceAll('_', ' ')],
+          ['Original / completeness', completeness?.label || 'Not established'],
+          ['Transcript source', transcriptSearch ? String(transcriptSearch.status || 'UNAVAILABLE').replaceAll('_', ' ') : 'Not searched'],
+          ['Context preservation', String(completeness?.contextIntegrity?.verdict || contextReport?.related_news_context || 'INCONCLUSIVE').replaceAll('_', ' ')],
+          ['Related news', relatedVideoNews ? String(relatedVideoNews.overallContextVerdict || relatedVideoNews.status || 'INCONCLUSIVE').replaceAll('_', ' ') : 'Not available']
+        ].map(([label, value]) => (
+          <div key={label} className="min-w-0 rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3">
+            <span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">{label}</span>
+            <strong className="mt-1 block break-words text-[10px] font-mono text-[#0B5CD5]">{value}</strong>
+          </div>
+        ))}
       </div>
 
       {completeness && (
@@ -348,6 +365,71 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
           )}
 
           {Array.isArray(completeness.limitations) && completeness.limitations.length > 0 && <p className="text-[10px] leading-relaxed text-[#B98520]">{completeness.limitations.join(' ')}</p>}
+        </div>
+      )}
+
+      {relatedVideoNews && (
+        <div className="rounded-2xl border border-[#CECECE] bg-[#F8F8F6] p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0B5CD5] flex items-center gap-1.5 font-mono">
+                <Search className="w-3.5 h-3.5 text-[#D97757]" /> Related video &amp; news context
+              </span>
+              <p className="mt-2 text-xs leading-relaxed text-[#2C4E86]">{relatedVideoNews.summary}</p>
+            </div>
+            <span className="self-start rounded-full border border-[#CECECE] bg-white px-3 py-1 text-[10px] font-mono font-bold text-[#0B5CD5]">
+              {String(relatedVideoNews.overallContextVerdict || relatedVideoNews.status || 'INCONCLUSIVE').replaceAll('_', ' ')}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {[
+              ['Sources reviewed', relatedVideoNews.readableArticleCount || 0],
+              ['Accepted evidence', relatedVideoNews.evidenceEligibleCount || 0],
+              ['Independent publishers', relatedVideoNews.independentPublisherCount || 0],
+              ['Supporting / refuting', `${relatedVideoNews.supportingCount || 0} / ${relatedVideoNews.refutingCount || 0}`]
+            ].map(([label, value]) => <div key={label} className="rounded-xl border border-[#CECECE] bg-white p-3"><span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">{label}</span><strong className="mt-1 block font-mono text-[#0B5CD5]">{value}</strong></div>)}
+          </div>
+
+          {relatedVideoNews.earliestPublication && (
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3 text-[11px]">
+              <span className="block text-[9px] uppercase tracking-wider text-[#7386A8]">Earliest recovered publication</span>
+              <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <strong className="break-words text-[#0B5CD5]">{relatedVideoNews.earliestPublication.title || relatedVideoNews.earliestPublication.domain}</strong>
+                <div className="flex items-center gap-3">
+                  {relatedVideoNews.earliestPublication.publishedAt && <span className="font-mono text-[10px] text-[#7386A8]">{new Date(relatedVideoNews.earliestPublication.publishedAt).toLocaleString()}</span>}
+                  <a href={relatedVideoNews.earliestPublication.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 text-[#D97757] font-semibold">Open <ExternalLink className="w-3 h-3" /></a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {relatedVideoArticles.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {relatedVideoArticles.map((article, index) => (
+                <article key={`${article.url}-${index}`} className="rounded-xl border border-[#CECECE] bg-white p-3 text-[11px] space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="break-words font-bold text-[#0B5CD5]">{article.title || article.domain || 'Related source'}</p>
+                      <p className="mt-1 text-[#7386A8]">{[article.publisher, article.publishedAt].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    <span className={`flex-shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-mono font-bold ${article.evidenceEligible ? 'border-[#B9D8C3] bg-[#E5F2E9] text-[#3E7A55]' : 'border-[#E8D4B0] bg-[#F7EEDA] text-[#B98520]'}`}>{article.evidenceEligible ? 'ACCEPTED' : 'REVIEW ONLY'}</span>
+                  </div>
+                  {article.newsSummary && <p className="leading-relaxed text-[#2C4E86]">{article.newsSummary}</p>}
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-full border border-[#CECECE] bg-[#F8F8F6] px-2 py-0.5 font-mono text-[9px] text-[#0B5CD5]">{String(article.mediaLinkStatus || 'UNVERIFIED').replaceAll('_', ' ')}</span>
+                    <span className="rounded-full border border-[#CECECE] bg-[#F8F8F6] px-2 py-0.5 font-mono text-[9px] text-[#0B5CD5]">{String(article.relationship || 'NEUTRAL').replaceAll('_', ' ')}</span>
+                    {article.exactFrameMatches > 0 && <span className="rounded-full border border-[#CECECE] bg-[#F8F8F6] px-2 py-0.5 font-mono text-[9px] text-[#0B5CD5]">{article.exactFrameMatches} keyframe match{article.exactFrameMatches === 1 ? '' : 'es'}</span>}
+                    {article.transcriptEvidenceScore > 0 && <span className="rounded-full border border-[#CECECE] bg-[#F8F8F6] px-2 py-0.5 font-mono text-[9px] text-[#0B5CD5]">Transcript {Math.round(article.transcriptEvidenceScore)}/100</span>}
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-[#7386A8]">{article.rationale}</p>
+                  {article.url && <a href={article.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 text-[#D97757] font-semibold">Open source <ExternalLink className="w-3 h-3" /></a>}
+                </article>
+              ))}
+            </div>
+          )}
+
+          {relatedVideoNews.limitations?.length > 0 && <p className="text-[10px] leading-relaxed text-[#7386A8]">{relatedVideoNews.limitations.join(' ')}</p>}
         </div>
       )}
 

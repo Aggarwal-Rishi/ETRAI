@@ -367,20 +367,29 @@ export default function NewAnalysisPage() {
 
   // Pipeline Stages Definition
   const PIPELINE_STAGES = [
-    { id: 'INTAKE', label: 'Intake & Parsing', desc: 'Validates input magic-bytes, extracts OCR/text, cleans payload' },
-    { id: 'PROVENANCE', label: 'Provenance & Source Authority', desc: 'Queries ranked sources, checks registrar WHOIS and wire archives' },
-    { id: 'CLAIMS', label: 'Claim Extraction Engine', desc: 'Decomposes narrative into atomic, verifiable assertions' },
-    { id: 'FACT_MATCH', label: 'Cross-Source Fact Match', desc: 'Queries primary web indices and evaluates corroboration signals' },
-    { id: 'FORENSICS', label: 'Media & Forensics Rails', desc: 'ELA pixel analysis, keyframe splice detection, spectral match' }
+    { id: 'INTAKE', label: 'Intake & Content Extraction', desc: 'Validates the payload and extracts document text, OCR, audio, or video frames' },
+    { id: 'FORENSICS', label: 'Media & Provenance Screening', desc: 'Checks file integrity, decoded-pixel signals, credentials, and authorized source matching' },
+    { id: 'CLAIMS', label: 'Claim & Observation Extraction', desc: 'Separates user claims, media observations, and contextual propositions' },
+    { id: 'FACT_MATCH', label: 'Evidence Evaluation', desc: 'Evaluates authorized sources as supporting, refuting, qualifying, or neutral' },
+    { id: 'REPORT', label: 'Scoring & Dossier Generation', desc: 'Calculates applicable factors and saves the final audit trail' }
   ];
 
   const getStageStatus = (stageId, index) => {
-    let currentIndex = 0;
-    if (progress < 25) currentIndex = 0;
-    else if (progress < 50) currentIndex = 1;
-    else if (progress < 75) currentIndex = 2;
-    else if (progress < 90) currentIndex = 3;
-    else currentIndex = 4;
+    const stageGroups = [
+      ['INTAKE', 'VALIDATION', 'READING', 'OCR', 'KEYFRAME_EXTRACTION', 'FRAME_ANALYSIS'],
+      ['FORENSICS', 'VIDEO_PROVENANCE', 'VIDEO_CONTEXT', 'MEDIA_ANALYSIS'],
+      ['CLAIMS', 'CLAIM_EXTRACTION'],
+      ['FACT_MATCH', 'ARTICLE_DEEP_RESEARCH', 'WEB_VERIFICATION'],
+      ['REPORT', 'REPORT_GENERATION', 'COMPLETED']
+    ];
+    let currentIndex = stageGroups.findIndex(group => group.includes(String(currentStage || '').toUpperCase()));
+    if (currentIndex < 0) {
+      if (progress < 25) currentIndex = 0;
+      else if (progress < 60) currentIndex = 1;
+      else if (progress < 75) currentIndex = 2;
+      else if (progress < 90) currentIndex = 3;
+      else currentIndex = 4;
+    }
 
     if (index < currentIndex) return 'COMPLETED';
     if (index === currentIndex) return 'ACTIVE';

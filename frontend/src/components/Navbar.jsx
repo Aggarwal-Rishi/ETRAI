@@ -161,7 +161,7 @@ export default function Navbar() {
               {/* Mobile Hamburger Trigger */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden w-11 h-11 inline-flex items-center justify-center rounded-xl text-[#A7B0D4] hover:text-white hover:bg-[rgba(240,237,233,0.10)] transition"
+                className="lg:hidden w-11 h-11 inline-flex items-center justify-center rounded-xl text-[#A7B0D4] hover:text-white hover:bg-[rgba(240,237,233,0.10)] transition"
                 aria-label="Toggle navigation drawer"
                 aria-expanded={isMobileMenuOpen}
                 aria-controls="app-mobile-navigation"
@@ -185,7 +185,7 @@ export default function Navbar() {
               </Link>
 
               {/* Desktop Nav Links */}
-              <nav className="hidden md:flex items-center gap-1.5">
+              <nav className="hidden lg:flex items-center gap-1.5">
                 {navLinks.map((item) => {
                   const active = isActive(item.to);
                   const Icon = item.icon;
@@ -423,7 +423,7 @@ export default function Navbar() {
 
         {/* Mobile Navigation Drawer */}
         {isMobileMenuOpen && (
-          <div id="app-mobile-navigation" className="md:hidden max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[rgba(240,237,233,0.16)] bg-[#000D59] px-4 py-4 space-y-2 animate-fadeIn">
+          <div id="app-mobile-navigation" className="lg:hidden max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[rgba(240,237,233,0.16)] bg-[#000D59] px-4 py-4 space-y-2 animate-fadeIn">
             {navLinks.map((item) => {
               const active = isActive(item.to);
               const Icon = item.icon;

@@ -1,3 +1,4 @@
+import ClaimGroupSummary from '../components/ClaimGroupSummary';
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -25,6 +26,12 @@ import {
   Link as LinkIcon,
   Hash,
   Share2,
+  Copy,
+  Mail,
+  MessageCircle,
+  Send,
+  Facebook,
+  X,
   Download,
   Printer,
   Check,
@@ -37,6 +44,14 @@ import {
   Lock,
 } from 'lucide-react';
 
+const isEvidentiarySource = (source = {}) => ['SUPPORTS', 'SUPPORT', 'REFUTES', 'CONTRADICTS', 'QUALIFIES', 'VERIFIED']
+  .includes(String(source.stance || source.relationship || '').toUpperCase());
+
+const uniqueSources = (items = []) => Array.from(new Map(items.filter(Boolean).map((source, index) => [
+  source.url || source.link || `${source.domain || 'source'}:${source.title || index}`,
+  source
+])).values());
+
 export default function ResultsPage() {
   const { id } = useParams();
   const [report, setReport] = useState(null);
@@ -48,6 +63,7 @@ export default function ResultsPage() {
   const [toastMsg, setToastMsg] = useState(null);
   const [researchingClaimIdx, setResearchingClaimIdx] = useState(null);
   const [claimSearchErrors, setClaimSearchErrors] = useState({});
+  const [shareOpen, setShareOpen] = useState(false);
 
   // SSE progress state for live pipeline jobs
   const [progressState, setProgressState] = useState({
@@ -238,6 +254,16 @@ export default function ResultsPage() {
     };
   }, [id]);
 
+  // Hooks must run on every render, including loading and error states.
+  useEffect(() => {
+    if (!shareOpen) return undefined;
+    const close = event => {
+      if (event.key === 'Escape') setShareOpen(false);
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [shareOpen]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans">
@@ -296,14 +322,15 @@ export default function ResultsPage() {
         : (report.factualAccuracyScore !== undefined ? Math.round(report.factualAccuracyScore) : 50));
   const verdict = report.verdict || (trustScore >= 75 ? 'Real' : trustScore >= 40 ? 'Suspicious' : 'Fake');
   const claims = report.claims || [];
-  const claimSources = claims.flatMap((claim) => Array.isArray(claim.sources) ? claim.sources : []);
-  const sources = report.sources?.length
-    ? report.sources
-    : Array.from(new Map(claimSources.map((source, index) => [
-      source.url || source.link || `${source.domain || 'source'}-${index}`,
-      source
-    ])).values());
-  const evidenceCount = claims.reduce((sum, c) => sum + (c.sources ? c.sources.length : 0), 0);
+  const claimSources = claims.flatMap((claim) => Array.isArray(claim.sources) ? claim.sources.filter(isEvidentiarySource) : []);
+  const sources = uniqueSources([...(report.sources || []).filter(isEvidentiarySource), ...claimSources]);
+  const evidenceCount = sources.length;
+  const displaySummary = report.summary?.replace(/\bbased on \d+ evidentiary sources?\b/, `based on ${evidenceCount} evidentiary source${evidenceCount === 1 ? '' : 's'}`);
+  const reviewedSources = uniqueSources([
+    ...(report.sources || []),
+    ...claims.flatMap(claim => claim.sources || []),
+    ...claims.flatMap(claim => claim.deepResearch?.evaluatedSources || [])
+  ]);
   const contradictionsCount = claims.filter(c => c.verdict === 'FALSE' || c.status === 'FABRICATED').length;
   const entities = report.entities || [];
   const entityVerification = report.entityVerification || {};
@@ -327,13 +354,23 @@ export default function ResultsPage() {
       Object.keys(report.mediaAnalysis.videoAudioForensics).length > 0) ||
     Boolean(report?.sourceTitle && /\b(?:video|clip|mp4|mov|webm|avi)\b/i.test(report.sourceTitle));
 
-  // Confidence derivation — exact same canonical metric as trust score
-  const confidencePct = trustScore;
+  // Evidence confidence is distinct from the article trust score.
+  const confidencePct = report.evidenceConfidence ?? report.scores?.evidenceConfidence ?? null;
 
   // Print PDF trigger
-  const handlePrintPdf = () => {
-    window.print();
+  const handlePrintPdf = () => { window.print(); };
+  const shareTitle = report?.sourceTitle || document.title || 'DeepTrust verification report';
+  const shareText = report?.summary || `Verification report: ${shareTitle}`;
+  const shareUrl = window.location.href;
+  const shareLinks = {
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${shareTitle}\n${shareUrl}`)}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+    x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText.slice(0, 240))}&url=${encodeURIComponent(shareUrl)}`,
+    telegram: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareTitle)}`,
+    email: `mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodeURIComponent(`${shareText}\n\n${shareUrl}`)}`
   };
+  const handleShare = async () => { if (navigator.share) { try { await navigator.share({ title: shareTitle, text: shareText, url: shareUrl }); setShareOpen(false); } catch (error) { if (error?.name !== 'AbortError') setShareOpen(true); } return; } setShareOpen(value => !value); };
+  const copyShareLink = async () => { try { await navigator.clipboard.writeText(shareUrl); showToast('Link copied!'); setShareOpen(false); } catch (_) { showToast('Unable to copy link'); } };
 
   const handleClaimResearch = async (claim, claimIndex) => {
     if (researchingClaimIdx !== null) return;
@@ -364,6 +401,7 @@ export default function ResultsPage() {
       }
 
       setReport(previous => {
+        if (payload.updatedReport) return payload.updatedReport;
         const updatedClaims = [...(previous.claims || [])];
         updatedClaims[claimIndex] = payload.updatedClaim;
         const sourceMap = new Map();
@@ -436,17 +474,22 @@ export default function ResultsPage() {
             <span>Back to History Ledger</span>
           </Link>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 relative">
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                showToast('Dossier URL copied to clipboard');
-              }}
+              onClick={handleShare}
+              aria-label="Share this verification report"
+              aria-expanded={shareOpen}
+              aria-haspopup="menu"
               className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
             >
               <Share2 className="w-3.5 h-3.5 text-[#D97757]" />
               <span>Share</span>
             </button>
+            {shareOpen && <div role="menu" aria-label="Share options" className="absolute right-0 top-11 z-30 w-64 rounded-2xl border border-[#CECECE] bg-white p-2 shadow-xl animate-fadeIn">
+              <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-[#7386A8]">Share report</p>
+              {[[MessageCircle, 'WhatsApp', shareLinks.whatsapp], [Facebook, 'Facebook', shareLinks.facebook], [X, 'X', shareLinks.x], [Send, 'Telegram', shareLinks.telegram], [Mail, 'Email', shareLinks.email]].map(([Icon, label, href]) => <a key={label} role="menuitem" href={href} target="_blank" rel="noreferrer" onClick={() => setShareOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[#2C4E86] hover:bg-[#F3F6FC] focus:outline-none focus:ring-2 focus:ring-[#0B5CD5]"><Icon className="h-4 w-4 text-[#D97757]" /><span>{label}</span></a>)}
+              <button role="menuitem" onClick={copyShareLink} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#2C4E86] hover:bg-[#F3F6FC] focus:outline-none focus:ring-2 focus:ring-[#0B5CD5]"><Copy className="h-4 w-4 text-[#D97757]" /><span>Copy Link</span></button>
+            </div>}
             <button
               onClick={handlePrintPdf}
               className="px-3.5 py-1.5 bg-[#0033C4] hover:bg-[#0A45E4] text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-1.5 border border-[rgba(240,237,233,0.28)]"
@@ -478,7 +521,7 @@ export default function ResultsPage() {
               </h1>
 
               <p className="text-xs sm:text-sm text-[#2C4E86] leading-relaxed">
-                {report.summary || 'Evidentiary investigation conducted across primary web and news archives.'}
+                {displaySummary || 'Evidentiary investigation conducted across primary web and news archives.'}
               </p>
             </div>
 
@@ -511,11 +554,13 @@ export default function ResultsPage() {
                 </div>
               </div>
 
+              {report.evidenceCoverage != null && <p className="text-xs text-[#7386A8] max-w-xs">Evidence coverage: <strong>{report.evidenceCoverage}%</strong>. Unresolved details are not established falsehoods.</p>}
+              {report.extractionCoverage?.unrepresentedPassages?.length > 0 && <details className="text-xs text-[#7386A8] max-w-sm"><summary className="cursor-pointer focus-visible:outline">{report.extractionCoverage.unrepresentedPassages.length} article passages not mapped to checked details</summary><p className="my-2">These may be background or omitted assertions; they have not been verified.</p>{report.extractionCoverage.unrepresentedPassages.map((text,i)=><p key={i} className="my-2">{text}</p>)}</details>}
               {/* Telemetry Stats Grid */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-mono">
                 <div>
                   <span className="text-[#7386A8] text-[10px] block">Confidence</span>
-                  <span className="font-bold text-[#0B5CD5]">{confidencePct}%</span>
+                  <span className="font-bold text-[#0B5CD5]">{confidencePct == null ? 'Not recorded' : `${confidencePct}%`}</span>
                 </div>
                 <div>
                   <span className="text-[#7386A8] text-[10px] block">Evidence Items</span>
@@ -523,7 +568,7 @@ export default function ResultsPage() {
                 </div>
                 <div>
                   <span className="text-[#7386A8] text-[10px] block">Sources Checked</span>
-                  <span className="font-bold text-[#0B5CD5]">{sources.length}</span>
+                  <span className="font-bold text-[#0B5CD5]">{reviewedSources.length}</span>
                 </div>
                 <div>
                   <span className="text-[#7386A8] text-[10px] block">Contradictions</span>
@@ -748,11 +793,11 @@ export default function ResultsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold text-[#D97757]">03 ·</span>
                     <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
-                      Atomic Claim Decomposition ({claims.length})
+                      {claims.some(c => c.claimGroup) ? `Claim groups (${new Set(claims.map(c => c.claimGroup?.id).filter(Boolean)).size}) · ${claims.length} factual details` : `Claim details (${claims.length})`}
                     </h3>
                   </div>
                   <span className="text-[11px] text-[#7386A8] font-mono">
-                    Click any claim to expand full statement & real news summary
+                    Expand a factual detail to inspect its verdict and evidence
                   </span>
                 </div>
 
@@ -773,6 +818,12 @@ export default function ResultsPage() {
                     const claimConfidence = typeof c.confidence === 'number' ? Math.round(c.confidence) : (
                       c.status === 'TRUSTED' || cVerdict === 'VERIFIED' || cVerdict === 'Real' ? 95 : 50
                     );
+                    const confidenceLabel = c.confidenceType === 'OCR_EXTRACTION'
+                      ? 'OCR extraction confidence'
+                      : c.confidenceType === 'VISUAL_EXTRACTION'
+                        ? 'Visual extraction confidence'
+                        : 'Evidence confidence';
+                    const neutralResearchSources = (c.deepResearch?.evaluatedSources || []).filter(source => !isEvidentiarySource(source));
 
                     return (
                       <div
@@ -783,6 +834,7 @@ export default function ResultsPage() {
                             : 'bg-white border-[#CECECE] hover:border-[#0B5CD5]/40 hover:bg-[#F8F8F6]'
                         }`}
                       >
+                        <ClaimGroupSummary claim={c} claims={claims} />
                         {/* Collapsed Header Bar */}
                         <div
                           onClick={() => setOpenClaimIdx(isOpen ? -1 : idx)}
@@ -794,11 +846,11 @@ export default function ResultsPage() {
                             </span>
                             <div className="min-w-0 flex-1">
                               <span className={`text-xs sm:text-sm font-semibold text-[#0B5CD5] block ${!isOpen ? 'truncate' : ''}`}>
-                                {fullClaimText}
+                                {c.claimGroup && <span className="text-[#52627D] font-normal">Detail: </span>}{fullClaimText}
                               </span>
                               {!isOpen && (
                                 <span className="text-[11px] text-[#7386A8] font-mono truncate block mt-0.5">
-                                  {c.category || c.claimType || 'Factual Proposition'} · {c.sources?.length || 0} source(s) · {claimConfidence}% confidence
+                                  {c.observationOnly ? 'Media Observation' : (c.category || c.claimType || 'Factual Proposition')} · {c.sources?.filter(isEvidentiarySource).length || 0} accepted evidence source(s) · {claimConfidence}% {confidenceLabel.toLowerCase()}
                                 </span>
                               )}
                             </div>
@@ -827,7 +879,7 @@ export default function ResultsPage() {
                                     {c.category || c.claimType || 'Factual Assertion'}
                                   </span>
                                   <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#0B5CD5] rounded font-bold border border-[#CECECE]">
-                                    Confidence: {claimConfidence}%
+                                    {confidenceLabel}: {claimConfidence}%
                                   </span>
                                   <button
                                     type="button"
@@ -868,6 +920,25 @@ export default function ResultsPage() {
                                   <p className="mt-1.5 text-[10px] text-[#B98520]">{c.deepResearch.limitations.join(' ')}</p>
                                 )}
                               </div>
+                            )}
+
+                            {neutralResearchSources.length > 0 && (
+                              <details className="rounded-xl border border-[#CECECE] bg-white p-3 text-xs text-[#2C4E86]">
+                                <summary className="cursor-pointer font-bold text-[#52627D]">
+                                  Search results reviewed but not accepted as evidence ({neutralResearchSources.length})
+                                </summary>
+                                <div className="mt-2 space-y-2">
+                                  {neutralResearchSources.map((source, sourceIndex) => {
+                                    const sourceUrl = source.url || source.link;
+                                    return (
+                                      <div key={`${sourceUrl || source.title}-${sourceIndex}`} className="rounded-lg border border-[#DEDEDA] bg-[#F8F8F6] p-2">
+                                        {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0B5CD5] hover:underline">{source.title || source.domain || 'Reviewed search result'}</a> : <strong>{source.title || 'Reviewed search result'}</strong>}
+                                        <p className="mt-0.5 text-[10px] text-[#7386A8]">Neutral or insufficiently relevant; excluded from scoring and the evidence ledger.</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </details>
                             )}
 
                             {/* 2. REAL NEWS & EVIDENTIARY FINDING SYNTHESIS */}
@@ -929,13 +1000,13 @@ export default function ResultsPage() {
                             )}
 
                             {/* 4. CROSS-REFERENCED EVIDENCE SOURCES WITH ACTIVE CLICKABLE LINKS */}
-                            {c.sources && c.sources.length > 0 && (
+                            {c.sources && c.sources.filter(isEvidentiarySource).length > 0 && (
                               <div className="space-y-2 pt-2 border-t border-[#CECECE]">
                                 <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">
-                                  Cited Evidence & Authoritative Source Ledger ({c.sources.length})
+                                  Accepted claim evidence ({c.sources.filter(isEvidentiarySource).length})
                                 </span>
                                 <div className="space-y-2">
-                                  {c.sources.map((s, sIdx) => {
+                                  {c.sources.filter(isEvidentiarySource).map((s, sIdx) => {
                                     const sUrl = s.url || s.link || (s.domain ? `https://${s.domain}` : null);
                                     const sDomain = s.domain || (sUrl ? (() => { try { return new URL(sUrl).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; } })() : 'web source');
                                     
@@ -1022,7 +1093,7 @@ export default function ResultsPage() {
                     <span className="text-xs font-mono font-bold text-[#D97757]">06 ·</span>
                     <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Cross-Reference Evidence & Source Ledger</h3>
                   </div>
-                  <span className="text-xs text-[#7386A8] font-mono">{sources.length} sources indexed</span>
+                  <span className="text-xs text-[#7386A8] font-mono">{sources.length} accepted evidence sources</span>
                 </div>
 
                 {sources.length > 0 ? (
@@ -1148,7 +1219,7 @@ export default function ResultsPage() {
                             Methods: {ent.detectionMethods.map(method => String(method).replaceAll('_', ' ').toLowerCase()).join(', ')}
                           </p>
                         )}
-                        {timestamps.length > 0 && (
+                        {timestamps.length > 0 && (mediaType.includes('VIDEO') || mediaType.includes('AUDIO')) && (
                           <p className="text-[10px] font-mono text-[#52627D]">
                             Seen at {timestamps.map(value => `${Number(value).toFixed(1)}s`).join(', ')}
                           </p>

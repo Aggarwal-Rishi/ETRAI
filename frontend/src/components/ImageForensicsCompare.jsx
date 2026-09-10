@@ -24,6 +24,12 @@ import {
 } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 
+const formatProvider = (value) => String(value || 'UNAVAILABLE').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+const formatSignalPercent = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${Math.round((numeric <= 1 ? numeric : numeric / 100) * 100)}%` : 'Not measured';
+};
+
 export default function ImageForensicsCompare({ images = [], reportData = {}, providedImage, originalImage, differences = [] }) {
   // If reportData has images array or imageForensics, extract the image item
   const imageList = Array.isArray(images) && images.length > 0
@@ -128,6 +134,11 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
     reportData?.mediaAnalysis?.imageSourceContextComparison ||
     reportData?.imageSourceContextComparison ||
     null;
+  const relatedImageNews = selectedAsset?.relatedNews ||
+    reportData?.relatedImageNews ||
+    reportData?.mediaAnalysis?.relatedImageNews ||
+    reportData?.mediaAnalysis?.imageForensics?.relatedNews ||
+    null;
 
   const comparisonTone = sourceComparison?.status === 'MATCHED'
     ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300'
@@ -230,10 +241,11 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
               <Search className="w-4 h-4" /> Reverse-image evidence
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div><span className="block text-[10px] uppercase text-[#7386A8]">Provider</span><strong className="text-[#0B5CD5]">{primaryItem.reverseSearchProvider || 'Unavailable'}</strong></div>
-              <div><span className="block text-[10px] uppercase text-[#7386A8]">Status</span><strong className="text-[#0B5CD5]">{primaryItem.originalFoundStatus || 'UNVERIFIED'}</strong></div>
+              <div><span className="block text-[10px] uppercase text-[#7386A8]">Provider</span><strong className="text-[#0B5CD5]">{formatProvider(primaryItem.reverseSearchProvider)}</strong></div>
+              <div><span className="block text-[10px] uppercase text-[#7386A8]">Status</span><strong className="text-[#0B5CD5]">{formatProvider(primaryItem.originalFoundStatus || 'UNVERIFIED')}</strong></div>
             </div>
             {primaryItem.reverseSearchQuery && <div><span className="block text-[10px] uppercase text-[#7386A8]">Search based on</span><p className="text-xs text-[#2C4E86] mt-1">{primaryItem.reverseSearchQuery}</p></div>}
+            {primaryItem.reverseSearchLimitations?.length > 0 && <p className="text-[11px] text-[#B98520] leading-relaxed">{primaryItem.reverseSearchLimitations.join(' ')}</p>}
             <p className="text-[11px] text-[#7386A8] leading-relaxed">Only a downloadable image that was compared locally can appear as an original or candidate. Ordinary keyword-result pages are excluded.</p>
           </div>
         </div>
@@ -300,6 +312,97 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
           </div>
         )}
 
+        {relatedImageNews && (
+          <div className="rounded-2xl border border-[#CECECE] bg-[#F8F8F6] p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#0B5CD5]">
+                  <Search className="w-4 h-4 text-[#D97757]" /> News related to this image
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-[#7386A8]">
+                  News pages connected to reverse-image results, checked against the submitted pixels and visual context.
+                </p>
+              </div>
+              <span className="rounded-full border border-[#CECECE] bg-white px-2.5 py-1 text-[10px] font-mono font-bold uppercase text-[#0B5CD5]">
+                {formatProvider(relatedImageNews.status)}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-[#CECECE] bg-white p-3">
+              <span className="block text-[10px] uppercase tracking-wider text-[#7386A8]">Related-news summary</span>
+              <p className="mt-1.5 text-xs leading-relaxed text-[#2C4E86]">{relatedImageNews.summary}</p>
+              {Array.isArray(relatedImageNews.newsDigest) && relatedImageNews.newsDigest.length > 0 && (
+                <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-[#52627D]">
+                  {relatedImageNews.newsDigest.map((item, index) => <li key={`digest-${index}`}>• {item}</li>)}
+                </ul>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-center">
+              {[
+                ['Readable pages', relatedImageNews.readableArticleCount || 0],
+                ['Accepted evidence', relatedImageNews.evidenceEligibleCount || 0],
+                ['Publishers', relatedImageNews.independentPublisherCount || 0],
+                ['Context verdict', formatProvider(relatedImageNews.overallContextVerdict || 'INSUFFICIENT_EVIDENCE')]
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-[#CECECE] bg-white px-2 py-3">
+                  <strong className="block text-xs text-[#0B5CD5]">{value}</strong>
+                  <span className="mt-1 block text-[9px] uppercase tracking-wider text-[#7386A8]">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {relatedImageNews.earliestPublication && (
+              <div className="rounded-xl border border-[#CECECE] bg-white p-3 text-xs">
+                <span className="block text-[10px] uppercase tracking-wider text-[#7386A8]">Earliest readable publication</span>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <strong className="text-[#0B5CD5]">{relatedImageNews.earliestPublication.title || relatedImageNews.earliestPublication.domain}</strong>
+                  {relatedImageNews.earliestPublication.publishedAt && <span className="font-mono text-[10px] text-[#7386A8]">{new Date(relatedImageNews.earliestPublication.publishedAt).toLocaleString()}</span>}
+                  <a href={relatedImageNews.earliestPublication.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[#D97757]">
+                    Open <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {Array.isArray(relatedImageNews.articles) && relatedImageNews.articles.length > 0 && (
+              <div className="space-y-2">
+                {relatedImageNews.articles.map((article, index) => (
+                  <article key={article.url || index} className="rounded-xl border border-[#CECECE] bg-white p-3 space-y-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <a href={article.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-[#0B5CD5] hover:text-[#D97757]">
+                          {article.title || article.domain || 'Related news page'} <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                        </a>
+                        <p className="mt-0.5 text-[10px] font-mono text-[#7386A8]">
+                          {article.publisher || article.domain || 'Unknown publisher'}
+                          {article.publishedAt ? ` · ${new Date(article.publishedAt).toLocaleDateString()}` : ''}
+                          {Number.isFinite(article.imageSimilarity) ? ` · ${article.imageSimilarity}% image similarity` : ''}
+                        </p>
+                      </div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-mono font-bold uppercase ${
+                        article.evidenceEligible
+                          ? article.relationship === 'REFUTES'
+                            ? 'border-[#EBC7C2] bg-[#F7E3E0] text-[#B23F35]'
+                            : 'border-[#C5DEC9] bg-[#E4EFE7] text-[#2C5B3E]'
+                          : 'border-[#E8D4B0] bg-[#F7EEDA] text-[#B98520]'
+                      }`}>
+                        {article.evidenceEligible ? `${article.relationship} · accepted` : 'Reviewed · not evidence'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#52627D]">{article.newsSummary || article.limitation || 'No readable article summary was available.'}</p>
+                    {article.rationale && <p className="text-[10px] leading-relaxed text-[#7386A8]">{article.rationale}</p>}
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {relatedImageNews.limitations?.length > 0 && (
+              <p className="text-[10px] leading-relaxed text-[#7386A8]">{relatedImageNews.limitations.join(' ')}</p>
+            )}
+          </div>
+        )}
+
         {/* Assets Container (.asset) */}
         <div className="divide-y divide-[#CECECE]">
           {(imageList.length > 0 ? imageList : [primaryItem]).map((asset, idx) => {
@@ -350,7 +453,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
                     <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
                       <span className="text-[#7386A8]">EXIF / C2PA</span>
-                      <b className={`font-semibold text-right ${asset.exifState === 'VALID' ? 'text-[#2C5B3E]' : asset.exifState === 'EDITED' ? 'text-[#B98520]' : 'text-[#B23F35]'}`}>
+                      <b className={`font-semibold text-right ${asset.exifState === 'VALID' ? 'text-[#2C5B3E]' : asset.exifState === 'EDITED' ? 'text-[#B98520]' : 'text-[#52627D]'}`}>
                         {asset.exifStatus}
                       </b>
                     </div>
@@ -362,9 +465,9 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                       </b>
                     </div>
 
-                    {asset.manipulationLikelihood && (
+                    {asset.manipulationLikelihood !== undefined && asset.manipulationLikelihood !== null && (
                       <div className="flex justify-between gap-4 py-1 border-b border-dashed border-[#CECECE]">
-                        <span className="text-[#7386A8]">Manipulation likelihood</span>
+                        <span className="text-[#7386A8]">{asset.manipulationMeasurementLabel || 'Detected manipulation signal score'}</span>
                         <b className={`font-semibold text-right ${
                           parseFloat(asset.manipulationLikelihood) >= 0.70
                             ? 'text-[#B23F35]'
@@ -372,11 +475,21 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                             ? 'text-[#B98520]'
                             : 'text-[#2C5B3E]'
                         }`}>
-                          {asset.manipulationLikelihood}
+                          {formatSignalPercent(asset.manipulationLikelihood)}
                         </b>
                       </div>
                     )}
                   </div>
+
+                  {asset.forensics && (
+                    <div className="rounded-xl border border-[#DEDEDA] bg-white p-3 text-[11px] text-[#52627D] space-y-1.5">
+                      <p><strong className="text-[#0B5CD5]">File structure:</strong> {asset.forensics.integrity?.isValid === true ? 'Valid; no truncation or trailing payload detected' : asset.forensics.integrity?.status || 'Not measured'}</p>
+                      <p><strong className="text-[#0B5CD5]">Pixel duplicate screen:</strong> {asset.forensics.copyMove?.rationale || 'Not measured'}</p>
+                      <p><strong className="text-[#0B5CD5]">Compression screen:</strong> {asset.forensics.ela?.details || 'Not measured'}</p>
+                      <p><strong className="text-[#0B5CD5]">Pixel hash:</strong> <span className="font-mono">{asset.forensics.perceptualHash || asset.forensics.dHash || 'Not available'}</span></p>
+                      <p className="text-[#7386A8]">A clean screen means no tested signal was found; it does not establish authorship, capture date, or originality.</p>
+                    </div>
+                  )}
 
                   {/* CTA Button: Open side-by-side compare */}
                   <div className="pt-2">
@@ -441,6 +554,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
               <button
                 type="button"
+                aria-label="Close image comparison"
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 rounded-xl bg-[#EFEEE9] hover:bg-[#CECECE] text-[#7386A8] hover:text-[#0B5CD5] transition"
               >
@@ -601,9 +715,9 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                 </span>
 
                 {/* Change Markers (A, B, C, D) Superimposed */}
-                {showBoxes && diffList.map((d) => {
+                {showBoxes && diffList.filter((d) => d.box).map((d) => {
                   const isActive = activeDiff === d.id.toLowerCase() || activeDiff === d.id;
-                  const b = d.box || { left: '20%', top: '20%', width: '30%', height: '20%' };
+                  const b = d.box;
 
                   return (
                     <div

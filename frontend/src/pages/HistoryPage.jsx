@@ -255,10 +255,10 @@ export default function HistoryPage() {
   });
 
   // Real metric sums
-  const totalTokens = filteredRuns.reduce((acc, r) => acc + (r.tokensConsumed || 120000), 0);
-  const totalCost = filteredRuns.reduce((acc, r) => acc + (r.costUsd || 0.75), 0);
-  const avgCost = filteredRuns.length > 0 ? (totalCost / filteredRuns.length).toFixed(2) : '0.75';
-  const avgTok = filteredRuns.length > 0 ? Math.round(totalTokens / filteredRuns.length).toLocaleString() : '122,739';
+  const totalTokens = filteredRuns.reduce((acc, r) => acc + (r.tokensConsumed ?? 0), 0);
+  const totalCost = filteredRuns.reduce((acc, r) => acc + (r.costUsd ?? 0), 0);
+  const avgCost = filteredRuns.length > 0 ? (totalCost / filteredRuns.length).toFixed(2) : '0.00';
+  const avgTok = filteredRuns.length > 0 ? Math.round(totalTokens / filteredRuns.length).toLocaleString() : '0';
 
   // Real CSV Export
   const exportCSV = () => {
@@ -382,7 +382,7 @@ export default function HistoryPage() {
                 {filteredRuns.length}
               </div>
               <div className="text-xs text-[#7386A8] mt-1 font-medium font-mono">
-                310 this cycle
+                Recorded analyses
               </div>
             </div>
 
@@ -408,7 +408,7 @@ export default function HistoryPage() {
                 ${totalCost.toFixed(2)}
               </div>
               <div className="text-xs text-[#7386A8] mt-1 font-medium">
-                Billed to your plan allowance
+                Recorded usage; unavailable measurements are not estimated
               </div>
             </div>
 
