@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import VerdictBadge from '../components/VerdictBadge';
+import ForensicLoadingConsole from '../components/ForensicLoadingConsole';
 import { apiUrl } from '../utils/api';
 import {
   Radio,
@@ -59,8 +60,6 @@ export default function NewAnalysisPage() {
   
   // Inputs
   const [urlInput, setUrlInput] = useState('');
-  // Presets are opt-in. Pre-filling one contaminated image/video reports with
-  // an unrelated sample claim when users switched input modes.
   const [textInput, setTextInput] = useState(location.state?.initialText || '');
   const [uploadedFile, setUploadedFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
@@ -74,7 +73,7 @@ export default function NewAnalysisPage() {
   const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(false);
   const [optTraceProvenance, setOptTraceProvenance] = useState(true);
   const [optDetectEntities, setOptDetectEntities] = useState(true);
-  const [optDeepArchive, setOptDeepArchive] = useState(false); // Coming soon
+  const [optDeepArchive, setOptDeepArchive] = useState(false);
 
   // Pipeline Execution State (Runner)
   const [isRunning, setIsRunning] = useState(false);
@@ -129,7 +128,6 @@ export default function NewAnalysisPage() {
   // Global Clipboard Paste Listener (Ctrl+V / Cmd+V)
   useEffect(() => {
     const handleGlobalPaste = (e) => {
-      // Don't intercept text pastes when user is actively typing in text input/textarea
       const activeTag = document.activeElement?.tagName?.toLowerCase();
       const isInputActive = activeTag === 'textarea' || (activeTag === 'input' && document.activeElement.type === 'text');
 
@@ -351,8 +349,6 @@ export default function NewAnalysisPage() {
       };
 
       eventSource.onerror = () => {
-        // EventSource reconnects automatically. Poll the authenticated job-state
-        // endpoint as a recovery path in case a proxy keeps the stream closed.
         if (eventSourceRef.current === eventSource && !pollTimerRef.current) {
           pollTimerRef.current = setTimeout(pollJobState, 3000);
         }
@@ -363,37 +359,6 @@ export default function NewAnalysisPage() {
       setIsRunning(false);
       setErrorMessage(err.message || 'Pipeline initialization failed.');
     }
-  };
-
-  // Pipeline Stages Definition
-  const PIPELINE_STAGES = [
-    { id: 'INTAKE', label: 'Intake & Content Extraction', desc: 'Validates the payload and extracts document text, OCR, audio, or video frames' },
-    { id: 'FORENSICS', label: 'Media & Provenance Screening', desc: 'Checks file integrity, decoded-pixel signals, credentials, and authorized source matching' },
-    { id: 'CLAIMS', label: 'Claim & Observation Extraction', desc: 'Separates user claims, media observations, and contextual propositions' },
-    { id: 'FACT_MATCH', label: 'Evidence Evaluation', desc: 'Evaluates authorized sources as supporting, refuting, qualifying, or neutral' },
-    { id: 'REPORT', label: 'Scoring & Dossier Generation', desc: 'Calculates applicable factors and saves the final audit trail' }
-  ];
-
-  const getStageStatus = (stageId, index) => {
-    const stageGroups = [
-      ['INTAKE', 'VALIDATION', 'READING', 'OCR', 'KEYFRAME_EXTRACTION', 'FRAME_ANALYSIS'],
-      ['FORENSICS', 'VIDEO_PROVENANCE', 'VIDEO_CONTEXT', 'MEDIA_ANALYSIS'],
-      ['CLAIMS', 'CLAIM_EXTRACTION'],
-      ['FACT_MATCH', 'ARTICLE_DEEP_RESEARCH', 'WEB_VERIFICATION'],
-      ['REPORT', 'REPORT_GENERATION', 'COMPLETED']
-    ];
-    let currentIndex = stageGroups.findIndex(group => group.includes(String(currentStage || '').toUpperCase()));
-    if (currentIndex < 0) {
-      if (progress < 25) currentIndex = 0;
-      else if (progress < 60) currentIndex = 1;
-      else if (progress < 75) currentIndex = 2;
-      else if (progress < 90) currentIndex = 3;
-      else currentIndex = 4;
-    }
-
-    if (index < currentIndex) return 'COMPLETED';
-    if (index === currentIndex) return 'ACTIVE';
-    return 'PENDING';
   };
 
   return (
@@ -441,189 +406,131 @@ export default function NewAnalysisPage() {
               {[
                 { id: 'NEWS_URL', label: 'News link', icon: Radio, sub: 'Web article' },
                 { id: 'IMAGE', label: 'Image asset', icon: ImageIcon, sub: 'Photo / ELA' },
-                {
-                  id: 'VIDEO',
-                  label: 'Video clip',
-                  icon: Film,
-                  sub: 'MP4 / MOV / WebM'
-                },
+                { id: 'VIDEO', label: 'Video clip', icon: Film, sub: 'MP4 / MOV / WebM' },
                 { id: 'PDF', label: 'PDF document', icon: FileText, sub: 'Notices / Briefs' },
-                { id: 'TEXT', label: 'Claim text', icon: Layers, sub: 'Raw statements' },
-                { id: 'MIXED_URL', label: 'All in a URL', icon: Globe, sub: 'Deep scrape' }
+                { id: 'TEXT', label: 'Raw claim', icon: Sparkles, sub: 'Statement text' },
+                { id: 'MIXED_URL', label: 'Social / Post', icon: Globe, sub: 'X / TG / Post' }
               ].map(card => {
                 const Icon = card.icon;
                 const isSelected = selectedCard === card.id;
                 return (
-                  <div
+                  <button
                     key={card.id}
+                    type="button"
                     onClick={() => {
                       setSelectedCard(card.id);
                       setErrorMessage(null);
                     }}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
+                    className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden group ${
                       isSelected
-                        ? 'bg-white border-[#D97757] shadow-md ring-2 ring-[#D97757]/20 scale-[1.02]'
-                        : 'bg-white border-[#CECECE] hover:border-[#D97757] shadow-xs'
+                        ? 'bg-white border-[#D97757] shadow-md ring-2 ring-[#D97757]/20'
+                        : 'bg-white/70 border-[#CECECE] hover:border-[#D97757]/60 hover:bg-white'
                     }`}
                   >
-                    {card.badge && (
-                      <span className="absolute -top-2 right-2 px-1.5 py-0.2 bg-[#D97757] text-white rounded text-[9px] font-mono font-bold">
-                        {card.badge}
-                      </span>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <div className={`p-2 rounded-xl ${isSelected ? 'bg-[#D97757] text-white' : 'bg-[#EFEEE9] text-[#2C4E86]'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                        isSelected ? 'bg-[#D97757] text-white' : 'bg-[#EFEEE9] text-[#0B5CD5] group-hover:bg-[#F6E7DF] group-hover:text-[#B0512F]'
+                      }`}>
                         <Icon className="w-4 h-4" />
                       </div>
-                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
-                        isSelected ? 'border-[#D97757] bg-[#D97757]' : 'border-[#CECECE]'
-                      }`}>
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
+                      {isSelected && (
+                        <div className="w-2 h-2 rounded-full bg-[#D97757]" />
+                      )}
                     </div>
-
-                    <div>
-                      <span className="font-bold text-xs text-[#0B5CD5] block truncate">{card.label}</span>
-                      <span className="text-[10px] text-[#7386A8] font-mono block truncate">{card.sub}</span>
-                    </div>
-                  </div>
+                    <div className="font-bold text-xs text-[#0B5CD5] block">{card.label}</div>
+                    <div className="text-[10px] text-[#7386A8] mt-0.5 font-mono">{card.sub}</div>
+                  </button>
                 );
               })}
             </div>
 
-            {/* Conditional Input Field Box */}
-            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm">
+            {/* Dynamic Input Zone based on selectedCard */}
+            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
               
-              {/* URL Input */}
-              {(selectedCard === 'NEWS_URL' || selectedCard === 'MIXED_URL') && (
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-[#0B5CD5]">Article / Source Webpage URL</label>
-                  <div className="relative">
-                    <Globe className="w-4 h-4 text-[#7386A8] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="url"
-                      placeholder="https://news-outlet.com/article/2026/08/policy-notice"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] font-mono placeholder-[#7386A8]"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Text Area */}
+              {/* RAW CLAIM TEXT AREA */}
               {selectedCard === 'TEXT' && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-semibold text-[#0B5CD5]">Claim Statement / Article Text</label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-[#0B5CD5]">
+                      Factual Claim / Statement Text
+                    </label>
                     <span className="text-[11px] font-mono text-[#7386A8]">
-                      {textInput.trim().split(/\s+/).filter(Boolean).length} words
+                      {textInput.length} characters
                     </span>
                   </div>
                   <textarea
                     rows={5}
+                    placeholder="Enter or paste the claim statement to verify (e.g. news headline, policy update, official claim)..."
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
-                    placeholder="Paste the statement, press note, or forwarded message here..."
-                    className="w-full p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] leading-relaxed placeholder-[#7386A8]"
+                    className="w-full p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] placeholder-[#7386A8]"
                   />
                 </div>
               )}
 
-              {/* IMAGE SECTION (Dedicated Paste Option + Preview + Dropzone) */}
+              {/* URL INPUT (News URL or Mixed URL) */}
+              {(selectedCard === 'NEWS_URL' || selectedCard === 'MIXED_URL') && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">
+                    {selectedCard === 'NEWS_URL' ? 'Article / Webpage URL' : 'Social Post / Telegram / Web Link'}
+                  </label>
+                  <div className="relative">
+                    <Link2 className="w-4 h-4 text-[#7386A8] absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="url"
+                      placeholder="https://example.com/news/article-slug-2026..."
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] placeholder-[#7386A8]"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#7386A8] font-mono">
+                    DeepTrust Agent 1 will extract full article body, author bylines, publication timestamp, and embedded images.
+                  </p>
+                </div>
+              )}
+
+              {/* IMAGE DROP ZONE & CLIPBOARD */}
               {selectedCard === 'IMAGE' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-semibold text-[#0B5CD5]">
-                      Image Asset Forensics (ELA, EXIF, Duplicate Match)
+                      Upload Image or Screenshot for Forensics
                     </label>
-                    <span className="text-[11px] font-mono text-[#7386A8]">
-                      Supports PNG, JPG, JPEG, WEBP
-                    </span>
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#F6E7DF] hover:bg-[#E88F6B]/30 text-[#B0512F] text-[11px] font-semibold rounded-lg transition"
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5" />
+                      <span>Paste from Clipboard</span>
+                    </button>
                   </div>
 
-                  {uploadedFile && imagePreviewUrl ? (
-                    /* Attached Image Preview Card */
-                    <div className="p-5 bg-[#F8F8F6] border border-[#D97757]/40 rounded-2xl space-y-4 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-[#CECECE] pb-3">
-                        <div className="flex items-center gap-2 text-[#3E7A55] font-mono text-xs">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Image Loaded for Forensic Intake</span>
-                        </div>
-                        <span className="px-2 py-0.5 bg-[#F6E7DF] text-[#B0512F] border border-[#E88F6B]/30 rounded text-[10px] font-mono font-bold uppercase">
-                          {uploadedFile.type?.split('/')[1] || 'IMAGE'}
+                  {imagePreviewUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-[#CECECE] bg-[#000D59] p-4 text-center">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Upload Preview"
+                        className="max-h-64 mx-auto rounded-xl object-contain shadow-md"
+                      />
+                      <div className="mt-3 flex items-center justify-center gap-3">
+                        <span className="text-xs font-mono text-[#F0EDE9]">
+                          {uploadedFile?.name} ({(uploadedFile?.size / 1024).toFixed(0)} KB)
                         </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-center gap-5">
-                        {/* Thumbnail */}
-                        <div className="relative w-40 h-40 bg-white border border-[#CECECE] rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
-                          <img
-                            src={imagePreviewUrl}
-                            alt="Uploaded preview"
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-
-                        {/* File Details & Actions */}
-                        <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
-                          <div className="space-y-1">
-                            <span className="text-sm font-bold text-[#0B5CD5] block truncate" title={uploadedFile.name}>
-                              {uploadedFile.name}
-                            </span>
-                            <span className="text-xs text-[#7386A8] font-mono block">
-                              {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'image/png'}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
-                            <button
-                              type="button"
-                              onClick={handlePasteFromClipboard}
-                              className="px-3.5 py-1.5 bg-[#F6E7DF] hover:bg-[#EFD3C6] border border-[#E88F6B]/40 text-[#B0512F] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-                            >
-                              <ClipboardPaste className="w-3.5 h-3.5" />
-                              <span>Paste Another (Ctrl+V)</span>
-                            </button>
-
-                            <input
-                              type="file"
-                              id="studio-file-input-image"
-                              accept="image/*"
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  setUploadedFile(e.target.files[0]);
-                                  setErrorMessage(null);
-                                }
-                              }}
-                              className="hidden"
-                            />
-                            <label
-                              htmlFor="studio-file-input-image"
-                              className="px-3.5 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
-                            >
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>Replace File</span>
-                            </label>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setUploadedFile(null);
-                                setImagePreviewUrl(null);
-                              }}
-                              className="px-3.5 py-1.5 bg-[#F7E3E0] hover:bg-[#F7D2CC] border border-[#EBC7C2] text-[#8E2F27] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedFile(null);
+                            setImagePreviewUrl(null);
+                          }}
+                          className="px-3 py-1 bg-[#8E2F27] text-white text-xs font-semibold rounded-lg hover:bg-[#B23F35] transition"
+                        >
+                          Remove Image
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    /* Dropzone & Paste Box */
                     <div
                       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                       onDragLeave={() => setIsDragOver(false)}
@@ -635,162 +542,85 @@ export default function NewAnalysisPage() {
                           setErrorMessage(null);
                         }
                       }}
-                      className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-4 transition-colors ${
+                      className={`p-8 border-2 border-dashed rounded-2xl text-center space-y-3 transition-colors ${
                         isDragOver ? 'border-[#D97757] bg-[#F6E7DF]/30' : 'border-[#CECECE] bg-[#F8F8F6] hover:border-[#D97757]'
                       }`}
                     >
-                      <div className="p-3 bg-[#F6E7DF] border border-[#E88F6B]/30 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center text-[#D97757]">
-                        <ImageIcon className="w-7 h-7" />
-                      </div>
-
-                      <div className="space-y-1 max-w-md mx-auto">
+                      <ImageIcon className="w-8 h-8 text-[#D97757] mx-auto" />
+                      <div>
                         <p className="text-xs font-semibold text-[#0B5CD5]">
-                          Paste from clipboard, drag & drop, or browse your device
+                          Drag and drop image here, or click to browse
                         </p>
-                        <p className="text-[11px] text-[#7386A8] font-mono">
-                          Max 50MB · Preserves camera EXIF, hash signatures & tamper regions
+                        <p className="text-[11px] text-[#7386A8] font-mono mt-0.5">
+                          JPEG, PNG, WEBP · ELA Error Level, Noise Floor & Reverse Visual Search
                         </p>
                       </div>
 
-                      {/* Primary Actions: Paste & Browse */}
-                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                        <button
-                          type="button"
-                          onClick={handlePasteFromClipboard}
-                          className="px-4 py-2 bg-[#D97757] hover:bg-[#B0512F] text-white text-xs font-semibold rounded-xl shadow-md transition flex items-center gap-2 hover:scale-[1.02]"
-                        >
-                          <ClipboardPaste className="w-4 h-4" />
-                          <span>Paste Image (Ctrl+V)</span>
-                        </button>
-
-                        <input
-                          type="file"
-                          id="studio-file-input-image"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              setUploadedFile(e.target.files[0]);
-                              setErrorMessage(null);
-                            }
-                          }}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="studio-file-input-image"
-                          className="px-4 py-2 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-2"
-                        >
-                          <Upload className="w-4 h-4" />
-                          <span>Browse Local Disk</span>
-                        </label>
-                      </div>
-
-                      {/* Tip Pill */}
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#EFEEE9] border border-[#CECECE] rounded-full text-[10.5px] font-mono text-[#2C4E86]">
-                        <Sparkles className="w-3 h-3 text-[#D97757]" />
-                        <span>Tip: Take a screenshot (Win+Shift+S or PrtScn) and press Ctrl+V directly</span>
-                      </div>
+                      <input
+                        type="file"
+                        id="studio-file-input-image"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setUploadedFile(e.target.files[0]);
+                            setErrorMessage(null);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="studio-file-input-image"
+                        className="inline-block px-4 py-2 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition"
+                      >
+                        Browse Image File
+                      </label>
                     </div>
                   )}
 
-                  {/* Optional Image URL Input */}
+                  {/* Optional Claim Context */}
                   <div className="pt-2">
                     <label className="block text-[11px] font-medium text-[#2C4E86] mb-1.5">
-                      Or verify an Image by Direct Web URL
+                      Optional: Caption or Claim Associated with this Image
                     </label>
-                    <div className="relative">
-                      <Globe className="w-4 h-4 text-[#7386A8] absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="url"
-                        placeholder="https://example.com/press-photo.jpg"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] font-mono placeholder-[#7386A8]"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. Photo claimed to be taken in New Delhi yesterday showing..."
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] placeholder-[#7386A8]"
+                    />
                   </div>
                 </div>
               )}
 
-              {/* VIDEO SECTION (Direct File Dropzone + Video Preview) */}
+              {/* VIDEO DROP ZONE */}
               {selectedCard === 'VIDEO' && (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-[#0B5CD5]">
-                      Video Forensics & Speech Analysis
-                    </label>
-                    <span className="text-[11px] font-mono text-[#7386A8]">
-                      Direct Video File Upload
-                    </span>
-                  </div>
+                <div className="space-y-4">
+                  <label className="block text-xs font-semibold text-[#0B5CD5]">
+                    Upload Video Clip for Forensics
+                  </label>
 
-                  {/* Upload Video File or View Attached Preview */}
-                  {uploadedFile && videoPreviewUrl ? (
-                    <div className="p-5 bg-[#F8F8F6] border border-[#D97757]/40 rounded-2xl space-y-4 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-[#CECECE] pb-3">
-                        <div className="flex items-center gap-2 text-[#3E7A55] font-mono text-xs">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Video Clip Loaded for Forensic Keyframe Analysis</span>
-                        </div>
-                        <span className="px-2 py-0.5 bg-[#F6E7DF] text-[#B0512F] border border-[#E88F6B]/30 rounded text-[10px] font-mono font-bold uppercase">
-                          {uploadedFile.type?.split('/')[1] || 'VIDEO'}
+                  {videoPreviewUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-[#CECECE] bg-[#000D59] p-4 text-center">
+                      <video
+                        src={videoPreviewUrl}
+                        controls
+                        className="max-h-64 mx-auto rounded-xl shadow-md"
+                      />
+                      <div className="mt-3 flex items-center justify-center gap-3">
+                        <span className="text-xs font-mono text-[#F0EDE9]">
+                          {uploadedFile?.name} ({(uploadedFile?.size / (1024 * 1024)).toFixed(2)} MB)
                         </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-center gap-5">
-                        {/* Video Player Preview */}
-                        <div className="relative w-48 max-h-32 bg-black border border-[#CECECE] rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 shadow-inner">
-                          <video
-                            src={videoPreviewUrl}
-                            controls
-                            className="w-full h-full max-h-32 object-contain"
-                          />
-                        </div>
-
-                        {/* Details & Actions */}
-                        <div className="flex-1 space-y-3 min-w-0 text-center sm:text-left">
-                          <div className="space-y-1">
-                            <span className="text-sm font-bold text-[#0B5CD5] block truncate" title={uploadedFile.name}>
-                              {uploadedFile.name}
-                            </span>
-                            <span className="text-xs text-[#7386A8] font-mono block">
-                              {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB · {uploadedFile.type || 'video/mp4'}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
-                            <input
-                              type="file"
-                              id="studio-file-input-video-replace"
-                              accept="video/*"
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  setUploadedFile(e.target.files[0]);
-                                  setErrorMessage(null);
-                                }
-                              }}
-                              className="hidden"
-                            />
-                            <label
-                              htmlFor="studio-file-input-video-replace"
-                              className="px-3.5 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] text-[#2C4E86] text-xs font-semibold rounded-xl cursor-pointer transition flex items-center gap-1.5"
-                            >
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>Replace Video</span>
-                            </label>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setUploadedFile(null);
-                                setVideoPreviewUrl(null);
-                              }}
-                              className="px-3.5 py-1.5 bg-[#F7E3E0] hover:bg-[#F7D2CC] border border-[#EBC7C2] text-[#8E2F27] text-xs font-semibold rounded-xl transition flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedFile(null);
+                            setVideoPreviewUrl(null);
+                          }}
+                          className="px-3 py-1 bg-[#8E2F27] text-white text-xs font-semibold rounded-lg hover:bg-[#B23F35] transition"
+                        >
+                          Remove Video
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -910,7 +740,7 @@ export default function NewAnalysisPage() {
                 </div>
               )}
 
-              {/* "Try One" Real Preset Buttons */}
+              {/* 1-Click Real Presets */}
               <div className="pt-2 border-t border-[#CECECE] space-y-2">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#7386A8] block">
                   1-Click Real Presets:
@@ -975,8 +805,8 @@ export default function NewAnalysisPage() {
                         </span>
                         <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
                           {selectedCard === 'VIDEO'
-                            ? 'With your permission, DeepTrust may upload up to three selected keyframes—not the full video—and search high-confidence visible entity names using the configured providers. Frame bytes are not stored in the report.'
-                            : 'With your permission, DeepTrust may submit this image and search high-confidence visible entity names using the configured Google Lens, Google Vision, SerpApi, or Serper providers. Image bytes are not stored in the report.'}
+                            ? 'With your permission, DeepTrust may upload up to three selected keyframes—not the full video—and search high-confidence visible entity names using configured providers. Frame bytes are not stored in the report.'
+                            : 'With your permission, DeepTrust may submit this image and search high-confidence visible entity names using configured Google Lens, Google Vision, SerpApi, or Serper providers.'}
                         </span>
                       </div>
                     </label>
@@ -991,7 +821,7 @@ export default function NewAnalysisPage() {
                         <div>
                           <span className="font-semibold text-[#0B5CD5] block">Use transcript excerpts to find the original news</span>
                           <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
-                            With your permission, DeepTrust may send up to three short, distinctive spoken phrases and high-confidence public-figure names—not the full transcript, audio, or video—to the configured Serper search provider. The phrases and returned source links are recorded in the report for transparency.
+                            With your permission, DeepTrust may send up to three short, distinctive spoken phrases to Serper search to match official coverage.
                           </span>
                         </div>
                       </label>
@@ -1042,102 +872,21 @@ export default function NewAnalysisPage() {
         ) : (
           
           /* ========================================================================= */
-          /* MODE 2: AGENT PIPELINE RUNNER (LIVE SSE STREAM)                            */
+          /* MODE 2: FORENSIC COMMAND CONSOLE RUNNER (LIVE SSE STREAM)                 */
           /* ========================================================================= */
-          <div className="space-y-6 animate-fadeIn">
-            
-            {/* Top Running Banner */}
-            <div className="p-6 sm:p-8 bg-[#000D59] border border-[rgba(240,237,233,0.16)] rounded-3xl space-y-4 shadow-xl relative overflow-hidden text-[#EDE7DC]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#3E7A55] animate-ping" />
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#E88F6B]">
-                      Running Multi-Agent Rail
-                    </span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-[#F0EDE9]">
-                    Verifying Subject Matter...
-                  </h2>
-                  <p className="text-xs text-[#A7B0D4] font-mono max-w-xl truncate">
-                    {currentStep}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-4 flex-shrink-0 self-end sm:self-center">
-                  <div className="text-right font-mono">
-                    <span className="text-2xl font-bold text-[#F0EDE9] block">{elapsedSeconds}s</span>
-                    <span className="text-[10px] text-[#A7B0D4] uppercase">Execution Time</span>
-                  </div>
-                  <div className="w-14 h-14 relative flex items-center justify-center">
-                    <div className="w-full h-full rounded-full border-4 border-[rgba(240,237,233,0.2)] border-t-[#D97757] animate-spin" />
-                    <span className="absolute font-mono font-bold text-xs text-[#F0EDE9]">{progress}%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full h-2 bg-[#031246] rounded-full overflow-hidden relative z-10">
-                <div
-                  className="h-full bg-gradient-to-r from-[#0033C4] to-[#D97757] transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Vertical Timeline of Stages */}
-            <div className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-6 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0B5CD5] font-mono">
-                Pipeline Stage Execution
-              </h3>
-
-              <div className="space-y-4">
-                {PIPELINE_STAGES.map((stage, idx) => {
-                  const status = getStageStatus(stage.id, idx);
-                  return (
-                    <div
-                      key={stage.id}
-                      className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
-                        status === 'ACTIVE'
-                          ? 'bg-[#FFF6E3] border-[#D97757] shadow-sm ring-1 ring-[#D97757]/30'
-                          : status === 'COMPLETED'
-                          ? 'bg-[#F8F8F6] border-[#CECECE]'
-                          : 'bg-[#F8F8F6]/40 border-[#CECECE]/50 opacity-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold font-mono flex-shrink-0 mt-0.5 ${
-                          status === 'COMPLETED' ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C6DFCF]' :
-                          status === 'ACTIVE' ? 'bg-[#D97757] text-white animate-pulse' :
-                          'bg-[#EFEEE9] text-[#7386A8]'
-                        }`}>
-                          {status === 'COMPLETED' ? <Check className="w-4 h-4 stroke-[3]" /> : `0${idx + 1}`}
-                        </div>
-
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-[#0B5CD5]">{stage.label}</h4>
-                            {status === 'ACTIVE' && (
-                              <span className="px-2 py-0.2 bg-[#F6E7DF] text-[#B0512F] rounded font-mono text-[9px] font-bold uppercase">
-                                In Progress
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-[#2C4E86] mt-0.5">{stage.desc}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex-shrink-0 font-mono text-[11px]">
-                        {status === 'COMPLETED' && <span className="text-[#3E7A55] font-bold">Passed</span>}
-                        {status === 'ACTIVE' && <span className="text-[#D97757] font-bold">Executing...</span>}
-                        {status === 'PENDING' && <span className="text-[#7386A8]">Pending</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <ForensicLoadingConsole
+            jobId={jobId}
+            progress={progress}
+            currentStep={currentStep}
+            currentStage={currentStage}
+            elapsedSeconds={elapsedSeconds}
+            selectedCard={selectedCard}
+            uploadedFile={uploadedFile}
+            imagePreviewUrl={imagePreviewUrl}
+            videoPreviewUrl={videoPreviewUrl}
+            textInput={textInput}
+            urlInput={urlInput}
+          />
         )}
       </main>
     </div>
