@@ -31,10 +31,36 @@ function resolveJobTimeoutMs(mediaCategory = 'TEXT') {
   if (mediaCategory === 'PHOTO') {
     return parseTimeoutMs(process.env.PHOTO_PIPELINE_TIMEOUT_MS, 5 * 60 * 1000);
   }
-  return parseTimeoutMs(process.env.PIPELINE_TIMEOUT_MS, 3 * 60 * 1000);
+  // Article verification can legitimately run several evidence passes. Keep the
+  // absolute guard above the four-minute inactivity watchdog so healthy jobs are
+  // not marked failed while claims are still being evaluated.
+  return parseTimeoutMs(process.env.PIPELINE_TIMEOUT_MS, 10 * 60 * 1000);
 }
 
 function buildImageSourceEvidence(mediaAnalysis) {
+  const relatedEvidence = (mediaAnalysis?.relatedImageNews?.articles || [])
+    .filter(article => article.evidenceEligible && article.url)
+    .map(article => ({
+      title: article.title || `Related image news · ${article.domain || 'web source'}`,
+      url: article.url,
+      link: article.url,
+      domain: article.domain || null,
+      publisher: article.publisher || null,
+      snippet: article.newsSummary || article.description || '',
+      publishedAt: article.publishedAt || null,
+      stance: article.relationship,
+      relationship: article.relationship,
+      relevanceScore: article.contextConfidence,
+      visualSimilarity: article.imageSimilarity,
+      locallyVerified: true,
+      independenceGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      syndicationGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      evidenceType: 'VERIFIED_RELATED_IMAGE_NEWS',
+      sourceRole: 'RELATED_IMAGE_NEWS_CONTEXT'
+    }));
+  if (relatedEvidence.length) {
+    return Array.from(new Map(relatedEvidence.map(source => [source.url, source])).values());
+  }
   const comparison = mediaAnalysis?.imageSourceContextComparison;
   const source = comparison?.source;
   if (!source?.url) return [];
@@ -45,13 +71,35 @@ function buildImageSourceEvidence(mediaAnalysis) {
     domain: source.domain || null,
     snippet: source.description || comparison.sourceSummary || '',
     publishedAt: source.publishedAt || null,
+    stance: comparison.status === 'MATCHED' ? 'SUPPORTS' : comparison.status === 'CONTRADICTED' ? 'REFUTES' : 'NEUTRAL',
+    relationship: comparison.status === 'MATCHED' ? 'SUPPORTS' : comparison.status === 'CONTRADICTED' ? 'REFUTES' : 'NEUTRAL',
+    relevanceScore: comparison.confidence || 0,
+    locallyVerified: comparison.decisive === true,
     evidenceType: comparison.decisive ? 'VERIFIED_IMAGE_SOURCE_CONTEXT' : 'IMAGE_SOURCE_CONTEXT_CANDIDATE',
     sourceRole: 'IMAGE_CONTEXT'
   }];
 }
 
+function getImageContextAssessment(mediaAnalysis) {
+  const relatedNews = mediaAnalysis?.relatedImageNews;
+  const eligible = (relatedNews?.articles || []).filter(article => article.evidenceEligible);
+  if (eligible.length) {
+    const supporting = eligible.filter(article => article.relationship === 'SUPPORTS');
+    const refuting = eligible.filter(article => article.relationship === 'REFUTES');
+    return {
+      status: supporting.length && refuting.length ? 'MIXED' : refuting.length ? 'CONTRADICTED' : 'MATCHED',
+      decisive: true,
+      confidence: Math.round(eligible.reduce((sum, article) => sum + Number(article.contextConfidence || 0), 0) / eligible.length),
+      rationale: relatedNews.summary,
+      sourceSummary: relatedNews.newsDigest?.join(' ') || relatedNews.summary,
+      relatedNews
+    };
+  }
+  return mediaAnalysis?.imageSourceContextComparison || null;
+}
+
 function verifyObservationClaimsAgainstImageSource(claims = [], mediaAnalysis = null) {
-  const comparison = mediaAnalysis?.imageSourceContextComparison;
+  const comparison = getImageContextAssessment(mediaAnalysis);
   const sources = buildImageSourceEvidence(mediaAnalysis);
   const baseConfidence = Math.max(0, Math.min(100, Number(comparison?.confidence) || 0));
 
@@ -93,11 +141,33 @@ function verifyObservationClaimsAgainstImageSource(claims = [], mediaAnalysis = 
     }));
   }
 
+  if (comparison?.decisive && comparison.status === 'MIXED') {
+    return claims.map(claim => ({
+      ...claim,
+      status: 'PARTIALLY_VERIFIED',
+      verdict: 'PARTIALLY_VERIFIED',
+      confidence: baseConfidence,
+      sources,
+      evidenceState: 'MIXED',
+      evidenceEvaluations: sources.map(source => ({
+        source,
+        stance: source.stance,
+        relevance: 'DIRECT_IMAGE_CONTEXT',
+        explanation: comparison.rationale
+      })),
+      explanation: `Verified same-image news pages provide conflicting or qualified context. ${comparison.rationale}`,
+      verificationMode: 'MULTI_SOURCE_IMAGE_NEWS_CONTEXT'
+    }));
+  }
+
   return claims.map(claim => ({
     ...claim,
     status: 'SUSPICIOUS',
     verdict: 'OBSERVATION_ONLY',
-    confidence: Math.max(0, 100 - (mediaAnalysis?.ocrUncertainty || 20)),
+    confidence: claim.origin === 'IMAGE_OCR_TEXT'
+      ? Math.max(0, 100 - Number(mediaAnalysis?.ocrUncertainty ?? 20))
+      : Math.max(50, Math.min(85, Number(claim.observationConfidence || 75))),
+    confidenceType: claim.origin === 'IMAGE_OCR_TEXT' ? 'OCR_EXTRACTION' : 'VISUAL_EXTRACTION',
     sources,
     evidenceState: 'INSUFFICIENT',
     evidenceEvaluations: [],
@@ -109,8 +179,18 @@ function verifyObservationClaimsAgainstImageSource(claims = [], mediaAnalysis = 
 }
 
 function buildImageSourceResearchContext(mediaAnalysis, topic) {
-  const comparison = mediaAnalysis?.imageSourceContextComparison;
+  const comparison = getImageContextAssessment(mediaAnalysis);
   const sources = buildImageSourceEvidence(mediaAnalysis);
+  const relatedNews = mediaAnalysis?.relatedImageNews;
+  const reviewedSources = (relatedNews?.articles || []).filter(article => article.url).map(article => ({
+    title: article.title,
+    url: article.url,
+    domain: article.domain,
+    snippet: article.newsSummary || article.description || '',
+    stance: article.relationship,
+    relevanceScore: article.contextConfidence,
+    evidenceEligible: article.evidenceEligible
+  }));
   if (!comparison || comparison.status === 'UNAVAILABLE') {
     return {
       status: 'SKIPPED_FOR_VISUAL_OBSERVATIONS',
@@ -126,18 +206,14 @@ function buildImageSourceResearchContext(mediaAnalysis, topic) {
   return {
     status: comparison.status,
     topic,
-    summary: comparison.sourceSummary || comparison.rationale || '',
+    summary: relatedNews?.summary || comparison.sourceSummary || comparison.rationale || '',
     sources,
     overallSources: sources,
-    articleEvidencePool: sources.map(source => ({
-      title: source.title,
-      domain: source.domain,
-      snippet: source.snippet,
-      fullText: comparison.sourceSummary || source.snippet,
-      url: source.url
-    })),
+    reviewedSources,
+    articleEvidencePool: reviewedSources.map(source => ({ ...source, fullText: source.snippet })),
     isCovered: comparison.status !== 'INCONCLUSIVE',
     comparison,
+    relatedImageNews: relatedNews || null,
     explanation: comparison.rationale,
     timestamp: new Date().toISOString()
   };
@@ -310,7 +386,12 @@ async function runVerificationPipeline({
         }];
       }
     } else {
-      claims = await extractClaims(contentRes.extractedText);
+      claims = await extractClaims(contentRes.extractedText, { title: contentRes.sourceTitle, ...(contentRes.metadata || {}) });
+    }
+
+    // Persist the article identity alongside context through verification and later re-search.
+    if (inputType === 'URL' && url) {
+      claims.forEach(claim => { claim.articleContext = { ...(claim.articleContext || {}), sourceUrl: url }; });
     }
 
     const scopeCounts = {
@@ -347,7 +428,11 @@ async function runVerificationPipeline({
       status: 'PROCESSING',
       progress: 75,
       step: isMediaJob 
-        ? (hasAttachedNews ? 'Stage 2: Cross-checking attached news claims against web evidence...' : 'Stage 2: Searching & synthesizing related news coverage for media payload...') 
+        ? (hasAttachedNews
+          ? 'Stage 2: Cross-checking attached news claims against web evidence...'
+          : observationOnlyImage
+            ? 'Stage 2: Assessing image observations against available source context...'
+            : 'Stage 2: Searching & synthesizing related news coverage for media payload...')
         : 'Part 0: Performing Deep Research across overall story entities...',
       stage: 'ARTICLE_DEEP_RESEARCH'
     });
@@ -368,13 +453,15 @@ async function runVerificationPipeline({
     sseManager.emitProgress(jobId, {
       status: 'PROCESSING',
       progress: 80,
-      step: `Agent 3: Verifying ${claims.length} claims via web search & fuzzy engine...`,
+      step: observationOnlyImage
+        ? `Agent 3: Classifying ${claims.length} pixel observation${claims.length === 1 ? '' : 's'} and source context...`
+        : `Agent 3: Verifying ${claims.length} claims via web search & fuzzy engine...`,
       stage: 'WEB_VERIFICATION'
     });
 
     const progressCallback = (completedCount, total) => {
-      const startPct = 40;
-      const endPct = 85;
+      const startPct = 80;
+      const endPct = 89;
       const pct = Math.min(85, Math.round(startPct + (completedCount / Math.max(1, total)) * (endPct - startPct)));
       sseManager.emitProgress(jobId, {
         status: 'PROCESSING',
@@ -440,6 +527,8 @@ async function runVerificationPipeline({
           mediaAnalysis,
           inputType,
           userClaim: text || '',
+          transcriptText: [mediaAnalysis?.transcript, mediaAnalysis?.translatedTranscript].filter(Boolean).join('\n'),
+          ocrText: mediaAnalysis?.rawOcrText || String(mediaAnalysis?.ocrText || '').replace(/\[model-extracted text\]\s*:\s*/gi, ''),
           allowExternalEntitySearch: allowExternalVisualSearch === true
         }
       )
@@ -464,14 +553,21 @@ async function runVerificationPipeline({
         framingAnalysis: { status: 'DISABLED' }
       };
 
+    const mediaAnalysisText = [
+      contentRes.extractedText,
+      mediaAnalysis?.transcript,
+      mediaAnalysis?.translatedTranscript,
+      mediaAnalysis?.rawOcrText || String(mediaAnalysis?.ocrText || '').replace(/\[model-extracted text\]\s*:\s*/gi, '')
+    ].filter(Boolean).join('\n').trim();
+
     // Perform Deep Numerical Fact Analysis
     const { performNumericalFactAnalysis } = require('./numericalFactService');
-    const numericalRes = await performNumericalFactAnalysis(contentRes.extractedText || mediaAnalysis?.transcript || '', verifiedClaims);
+    const numericalRes = await performNumericalFactAnalysis(mediaAnalysisText, verifiedClaims);
 
     // Perform Advanced Text & Document Analysis
     const { performAdvancedTextAnalysis } = require('./advancedTextService');
     const textAnalysisRes = await performAdvancedTextAnalysis(
-      contentRes.extractedText || mediaAnalysis?.transcript || '',
+      mediaAnalysisText,
       contentRes.metadata,
       verifiedClaims
     );
@@ -487,13 +583,14 @@ async function runVerificationPipeline({
     const reportData = await generateReport({
       inputType,
       sourceTitle: contentRes.sourceTitle || sourceTitle,
-      extractedText: contentRes.extractedText,
+      extractedText: mediaAnalysisText,
       verifiedClaims,
       selectedTypes,
       articleSentiment,
       truncated: contentRes.truncated,
       internalConsistencyIssues: claims.internalConsistencyIssues || [],
       sourcingTransparency: claims.sourcingTransparency || null,
+      extractionCoverage: claims.extractionCoverage || null,
       mediaAnalysis,
       articleResearchContext,
       hasAttachedNews,
@@ -632,7 +729,7 @@ async function runVerificationPipeline({
             } : {}),
             ...(verifiedClaims && verifiedClaims.length > 0 ? {
               claims: {
-                create: verifiedClaims.slice(0, 20).map((c, cIdx) => ({
+                create: verifiedClaims.map((c, cIdx) => ({
                   claimText: c.claimText || c.text || `Claim ${cIdx + 1}`,
                   normalizedClaim: c.normalizedClaim || c.searchReadyText || c.claimText || c.text,
                   claimType: (c.claimType || c.category || 'FACTUAL_STATEMENT').toUpperCase().replace(/ /g, '_'),
@@ -918,6 +1015,7 @@ async function runVerificationPipeline({
   } finally {
     if (timeoutTimer) clearTimeout(timeoutTimer);
   }
+
 }
 
 module.exports = {
@@ -925,5 +1023,6 @@ module.exports = {
   buildImageSourceEvidence,
   verifyObservationClaimsAgainstImageSource,
   buildImageSourceResearchContext,
+  getImageContextAssessment,
   resolveJobTimeoutMs
 };

@@ -8,7 +8,7 @@ const { getProviderStatus, isKeyValid } = require('./providerManager');
 async function generateClaimCorrection(claim, verificationResult = {}, articleResearchContext = null) {
   const claimText = typeof claim === 'string' ? claim : (claim.text || claim.claimText || '');
   const status = verificationResult.verdict || verificationResult.status || claim.status || 'SUSPICIOUS';
-  const sources = verificationResult.sources || claim.sources || [];
+  const sources = (verificationResult.sources || claim.sources || []).filter(s => ['REFUTES', 'CONTRADICTS', 'QUALIFIES'].includes(s.stance));
   const refutingIndices = verificationResult.refutingSourceIndices || [];
 
   let hasCorrection = false;
@@ -19,7 +19,7 @@ async function generateClaimCorrection(claim, verificationResult = {}, articleRe
   // Gather evidence text snippets (strip metadata tags to prevent source index numbers like [Source 0] from being parsed as evidence numbers)
   const evidenceTextOnly = sources.map(s => `${s.snippet || s.title || ''}`).join(' ');
   const articleSummary = articleResearchContext?.summary || '';
-  const fullEvText = `${evidenceTextOnly} ${articleSummary}`.trim();
+  const fullEvText = evidenceTextOnly.trim();
   const evidenceSnippets = fullEvText || 'No direct evidence text available.';
 
   // Determine if claim requires correction
@@ -34,6 +34,13 @@ async function generateClaimCorrection(claim, verificationResult = {}, articleRe
       correctionBasis: null,
       partiallyAccurate: false
     };
+  }
+
+  // Do not rewrite quantities by matching an unrelated number or treating missing evidence as refutation.
+  // A replacement requires a reviewed same-metric, same-event correction; preserve the claim otherwise.
+  if (!sources.length || /\b\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|sixteen)\b/i.test(claimText)) {
+    return { hasCorrection: false, correctedClaim: null,
+      correctionBasis: 'No independently established same-metric replacement is available. Review the cited evidence before changing this claim.', partiallyAccurate: false };
   }
 
   // Check Gemini API key for grounded correction generation
@@ -95,19 +102,9 @@ GROUNDING RULES:
     // Search evidence snippets for a replacement metric attached to similar keywords
     const evNumMatches = fullEvText.match(/\b(\d+(?:\.\d+)?%?|\d+\s*(?:million|billion|trillion|percent|people|dead|injured|killed|casualties|workers|students|protesters))\b/gi);
 
-    const conflictingEvNum = evNumMatches ? evNumMatches.find(numStr => numStr.toLowerCase() !== claimNumStr.toLowerCase()) : null;
-
-    if (conflictingEvNum) {
-      // Replacement number is EXPLICITLY present in evidence
-      correctedClaim = `${claimText.replace(claimNumStr, conflictingEvNum)} (not ${claimNumStr} as reported in original text).`;
-      correctionBasis = `Evidence from cited sources explicitly confirms the figure is ${conflictingEvNum}, contrasting with the original claim of ${claimNumStr}.`;
-      partiallyAccurate = true;
-    } else {
-      // Replacement number is NOT present in evidence -> exact required sentence
-      correctedClaim = `The reported value could not be independently confirmed.`;
-      correctionBasis = `Retrieved evidence does not contain an explicit replacement figure to confirm or replace ${claimNumStr}.`;
-      partiallyAccurate = false;
-    }
+    correctedClaim = null;
+    correctionBasis = 'No independently established same-metric replacement is available.';
+    partiallyAccurate = false;
   } else {
     // Non-numerical claim correction
     if (isRefuted) {

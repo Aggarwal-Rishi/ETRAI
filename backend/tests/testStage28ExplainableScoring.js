@@ -133,7 +133,8 @@ async function runStage28ExplainableScoringTests() {
     const res = computeExplainableTrustScore(unverifiedData);
 
     assert.ok(res.counterfactualExplanation.includes('unverified claim'));
-    assert.ok(res.counterfactualExplanation.includes('gazettes') || res.counterfactualExplanation.includes('regulatory'));
+    assert.ok(res.counterfactualExplanation.includes('actual new evidence'));
+    assert.equal(res.sensitivity[0].impactScore, computeExplainableTrustScore({verifiedClaims:[{...unverifiedData.verifiedClaims[0],verdict:'VERIFIED',status:'TRUSTED',confidence:90}],skipSensitivity:true}).finalTrustScore-res.finalTrustScore);
   });
 
   // ----------------------------------------------------------------
@@ -166,6 +167,37 @@ async function runStage28ExplainableScoringTests() {
 
     assert.strictEqual(res.finalTrustScore, 100);
     assert.strictEqual(res.factorScores.sourceAuthority.weight, 0.5);
+  });
+
+  await runTest('6. Missing sources do not receive authority or corroboration credit', async () => {
+    const res = computeExplainableTrustScore({
+      inputType: 'PHOTO',
+      verifiedClaims: [{ claimText: 'A visible banner contains text', verdict: 'OBSERVATION_ONLY', sources: [] }],
+      mediaAnalysis: {
+        forensicVerdict: 'NO_MANIPULATION_SIGNAL_FOUND',
+        forensics: { verdict: 'NO_MANIPULATION_SIGNAL_FOUND', integrity: { isValid: true } }
+      },
+      textAnalysis: { summary: { wordCount: 4 } },
+      hasAttachedNews: false
+    });
+
+    assert.strictEqual(res.factorScores.sourceAuthority.score, 0);
+    assert.strictEqual(res.factorScores.sourceIndependence.score, 0);
+    assert.strictEqual(res.factorScores.provenanceConfidence.score, 0);
+    assert.strictEqual(res.factorScores.mediaIntegrity.score, 90, 'a structurally valid clean image must not be penalized by a mismatched integrity property');
+    assert.strictEqual(res.factorBreakdown.some(factor => factor.factorKey === 'attributionQuality'), false, 'photo OCR must not activate narrative attribution scoring');
+  });
+
+  await runTest('7. Neutral search results are not counted as evidentiary sources', async () => {
+    const res = computeExplainableTrustScore({
+      verifiedClaims: [{
+        claimText: 'A visible phrase appears in an image',
+        verdict: 'UNVERIFIED',
+        sources: [{ domain: 'example.com', stance: 'NEUTRAL', authorityScore: 99 }]
+      }]
+    });
+    assert.strictEqual(res.rawInputs.totalEvidenceCount, 0);
+    assert.strictEqual(res.factorScores.sourceAuthority.score, 0);
   });
 
   console.log('\n================================================================');

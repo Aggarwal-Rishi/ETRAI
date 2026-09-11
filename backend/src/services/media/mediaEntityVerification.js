@@ -47,7 +47,7 @@ function normalizePublicFigure(figure, timestamp = null, origin = 'VISUAL_PUBLIC
     prominent: confidence >= 75,
     verificationStatus: confidence >= 75 ? 'UNVERIFIED' : 'AMBIGUOUS',
     detectionMethods: [origin],
-    frameTimestamps: Number.isFinite(Number(timestamp)) ? [Number(timestamp)] : [],
+    frameTimestamps: timestamp !== null && timestamp !== undefined && Number.isFinite(Number(timestamp)) ? [Number(timestamp)] : [],
     visibleAppearance: cleanEntityName(raw.visibleAppearance),
     attire: cleanEntityName(raw.attire),
     visualBasis: cleanEntityName(raw.basis) || 'Visual model proposed this public-figure identity; independent corroboration is required.'
@@ -70,7 +70,7 @@ function normalizeNamedVisual(value, type, method, timestamp = null, confidence 
     prominent: confidence >= 75,
     verificationStatus: 'UNVERIFIED',
     detectionMethods: [method],
-    frameTimestamps: Number.isFinite(Number(timestamp)) ? [Number(timestamp)] : [],
+    frameTimestamps: timestamp !== null && timestamp !== undefined && Number.isFinite(Number(timestamp)) ? [Number(timestamp)] : [],
     visualBasis: `${type.replaceAll('_', ' ').toLowerCase()} observed in submitted media.`
   };
 }
@@ -147,7 +147,21 @@ function collectExistingEntityEvidence(entity, mediaAnalysis = {}) {
   const provenanceCandidates = [provenance.originalCandidate, ...(provenance.sourceCandidates || [])].filter(Boolean);
   const reverseCandidates = [
     ...(mediaAnalysis.reverseSearch?.matches || []),
-    ...(mediaAnalysis.imageSourceContextComparison?.source ? [mediaAnalysis.imageSourceContextComparison.source] : [])
+    ...(mediaAnalysis.imageSourceContextComparison?.source ? [mediaAnalysis.imageSourceContextComparison.source] : []),
+    ...(mediaAnalysis.relatedImageNews?.articles || [])
+      .filter(article => article.evidenceEligible)
+      .map(article => ({
+        ...article,
+        snippet: article.newsSummary || article.description || '',
+        exactMatch: article.imageMatchStatus === 'VERIFIED_SAME_IMAGE'
+      })),
+    ...(mediaAnalysis.relatedVideoNews?.articles || mediaAnalysis.videoContextReport?.relatedNews?.articles || [])
+      .filter(article => article.evidenceEligible)
+      .map(article => ({
+        ...article,
+        snippet: article.newsSummary || article.description || '',
+        exactMatch: ['VERIFIED_KEYFRAME_LINK', 'RESOLVER_VERIFIED'].includes(article.mediaLinkStatus)
+      }))
   ];
   [...provenanceCandidates, ...reverseCandidates].forEach(candidate => {
     const text = entityKey(`${candidate.title || ''} ${candidate.snippet || ''} ${candidate.publisher || ''}`);
@@ -177,7 +191,10 @@ function buildEntitySearchQuery(entity, context = {}) {
 
 async function verifyVisualEntities(entities = [], mediaAnalysis = {}, text = '', options = {}) {
   const candidates = entities.filter(entity => entity.visuallyDetected && entity.prominent && Number(entity.visualConfidence || entity.confidence || 0) >= 70).slice(0, Number(options.maxEntitySearches || 6));
-  const transcriptAndOcr = `${text || ''} ${mediaAnalysis.transcript || ''} ${mediaAnalysis.ocrText || ''}`.toLocaleLowerCase();
+  // Cross-modal confirmation must come from an independent speech/OCR channel.
+  // The combined entity-analysis text also contains the visual model's own
+  // description, so using it here would let a visual guess corroborate itself.
+  const transcriptAndOcr = `${options.transcriptText ?? mediaAnalysis.transcript ?? ''} ${options.ocrText ?? mediaAnalysis.rawOcrText ?? mediaAnalysis.ocrText ?? ''}`.toLocaleLowerCase();
   const observed = mediaAnalysis.observed || {};
   const context = {
     logos: observed.logos || [],

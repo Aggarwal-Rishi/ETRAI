@@ -138,7 +138,7 @@ async function runStage27ExplainableReportTests() {
   await runTest('4. Generates formatted Markdown export summary with all key metrics and citations', async () => {
     const md = generateReportMarkdownExport(mockRawReport);
 
-    assert.ok(md.includes('# ETRAI Fact-Check & Verification Report'));
+    assert.ok(md.includes('# DeepTrust Fact-Check & Verification Report'));
     assert.ok(md.includes('**Overall Verdict:** VERIFIED'));
     assert.ok(md.includes('pib.gov.in'));
     assert.ok(md.includes('₹19,744 Cr'));

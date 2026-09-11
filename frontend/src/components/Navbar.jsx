@@ -5,7 +5,6 @@ import {
   Search,
   Plus,
   PlusCircle,
-  Home,
   LayoutDashboard,
   Radio,
   ShieldAlert,
@@ -30,6 +29,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/featureFlags';
 import GlobalSearchModal from './GlobalSearchModal';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar() {
   const location = useLocation();
@@ -134,7 +134,6 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
 
   const navLinks = [
-    { to: '/', label: 'Home', icon: Home },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/news', label: 'Latest News', icon: Radio },
     ...(FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? [{
@@ -170,15 +169,15 @@ export default function Navbar() {
               </button>
 
               {/* DeepTrust Logo */}
-              <Link to="/" className="flex items-center gap-3 group" aria-label="DeepTrust homepage">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0033C4] to-[#D97757] shadow-md shadow-[#0033C4]/30 flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-5 h-5" />
+              <Link to="/" className="flex items-center gap-2.5 sm:gap-3 group" aria-label="DeepTrust homepage">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-[#0033C4] to-[#D97757] shadow-md shadow-[#0033C4]/30 flex items-center justify-center text-white group-hover:scale-105 transition-transform flex-shrink-0">
+                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-lg font-bold tracking-tight text-[#F0EDE9] font-sans leading-none">
+                  <span className="text-base sm:text-lg font-bold tracking-tight text-[#F0EDE9] font-sans leading-none">
                     deep<b className="text-[#E88F6B] font-bold">trust</b>
                   </span>
-                  <span className="text-[10px] text-[#E88F6B] font-semibold tracking-wider uppercase leading-none mt-1">
+                  <span className="hidden sm:inline text-[10px] text-[#E88F6B] font-semibold tracking-wider uppercase leading-none mt-1">
                     AI VERIFICATION
                   </span>
                 </div>
@@ -214,8 +213,8 @@ export default function Navbar() {
               </nav>
             </div>
 
-            {/* Right: Search + Action Buttons + Notifications + Avatar */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            {/* Right: Search + Action Buttons + Theme Toggle + Notifications + Avatar */}
+            <div className="flex items-center gap-1.5 sm:gap-3">
               
               {/* Search Command Palette Trigger */}
               <button
@@ -248,6 +247,11 @@ export default function Navbar() {
                 <Gem className="w-3.5 h-3.5 text-[#F2C46B] group-hover:scale-110 transition-transform" />
                 <span>Upgrade</span>
               </Link>
+
+              {/* Day/Night Theme Toggle */}
+              <div className="flex items-center justify-center pl-0.5 sm:pl-1">
+                <ThemeToggle />
+              </div>
 
               {/* Notification Bell Dropdown */}
               <div className="relative" ref={notifMenuRef}>
@@ -448,6 +452,12 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Mobile Theme Appearance Toggle Row */}
+            <div className="pt-2 border-t border-[rgba(240,237,233,0.16)] flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[rgba(240,237,233,0.06)] border border-[rgba(240,237,233,0.12)]">
+              <span className="text-xs font-semibold text-[#F0EDE9]">Theme Appearance</span>
+              <ThemeToggle />
+            </div>
 
             <div className="pt-2 border-t border-[rgba(240,237,233,0.16)] flex flex-col gap-2">
               <Link

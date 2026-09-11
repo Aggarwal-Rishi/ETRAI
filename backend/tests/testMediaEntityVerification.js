@@ -84,7 +84,7 @@ async function run() {
   assert(rahul.sources.length > 0, 'verified entity should retain its evidence sources');
   assert(result.entityVerification.verifiedCount >= 1);
   assert(result.entityVerification.searchedCount >= 1);
-  assert(result.intentAnalysis.misinformationTargeting.targetedEntities.includes('Rahul Gandhi'));
+  assert.deepStrictEqual(result.intentAnalysis.misinformationTargeting.targetedEntities, [], 'neutral reporting must not label a visible person as a misinformation target');
   assert(consentedSearchCalls >= 1, 'explicit consent should enable corroboration searches');
 
   const tinyPng = Buffer.from(
@@ -96,6 +96,27 @@ async function run() {
     allowExternalVisualSearch: false
   });
   assert.strictEqual(imageForensics.reverseSearch.status, 'WITHHELD', 'image bytes must not leave the app without explicit visual-search consent');
+
+  const stillPhoto = {
+    transcript: '',
+    rawOcrText: 'Public event 2047',
+    visualDescription: 'Narendra Modi appears in a crowd.',
+    observed: {
+      publicFigures: [{ name: 'Narendra Modi', confidence: 96 }],
+      entities: ['Narendra Modi'],
+      logos: [], landmarks: [], visibleLocationClues: []
+    },
+    keyframes: []
+  };
+  const stillCandidates = extractVisualEntityCandidates(stillPhoto);
+  const stillModi = stillCandidates.find(entity => entity.normalizedName === 'Narendra Modi');
+  assert.deepStrictEqual(stillModi.frameTimestamps, [], 'a still image must not receive a synthetic 0.0 second timestamp');
+  const stillVerification = await verifyVisualEntities(stillCandidates, stillPhoto, stillPhoto.visualDescription, {
+    allowExternalEntitySearch: false,
+    transcriptText: '',
+    ocrText: stillPhoto.rawOcrText
+  });
+  assert.strictEqual(stillVerification.entities.find(entity => entity.normalizedName === 'Narendra Modi').crossModalConfirmation, false, 'a visual description must not corroborate its own identity guess');
 
   console.log('PASS media entity extraction, consent, corroboration, image privacy, and intent integration');
 }

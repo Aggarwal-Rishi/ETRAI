@@ -507,7 +507,7 @@ export default function ResultsPage() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             
             {/* Left: Title + Source + Verdict Wash */}
-            <div className="space-y-3 max-w-2xl">
+            <div className="min-w-0 space-y-3 lg:flex-1">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <VerdictBadge status={verdict} size="lg" />
                 <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-mono text-[10px] font-bold border border-[#CECECE]">
@@ -516,7 +516,7 @@ export default function ResultsPage() {
                 <span className="text-xs text-[#7386A8] font-mono">Dossier {id.slice(0, 12)}</span>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-[#0B5CD5] leading-snug">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#0B5CD5] leading-snug break-words">
                 {report.sourceTitle || report.title || 'Verification Investigation'}
               </h1>
 
@@ -525,59 +525,77 @@ export default function ResultsPage() {
               </p>
             </div>
 
-            {/* Right: Circular SVG Trust Dial + Telemetry Stats */}
-            <div className="flex items-center gap-6 flex-shrink-0 bg-[#F8F8F6] p-5 rounded-2xl border border-[#CECECE]">
-              
-              {/* Dial */}
-              <div className="relative w-24 h-24 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    className="text-[#EFEEE9]"
-                    strokeWidth="3.5"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className={trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'}
-                    strokeDasharray={`${trustScore}, 100`}
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-black font-mono text-[#0B5CD5] leading-none">{trustScore}</span>
-                  <span className="text-[9px] uppercase font-mono text-[#7386A8] mt-0.5">Trust</span>
+            {/* Right: responsive score summary shared by every report */}
+            <aside
+              className="w-full lg:w-[390px] xl:w-[430px] flex-shrink-0 rounded-2xl border border-[#D9D9D4] bg-[#F8F8F6] p-4 sm:p-5 shadow-sm"
+              aria-label={`Trust score ${trustScore} out of 100`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="relative h-24 w-24 flex-shrink-0 flex items-center justify-center" aria-hidden="true">
+                  <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-[#E7E7E2]"
+                      strokeWidth="3.5"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className={trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'}
+                      strokeDasharray={`${trustScore}, 100`}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center text-center">
+                    <span className="font-mono text-2xl font-black leading-none text-[#0B5CD5]">{trustScore}</span>
+                    <span className="mt-1 font-mono text-[9px] font-bold uppercase tracking-wider text-[#7386A8]">Trust score</span>
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#7386A8]">Report confidence</p>
+                  <p className={`mt-1 text-sm font-bold ${trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'}`}>
+                    {String(verdict).replaceAll('_', ' ')}
+                  </p>
+                  {report.evidenceCoverage != null && (
+                    <p className="mt-2 text-xs leading-relaxed text-[#59709A]">
+                      <strong className="text-[#2C4E86]">{report.evidenceCoverage}% evidence coverage.</strong>{' '}
+                      Unresolved details remain unverified.
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {report.evidenceCoverage != null && <p className="text-xs text-[#7386A8] max-w-xs">Evidence coverage: <strong>{report.evidenceCoverage}%</strong>. Unresolved details are not established falsehoods.</p>}
-              {report.extractionCoverage?.unrepresentedPassages?.length > 0 && <details className="text-xs text-[#7386A8] max-w-sm"><summary className="cursor-pointer focus-visible:outline">{report.extractionCoverage.unrepresentedPassages.length} article passages not mapped to checked details</summary><p className="my-2">These may be background or omitted assertions; they have not been verified.</p>{report.extractionCoverage.unrepresentedPassages.map((text,i)=><p key={i} className="my-2">{text}</p>)}</details>}
-              {/* Telemetry Stats Grid */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-mono">
-                <div>
-                  <span className="text-[#7386A8] text-[10px] block">Confidence</span>
-                  <span className="font-bold text-[#0B5CD5]">{confidencePct == null ? 'Not recorded' : `${confidencePct}%`}</span>
-                </div>
-                <div>
-                  <span className="text-[#7386A8] text-[10px] block">Evidence Items</span>
-                  <span className="font-bold text-[#D97757]">{evidenceCount}</span>
-                </div>
-                <div>
-                  <span className="text-[#7386A8] text-[10px] block">Sources Checked</span>
-                  <span className="font-bold text-[#0B5CD5]">{reviewedSources.length}</span>
-                </div>
-                <div>
-                  <span className="text-[#7386A8] text-[10px] block">Contradictions</span>
-                  <span className={`font-bold ${contradictionsCount > 0 ? 'text-[#B23F35]' : 'text-[#2C5B3E]'}`}>
-                    {contradictionsCount}
-                  </span>
-                </div>
+              <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[#DEDEDA] bg-[#DEDEDA] font-mono text-xs">
+                {[
+                  ['Confidence', confidencePct == null ? '—' : `${confidencePct}%`, 'text-[#0B5CD5]'],
+                  ['Evidence', evidenceCount, 'text-[#D97757]'],
+                  ['Sources checked', reviewedSources.length, 'text-[#0B5CD5]'],
+                  ['Contradictions', contradictionsCount, contradictionsCount > 0 ? 'text-[#B23F35]' : 'text-[#2C5B3E]']
+                ].map(([label, value, tone]) => (
+                  <div key={label} className="bg-white px-3 py-2.5">
+                    <span className="block text-[9px] font-bold uppercase tracking-wide text-[#7386A8]">{label}</span>
+                    <span className={`mt-0.5 block text-sm font-black ${tone}`}>{value}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {report.extractionCoverage?.unrepresentedPassages?.length > 0 && (
+                <details className="mt-3 border-t border-[#DEDEDA] pt-3 text-xs text-[#59709A]">
+                  <summary className="cursor-pointer rounded font-medium text-[#2C4E86] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B5CD5]">
+                    {report.extractionCoverage.unrepresentedPassages.length} article passages not mapped
+                  </summary>
+                  <p className="mt-2">These passages may be background or omitted assertions and have not been verified.</p>
+                  {report.extractionCoverage.unrepresentedPassages.map((passage, index) => (
+                    <p key={index} className="mt-2 border-l-2 border-[#D9D9D4] pl-2 leading-relaxed">{passage}</p>
+                  ))}
+                </details>
+              )}
+            </aside>
           </div>
         </div>
 
@@ -1307,7 +1325,7 @@ export default function ResultsPage() {
                 
                 {/* Mini Verdict Dial */}
                 <div className="p-5 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-center shadow-sm">
-                  <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold">Dossier Confidence</span>
+                  <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold">Trust score</span>
                   <div className={`text-3xl font-black font-mono ${
                     trustScore >= 75 ? 'text-[#2C5B3E]' : trustScore >= 40 ? 'text-[#B98520]' : 'text-[#B23F35]'
                   }`}>

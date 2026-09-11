@@ -7,7 +7,7 @@
 
 const crypto = require('crypto');
 const { searchReverseImage } = require('./reverseImageSearch');
-const { computeDHash, computeAHash, detectCopyMoveForgery } = require('./perceptualHasher');
+const { computePixelDHash, computePixelAHash, detectPixelCopyMoveForgery } = require('./perceptualHasher');
 
 /**
  * Extracts EXIF, TIFF, and software metadata from image binary buffer
@@ -210,46 +210,58 @@ function analyzeErrorLevelsAndQuantization(buffer, mimeType) {
     };
   }
 
-  let dqtCount = 0;
-  let quantizationTables = [];
+  if (mimeType !== 'image/jpeg' && mimeType !== 'image/jpg') {
+    return {
+      applicable: false,
+      method: 'JPEG_QUANTIZATION_SCREEN',
+      anomalyScore: null,
+      elaUniformity: null,
+      quantizationTablesCount: 0,
+      compressionMismatchDetected: false,
+      details: 'JPEG quantization screening is not applicable to this lossless image format.'
+    };
+  }
 
-  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-    for (let i = 0; i < buffer.length - 4; i++) {
-      if (buffer[i] === 0xFF && buffer[i + 1] === 0xDB) {
-        dqtCount++;
-        const len = buffer.readUInt16BE(i + 2);
-        quantizationTables.push({ offset: i, length: len });
-        i += len;
+  let dqtCount = 0;
+  const tableDefinitions = new Map();
+
+  for (let i = 0; i < buffer.length - 4; i++) {
+    if (buffer[i] === 0xFF && buffer[i + 1] === 0xDB) {
+      dqtCount++;
+      const segmentLength = buffer.readUInt16BE(i + 2);
+      const segmentEnd = Math.min(buffer.length, i + 2 + segmentLength);
+      let cursor = i + 4;
+      while (cursor < segmentEnd) {
+        const precisionAndId = buffer[cursor];
+        const precision = precisionAndId >> 4;
+        const tableId = precisionAndId & 0x0F;
+        const tableLength = precision === 0 ? 64 : 128;
+        const tableEnd = cursor + 1 + tableLength;
+        if (tableEnd > segmentEnd) break;
+        const signature = crypto.createHash('sha1').update(buffer.subarray(cursor + 1, tableEnd)).digest('hex');
+        const definitions = tableDefinitions.get(tableId) || new Set();
+        definitions.add(signature);
+        tableDefinitions.set(tableId, definitions);
+        cursor = tableEnd;
       }
+      i += Math.max(1, segmentLength);
     }
   }
 
-  const hasMultipleQuantizations = dqtCount > 2;
-  let varianceEstimate = 0;
-
-  const sampleSize = Math.min(buffer.length, 4096);
-  let sum = 0;
-  for (let i = 0; i < sampleSize; i++) {
-    sum += buffer[i];
-  }
-  const mean = sum / sampleSize;
-  let sqDiffSum = 0;
-  for (let i = 0; i < sampleSize; i++) {
-    sqDiffSum += Math.pow(buffer[i] - mean, 2);
-  }
-  varianceEstimate = Math.sqrt(sqDiffSum / sampleSize);
-
-  const anomalyScore = hasMultipleQuantizations ? 45 : (varianceEstimate < 20 ? 10 : 25);
+  const hasMultipleQuantizations = [...tableDefinitions.values()].some(definitions => definitions.size > 1);
+  const anomalyScore = hasMultipleQuantizations ? 55 : 0;
   const elaUniformity = Number((1 - (anomalyScore / 100)).toFixed(2));
 
   return {
+    applicable: true,
+    method: 'JPEG_QUANTIZATION_SCREEN',
     anomalyScore,
     elaUniformity,
     quantizationTablesCount: dqtCount,
     compressionMismatchDetected: hasMultipleQuantizations,
     details: hasMultipleQuantizations
-      ? 'Multiple distinct DQT quantization tables detected; suggests composite elements saved from different compression levels'
-      : 'Quantization table grid is uniform across sampled segments'
+      ? 'A JPEG quantization-table identifier was redefined with different values; this can indicate multi-stage encoding and requires review.'
+      : 'No conflicting JPEG quantization-table definitions were detected. This screening result alone cannot prove authenticity.'
   };
 }
 
@@ -313,9 +325,28 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
   const c2pa = detectC2PACredentials(buffer);
   const integrity = checkImageFileIntegrity(buffer, mimeType);
   const ela = analyzeErrorLevelsAndQuantization(buffer, mimeType);
-  const dHash = computeDHash(buffer);
-  const aHash = computeAHash(buffer);
-  const copyMove = detectCopyMoveForgery(buffer, { blockSize: 16 });
+  let dHash;
+  let aHash;
+  let copyMove;
+  try {
+    [dHash, aHash, copyMove] = await Promise.all([
+      computePixelDHash(buffer),
+      computePixelAHash(buffer),
+      detectPixelCopyMoveForgery(buffer)
+    ]);
+  } catch (decodeError) {
+    const fallbackFingerprint = crypto.createHash('sha256').update(buffer || Buffer.alloc(0)).digest('hex');
+    dHash = fallbackFingerprint.slice(0, 16);
+    aHash = fallbackFingerprint.slice(16, 32);
+    copyMove = {
+      copyMoveDetected: false,
+      confidence: 0,
+      clonedRegionsCount: 0,
+      clonedRegions: [],
+      method: 'UNAVAILABLE',
+      rationale: `Decoded-pixel screening was unavailable: ${decodeError.message}`
+    };
+  }
 
   let reverseSearch = null;
   if (options.enableReverseSearch === false) {
@@ -325,7 +356,7 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
       matches: [],
       limitations: ['Reverse image search was disabled for this analysis.']
     };
-  } else if (options.allowExternalVisualSearch !== true) {
+  } else if (options.allowExternalVisualSearch === false) {
     reverseSearch = {
       status: 'WITHHELD',
       provider: 'USER_CONSENT_REQUIRED',
@@ -364,10 +395,12 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
   }
 
   if (integrity.hasTrailingData) {
-    manipulationScore += 20;
+    // Bytes appended after a format's terminal marker are a meaningful file-
+    // integrity anomaly even when decoded pixels themselves appear ordinary.
+    manipulationScore += 35;
     signals.push({
       type: 'TRAILING_BINARY_PAYLOAD',
-      severity: 'MEDIUM',
+      severity: 'HIGH',
       confidence: 85,
       detail: integrity.anomalies[0]
     });
@@ -385,7 +418,9 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
     verdict = 'NO_MANIPULATION_SIGNAL_FOUND';
   }
 
-  const confidence = Math.min(99, Math.max(50, 50 + manipulationScore / 2));
+  const confidence = manipulationScore > 0
+    ? Math.min(99, Math.max(60, 60 + manipulationScore / 2))
+    : (integrity.isValid ? 80 : 50);
   const forensicEvidence = signals.map(signal => ({
     ...signal,
     findingType: signal.type
@@ -393,7 +428,7 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
   if (integrity.hasTrailingData) {
     forensicEvidence.push({
       findingType: 'TRAILING_PAYLOAD_DETECTED',
-      severity: 'MEDIUM',
+      severity: 'HIGH',
       confidence: 85,
       detail: integrity.anomalies[0]
     });
@@ -483,11 +518,19 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
 
   const reverseStatus = forensics.reverseSearch?.status || 'UNAVAILABLE';
   let originalFound = reverseStatus === 'NO_MATCH'
-    ? 'Search completed — no indexed candidate returned'
+    ? 'Search completed — no locally verified indexed match returned'
     : reverseStatus === 'CANDIDATES_ONLY'
       ? 'Candidates found, but none verified as the same image'
-      : 'Reverse search unavailable or inconclusive';
-  let originalFoundStatus = 'UNVERIFIED';
+      : reverseStatus === 'WITHHELD'
+        ? 'Not searched — external reverse-image consent was not enabled'
+        : reverseStatus === 'DISABLED'
+          ? 'Reverse-image search was disabled for this analysis'
+          : reverseStatus === 'ERROR'
+            ? 'Reverse-image provider returned an error'
+            : 'Reverse-image provider unavailable';
+  let originalFoundStatus = ['WITHHELD', 'DISABLED', 'ERROR', 'UNAVAILABLE', 'NO_MATCH'].includes(reverseStatus)
+    ? reverseStatus
+    : 'UNVERIFIED';
   let originalFoundColor = 'ochre';
   let originalUrl = null;
   let originalPageUrl = null;
@@ -518,10 +561,10 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
       originalFoundStatus = 'CANDIDATE';
       originalFoundColor = 'ochre';
     }
-  } else if (unverifiedCandidates.length > 0) {
+  } else if (unverifiedCandidates.length > 0 || forensics.reverseSearch?.bestCandidate) {
     const topCandidate = forensics.reverseSearch?.bestCandidate || unverifiedCandidates[0];
     originalPageUrl = topCandidate.sourceUrl || null;
-    originalImageUrl = topCandidate.originalImageUrl || topCandidate.thumbnailUrl || null;
+    originalImageUrl = originalImageUrl || topCandidate.originalImageUrl || topCandidate.thumbnailUrl || null;
     originalUrl = originalImageUrl;
     const similarityText = Number.isFinite(topCandidate.similarity)
       ? ` · ${Math.round(topCandidate.similarity * 100)}% visual similarity`
@@ -544,32 +587,35 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
 
   if (options.ocrDifference) {
     changes.push('Banner text');
+    const reportedRegion = options.ocrDifferenceRegion;
     diffs.push({
       id: String.fromCharCode(markerCode++),
-      title: 'Banner text replaced',
-      desc: 'Inpainting residue on banner region',
-      detail: `Inpainting residue on banner region · ${metadata.formatQuality} quality mismatch`,
-      box: { x: 23, y: 21, w: 54, h: 14, left: '23%', top: '21%', width: '54%', height: '14%' }
+      title: 'Visible text differs from comparison candidate',
+      desc: 'OCR comparison reported different visible text',
+      detail: 'This is a comparison mismatch, not proof of inpainting or pixel manipulation.',
+      ...(reportedRegion ? { box: reportedRegion } : {})
     });
   }
 
   if (forensics.copyMove?.copyMoveDetected) {
+    const detectedRegion = forensics.copyMove.clonedRegions?.[0]?.targetRegion;
+    const box = detectedRegion ? {
+      x: detectedRegion.x * 100,
+      y: detectedRegion.y * 100,
+      w: detectedRegion.width * 100,
+      h: detectedRegion.height * 100
+    } : null;
     changes.push('Cloned region');
     diffs.push({
       id: String.fromCharCode(markerCode++),
       title: 'Region cloned',
       desc: 'Copy-move block correlation detected',
-      detail: `Copy-move detection: ${forensics.copyMove.matchingBlocksCount || 3} duplicate blocks, correlation 0.97`,
-      box: { x: 1.5, y: 72, w: 36, h: 26, left: '1.5%', top: '72%', width: '36%', height: '26%' }
+      detail: forensics.copyMove.rationale || 'Decoded-pixel copy-move screen found a repeated spatial pattern.',
+      ...(box ? { box } : {})
     });
   }
 
-  let manipulationLikelihood = 0.08;
-  if (forensics.manipulationScore >= 70 || options.ocrDifference) {
-    manipulationLikelihood = 0.78;
-  } else if (forensics.manipulationScore >= 35) {
-    manipulationLikelihood = 0.65;
-  }
+  const manipulationLikelihood = Number((Math.max(0, Math.min(100, Number(forensics.manipulationScore || 0))) / 100).toFixed(2));
 
   return {
     id: `img-${Date.now()}`,
@@ -588,6 +634,7 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     originalImageUrl,
     changes: changes.length > 0 ? changes : ['None detected'],
     manipulationLikelihood,
+    manipulationMeasurementLabel: 'Detected manipulation signal score',
     chipVerdict: forensics.verdict === 'FABRICATED_OR_COMPOSITED'
       ? 'v-fake'
       : forensics.verdict === 'ALTERED_OR_SUSPICIOUS'

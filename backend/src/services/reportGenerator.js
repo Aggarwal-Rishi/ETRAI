@@ -1,3 +1,4 @@
+const { summarizeClaimGroups } = require('./claimGroups');
 const { GoogleGenAI } = require('@google/genai');
 const { getProviderStatus, isKeyValid } = require('./providerManager');
 
@@ -37,8 +38,10 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
 
   // Canonical Article Verdict determination
   let articleVerdict = 'UNVERIFIED';
-  if (falseCount > 0 || (total > 0 && factualAccuracyScore < 35 && verifiedCount === 0 && partiallyVerifiedCount === 0)) {
+  if (falseCount > 0 && falseCount === total) {
     articleVerdict = 'FALSE';
+  } else if (falseCount > 0) {
+    articleVerdict = verifiedCount > 0 || partiallyVerifiedCount > 0 ? 'PARTIALLY_VERIFIED' : 'UNVERIFIED';
   } else if (factualAccuracyScore >= 70 && verifiedCount > 0 && unverifiedCount === 0) {
     articleVerdict = 'VERIFIED';
   } else if (partiallyVerifiedCount > 0 && falseCount === 0) {
@@ -153,6 +156,8 @@ Media Payload Verification Details:
 - Has Attached News Text: ${hasAttachedNews ? 'YES (Verified against visual findings)' : 'NO (Standalone media submission)'}
 - Related News Research Summary: ${articleResearchContext?.summary || 'N/A'}
 - Matched Source Context Comparison: ${JSON.stringify(mediaAnalysis.imageSourceContextComparison || {})}
+- Related Same-Image News Analysis: ${JSON.stringify(mediaAnalysis.relatedImageNews || {})}
+- Related Video/News Context Analysis: ${JSON.stringify(mediaAnalysis.relatedVideoNews || mediaAnalysis.videoContextReport?.relatedNews || {})}
 - Segment-Level Video Context Report: ${JSON.stringify(mediaAnalysis.videoContextReport || {})}
 ` : '';
 
@@ -263,6 +268,13 @@ Return ONLY a JSON object with this exact structure:
       keyHighlights = [contextHighlight, ...keyHighlights.filter(item => item !== contextHighlight)].slice(0, 4);
       explanationOfFindings = `${explanationOfFindings} Source-context comparison: ${sourceComparison.rationale || sourceComparison.status}.`;
     }
+
+    const relatedImageNews = mediaAnalysis?.relatedImageNews;
+    if (relatedImageNews?.status === 'AVAILABLE') {
+      const newsHighlight = `Related-image news: ${relatedImageNews.evidenceEligibleCount || 0} of ${relatedImageNews.readableArticleCount || 0} readable pages passed the evidence gate`;
+      keyHighlights = [newsHighlight, ...keyHighlights.filter(item => item !== newsHighlight)].slice(0, 4);
+      explanationOfFindings = `${explanationOfFindings} Related-image news analysis: ${relatedImageNews.summary}`;
+    }
   }
 
   const videoCompletenessSummary = mediaAnalysis?.videoContextReport?.completeness;
@@ -270,6 +282,13 @@ Return ONLY a JSON object with this exact structure:
     const videoHighlight = `Video context: ${videoCompletenessSummary.label || String(videoCompletenessSummary.verdict || 'inconclusive').replaceAll('_', ' ')}`;
     keyHighlights = [videoHighlight, ...keyHighlights.filter(item => item !== videoHighlight)].slice(0, 4);
     explanationOfFindings = `${explanationOfFindings} Video originality/context assessment: ${videoCompletenessSummary.explanation || videoCompletenessSummary.verdict}.`;
+  }
+
+  const relatedVideoNews = mediaAnalysis?.relatedVideoNews || mediaAnalysis?.videoContextReport?.relatedNews;
+  if (relatedVideoNews?.status === 'AVAILABLE') {
+    const videoNewsHighlight = `Related video/news: ${relatedVideoNews.evidenceEligibleCount || 0} of ${relatedVideoNews.readableArticleCount || 0} sources passed the media-link and context gates`;
+    keyHighlights = [videoNewsHighlight, ...keyHighlights.filter(item => item !== videoNewsHighlight)].slice(0, 4);
+    explanationOfFindings = `${explanationOfFindings} Related video/news context: ${relatedVideoNews.summary}`;
   }
 
   const manipulationAnalysis = {
@@ -295,12 +314,59 @@ Return ONLY a JSON object with this exact structure:
       c.sources.forEach(s => allDiscoveredSources.push(s));
     }
   });
-  const uniqueDiscoveredSources = Array.from(new Map(
-    allDiscoveredSources.map((source, index) => [
-      source.url || source.link || `${source.domain || 'source'}-${index}`,
-      source
-    ])
-  ).values());
+  const isAcceptedEvidence = source => ['SUPPORTS', 'SUPPORT', 'REFUTES', 'CONTRADICTS', 'QUALIFIES', 'VERIFIED'].includes(String(source.stance || source.relationship || '').toUpperCase());
+  const discoveredByUrl = new Map();
+  allDiscoveredSources.forEach((source, index) => {
+    const key = source.url || source.link || `${source.domain || 'source'}-${index}`;
+    // A source accepted for one claim remains evidence even if neutral for another.
+    if (!discoveredByUrl.has(key) || isAcceptedEvidence(source)) discoveredByUrl.set(key, source);
+  });
+  const uniqueDiscoveredSources = Array.from(discoveredByUrl.values());
+
+  for (const article of mediaAnalysis?.relatedImageNews?.articles || []) {
+    if (!article.evidenceEligible || !article.url || uniqueDiscoveredSources.some(source => (source.url || source.link) === article.url)) continue;
+    uniqueDiscoveredSources.push({
+      title: article.title || `Related image news · ${article.domain || 'web source'}`,
+      url: article.url,
+      link: article.url,
+      domain: article.domain || null,
+      publisher: article.publisher || null,
+      snippet: article.newsSummary || article.description || '',
+      publishedAt: article.publishedAt || null,
+      stance: article.relationship,
+      relationship: article.relationship,
+      relevanceScore: article.contextConfidence,
+      visualSimilarity: article.imageSimilarity,
+      locallyVerified: true,
+      independenceGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      syndicationGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      evidenceType: 'VERIFIED_RELATED_IMAGE_NEWS',
+      sourceRole: 'RELATED_IMAGE_NEWS_CONTEXT'
+    });
+  }
+
+  for (const article of relatedVideoNews?.articles || []) {
+    if (!article.evidenceEligible || !article.url || uniqueDiscoveredSources.some(source => (source.url || source.link) === article.url)) continue;
+    uniqueDiscoveredSources.push({
+      title: article.title || `Related video/news · ${article.domain || 'web source'}`,
+      url: article.url,
+      link: article.url,
+      domain: article.domain || null,
+      publisher: article.publisher || null,
+      snippet: article.newsSummary || article.description || '',
+      publishedAt: article.publishedAt || null,
+      stance: article.relationship,
+      relationship: article.relationship,
+      relevanceScore: article.contextConfidence,
+      locallyVerified: ['VERIFIED_KEYFRAME_LINK', 'RESOLVER_VERIFIED'].includes(article.mediaLinkStatus),
+      independenceGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      syndicationGroup: String(article.publisher || article.domain || '').toLocaleLowerCase(),
+      evidenceType: 'VERIFIED_RELATED_VIDEO_NEWS',
+      sourceRole: 'RELATED_VIDEO_NEWS_CONTEXT',
+      matchedFrameTimestamps: article.matchedFrameTimestamps || [],
+      transcriptEvidenceScore: article.transcriptEvidenceScore || null
+    });
+  }
 
   const imageReportItem = mediaAnalysis?.images?.[0] || mediaAnalysis?.imageForensics?.reportItem || null;
   if (
@@ -395,6 +461,8 @@ Return ONLY a JSON object with this exact structure:
     sources: uniqueDiscoveredSources,
     provenance,
     mediaAnalysis,
+    extractedText,
+    hasAttachedNews: !!hasAttachedNews,
     textAnalysis: arguments[0].textAnalysis,
     numericalAnalysis: arguments[0].numericalAnalysis,
     linkIntelligence: arguments[0].linkIntelligence,
@@ -402,23 +470,48 @@ Return ONLY a JSON object with this exact structure:
   });
 
   scores.overallTrustScore = explainableScoring.finalTrustScore;
-  scores.factualAccuracyScore = explainableScoring.finalTrustScore;
-  scores.confidenceRating = explainableScoring.finalTrustScore;
+  scores.factualAccuracyScore = factualAccuracyScore;
+  scores.evidenceCoverage = explainableScoring.evidenceCoverage;
+  scores.claimResolutionScore = factualAccuracyScore;
+  scores.confidenceRating = evidenceConfidence;
   scores.evidenceConfidence = evidenceConfidence;
   scores.explainableScoring = explainableScoring;
-  scores.methodologyVersion = 'ETRAI-v2.4-TransparentScoring';
+  scores.methodologyVersion = 'ETRAI-v2.5-TransparentScoring';
+
+  const aiGeneratedNarrative = summary;
+  const totalClaims = breakdown.totalClaims || 0;
+  const evidenceCount = uniqueDiscoveredSources.filter(source => ['SUPPORTS', 'SUPPORT', 'REFUTES', 'CONTRADICTS', 'QUALIFIES', 'VERIFIED'].includes(String(source.stance || source.relationship || '').toUpperCase())).length;
+  const verdictLabel = String(articleVerdict || 'UNVERIFIED').replaceAll('_', ' ');
+  const mediaVerdict = mediaAnalysis?.forensicVerdict || mediaAnalysis?.imageForensics?.verdict || mediaAnalysis?.forensics?.verdict;
+  const mediaSentence = mediaAnalysis
+    ? (mediaVerdict === 'NO_MANIPULATION_SIGNAL_FOUND'
+      ? 'Local forensic screening found no manipulation signal, which is not proof of provenance or originality.'
+      : `Local media-forensic status: ${String(mediaVerdict || 'INCONCLUSIVE').replaceAll('_', ' ')}.`)
+    : '';
+  const imageNewsSentence = mediaAnalysis?.relatedImageNews?.status === 'AVAILABLE'
+    ? `Related-image news review examined ${mediaAnalysis.relatedImageNews.readableArticleCount || 0} readable page${mediaAnalysis.relatedImageNews.readableArticleCount === 1 ? '' : 's'}; ${mediaAnalysis.relatedImageNews.evidenceEligibleCount || 0} passed the same-image and context evidence gates.`
+    : '';
+  const videoNewsSentence = relatedVideoNews?.status === 'AVAILABLE'
+    ? `Related-video news review examined ${relatedVideoNews.readableArticleCount || 0} source${relatedVideoNews.readableArticleCount === 1 ? '' : 's'}; ${relatedVideoNews.evidenceEligibleCount || 0} passed the media-link and context evidence gates.`
+    : '';
+  summary = `Analysis evaluated ${totalClaims} extracted claim${totalClaims === 1 ? '' : 's'} and observations. Verdict: ${verdictLabel}. Overall trust score: ${explainableScoring.finalTrustScore}/100, based on ${evidenceCount} evidentiary source${evidenceCount === 1 ? '' : 's'}. ${mediaSentence} ${imageNewsSentence} ${videoNewsSentence}`.trim();
+  keyHighlights = keyHighlights.filter(item => !/\b(?:factual accuracy|trust) score\b/i.test(String(item)));
+  manipulationAnalysis.factualAccuracyScore = factualAccuracyScore;
 
   return {
     inputType: resolvedInputType,
     sourceTitle,
     selectedTypes,
-    factualAccuracyScore: explainableScoring.finalTrustScore,
+    factualAccuracyScore,
+    evidenceCoverage: explainableScoring.evidenceCoverage,
+    extractionCoverage: arguments[0].extractionCoverage || null,
+    claimResolutionScore: factualAccuracyScore,
     evidenceConfidence,
     articleVerdict,
     verdict: articleVerdict,
     trustScore: explainableScoring.finalTrustScore,
-    confidenceRating: explainableScoring.finalTrustScore,
-    methodologyVersion: 'ETRAI-v2.4-TransparentScoring',
+    confidenceRating: evidenceConfidence,
+    methodologyVersion: 'ETRAI-v2.5-TransparentScoring',
     explainableScoring,
     extractionMode: verifiedClaims?.[0]?.extractionMode || 'REAL_LLM',
     manipulationRisk,
@@ -427,6 +520,7 @@ Return ONLY a JSON object with this exact structure:
     overallMetrics: scores,
     breakdown,
     summary,
+    aiGeneratedNarrative,
     recommendation,
     keyHighlights,
     explanationOfFindings,
@@ -435,8 +529,11 @@ Return ONLY a JSON object with this exact structure:
     aiSummaryError,
     chartData,
     claims: verifiedClaims,
+    claimGroups: summarizeClaimGroups(verifiedClaims),
     sources: uniqueDiscoveredSources,
     mediaAnalysis: mediaAnalysis || null,
+    relatedImageNews: mediaAnalysis?.relatedImageNews || null,
+    relatedVideoNews: relatedVideoNews || null,
     images: mediaAnalysis?.images || (mediaAnalysis?.imageForensics?.reportItem ? [mediaAnalysis.imageForensics.reportItem] : []),
     articleResearchContext: articleResearchContext || null,
     provenance,

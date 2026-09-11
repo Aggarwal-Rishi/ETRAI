@@ -77,14 +77,16 @@ function extractQuotesAndAttributions(text = '', sources = []) {
   if (!text || typeof text !== 'string') return quotes;
 
   // Regex capturing quote strings and preceding/trailing attribution verbs
-  const quoteRegex = /(?:([A-Z][a-zA-Z\s\.\-]{2,60})\s+(?:stated|said|claimed|declared|announced|warned|asserted|posted|tweeted|wrote|reported|confirmed)[,:\s]+)?["“'«]([^"”'»]{8,400})["”'»](?:\s+[,:\-]\s*([A-Z][a-zA-Z\s\.\-]{2,60}))?/gi;
+  // Match paired quotation marks; apostrophes inside words are not delimiters.
+  const quoteRegex = /(?:([A-Z][a-zA-Z\s.\-]{2,60})\s+(?:stated|said|claimed|declared|announced|warned|reported|confirmed)[,:\s]+)?(?:"([^"\n]{8,800})"|“([^”]{8,800})”|«([^»]{8,800})»|(?<![\p{L}\p{N}])'([^'\n]{8,800})'(?![\p{L}\p{N}]))(?:\s*[,—-]?\s*(?:said|stated|reported|confirmed)\s+([^.!?\n]{2,80}))?/gu;
 
   let match;
   let quoteId = 1;
   while ((match = quoteRegex.exec(text)) !== null) {
     let speakerPrefix = (match[1] || '').trim();
-    const quoteBody = (match[2] || '').trim();
-    let speakerSuffix = (match[3] || '').trim();
+    const quoteBody = (match[2] || match[3] || match[4] || match[5] || '').trim();
+    let speakerSuffix = (match[6] || '').trim();
+    if (!speakerSuffix) speakerSuffix = (text.slice(quoteRegex.lastIndex).match(/^\s*[,—-]?\s*([^.!?\n]{2,65}?)\s+(?:said|stated|reported)\b/i)?.[1] || '').trim();
 
     // Strip leading transitional adverbials
     speakerPrefix = speakerPrefix.replace(/^(Meanwhile|However|Furthermore|Additionally|In addition|Later|Consequently)[,\s]+/i, '').trim();
@@ -208,9 +210,12 @@ function extractEntitiesDeterministic(text = '') {
     const exclusions = [
       'The Union', 'According To', 'In Addition', 'On Wednesday', 'On Monday',
       'On Tuesday', 'On Thursday', 'On Friday', 'On Saturday', 'On Sunday',
-      'In India', 'In Recent', 'As Per', 'Under The', 'For The', 'With Regard'
+      'In India', 'In Recent', 'As Per', 'Under The', 'For The', 'With Regard',
+      'Numerous Indian', 'Visible OCR', 'Visual Scene', 'The Submitted',
+      'A Wide', 'The Central', 'In The', 'Against A', 'No Independent'
     ];
-    if (exclusions.includes(candidate)) continue;
+    const genericLead = /^(?:numerous|massive|prominent|visible|submitted|central|matching|colorful|clear|pale|wide|high|outdoor|related|potential|provided|original)\b/i;
+    if (exclusions.includes(candidate) || genericLead.test(candidate)) continue;
 
     if (!entitiesMap.has(candidate) && !CANONICAL_KNOWLEDGE_BASE[candidateLower]) {
       let type = 'ORGANIZATION';
@@ -543,6 +548,14 @@ Text: ${text.substring(0, 2000)}`;
     };
   entities = entityVerification.entities;
   entityClaimConnections = connectEntitiesToClaims(entities, claims);
+  const targetingSignalPresent = !['INFORMATIONAL_REPORTING', 'INFORMATIONAL', 'NEUTRAL', 'NONE']
+    .includes(String(framingAnalysis.primaryFramingSignal || '').toUpperCase());
+  const targetedEntities = targetingSignalPresent
+    ? entities
+      .filter(entity => entity.type === 'PERSON' || entity.type === 'GOVERNMENT_BODY' || entity.type === 'COMPANY')
+      .filter(entity => entityClaimConnections.some(connection => connection.entityName === (entity.normalizedName || entity.name) && connection.roleInClaim === 'TARGET'))
+      .map(entity => entity.normalizedName || entity.name)
+    : [];
   geographicRelevance = {
     primaryJurisdiction: entities.find(e => e.type === 'LOCATION')?.jurisdiction || 'National',
     locationsIdentified: entities.filter(e => e.type === 'LOCATION').map(e => e.normalizedName || e.name),
@@ -569,7 +582,7 @@ Text: ${text.substring(0, 2000)}`;
       reasoning: framingAnalysis.reasoning,
       signalsBreakdown: framingAnalysis.signalsBreakdown,
       misinformationTargeting: {
-        targetedEntities: entities.filter(e => e.type === 'PERSON' || e.type === 'GOVERNMENT_BODY' || e.type === 'COMPANY').map(e => e.normalizedName),
+        targetedEntities,
         potentialHarmVector: framingAnalysis.primaryFramingSignal === 'URGENCY_PRESSURE' ? 'PUBLIC_PANIC_RISK' : (framingAnalysis.primaryFramingSignal === 'MONETIZATION_PROMOTION' ? 'MARKET_DISTORTION_RISK' : 'MINIMAL_RISK')
       }
     },
@@ -578,7 +591,7 @@ Text: ${text.substring(0, 2000)}`;
       primaryFramingSignal: framingAnalysis.primaryFramingSignal,
       intentConfidence: framingAnalysis.confidence,
       isAnalyticalInference: true,
-      targetedEntitiesCount: entities.length,
+      targetedEntitiesCount: targetedEntities.length,
       quotesVerifiedCount: quotes.filter(q => q.verificationStatus === 'VERIFIED_ATTRIBUTION' || q.verificationStatus === 'ATTRIBUTED_STATEMENT').length,
       unattributedQuotesCount: quotes.filter(q => q.verificationStatus === 'UNATTRIBUTED_ASSERTION').length
     }

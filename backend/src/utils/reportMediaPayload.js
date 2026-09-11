@@ -19,13 +19,19 @@ function compactReportMediaPayload(report = {}) {
   if (canonicalItem) {
     const canonicalImage = canonicalItem.uploadedImageDataUrl || canonicalItem.providedImageUrl || null;
     canonicalItem.uploadedImageDataUrl = canonicalImage;
-    delete canonicalItem.providedImageUrl;
+    canonicalItem.providedImageUrl = canonicalImage;
     report.images = [canonicalItem];
   }
 
   if (media) {
-    // Compatibility aliases of imageForensics/report.images.
-    delete media.images;
+    // Preserve canonical reference in media.images for frontend compatibility
+    if (canonicalItem) {
+      media.images = [canonicalItem];
+    }
+    // The report-level field and canonical image item retain the related-news
+    // result; remove nested aliases so one article digest is not stored 3–4 times.
+    delete media.relatedImageNews;
+    if (media.imageForensics) delete media.imageForensics.relatedNews;
     if (media.forensics === media.imageForensics || media.forensics?.reportItem) {
       delete media.forensics;
     }
@@ -34,8 +40,6 @@ function compactReportMediaPayload(report = {}) {
     if (nestedReportItem && nestedReportItem !== canonicalItem) {
       delete nestedReportItem.uploadedImageDataUrl;
       delete nestedReportItem.providedImageUrl;
-    } else if (nestedReportItem) {
-      delete media.imageForensics.reportItem;
     }
   }
 

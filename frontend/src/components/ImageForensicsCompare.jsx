@@ -80,6 +80,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
   const containerRef = useRef(null);
   const isDragging = useRef(false);
 
+
   // Sync selected asset if primary item changes
   useEffect(() => {
     if (imageList.length > 0) {
@@ -107,21 +108,31 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
   const diffList = (selectedAsset.diffs && selectedAsset.diffs.length > 0)
     ? selectedAsset.diffs
     : (differences.length > 0 ? differences : selectedAsset.diffs || []);
+  const candidateUrl = selectedAsset.forensics?.reverseSearch?.bestCandidate?.originalImageUrl ||
+    selectedAsset.forensics?.reverseSearch?.candidateMatches?.[0]?.originalImageUrl ||
+    selectedAsset.forensics?.reverseSearch?.matches?.[0]?.originalImageUrl ||
+    null;
 
-  const hasOriginal = ['FOUND', 'CANDIDATE'].includes(selectedAsset.originalFoundStatus) && Boolean(
-    selectedAsset.originalImageUrl || selectedAsset.originalUrl || originalImage
+  const rawOriginalUrl = selectedAsset.originalImageUrl ||
+    selectedAsset.originalUrl ||
+    candidateUrl ||
+    originalImage ||
+    null;
+
+  const hasOriginal = (['FOUND', 'CANDIDATE'].includes(selectedAsset.originalFoundStatus) || Boolean(rawOriginalUrl)) && Boolean(
+    rawOriginalUrl || manualOriginalSrc
   );
 
   // Determine Real Image Sources
   const providedSrc = selectedAsset.uploadedImageDataUrl ||
     selectedAsset.providedImageUrl ||
+    selectedAsset.url ||
     reportData?.mediaAnalysis?.file?.url ||
+    reportData?.mediaAnalysis?.images?.[0]?.uploadedImageDataUrl ||
+    reportData?.mediaAnalysis?.images?.[0]?.providedImageUrl ||
+    reportData?.images?.[0]?.uploadedImageDataUrl ||
+    reportData?.images?.[0]?.providedImageUrl ||
     providedImage ||
-    null;
-
-  const rawOriginalUrl = selectedAsset.originalImageUrl ||
-    selectedAsset.originalUrl ||
-    originalImage ||
     null;
 
   const originalSrc = manualOriginalSrc || (rawOriginalUrl

@@ -109,6 +109,8 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
   let ocrRes = { status: 'NO_TEXT_DETECTED', ocrText: '', rawOcrText: '', blocks: [] };
   let reverseSearch = { status: 'UNAVAILABLE', matches: [] };
   let imageSourceContextComparison = null;
+  let relatedImageNews = null;
+  let relatedVideoNews = null;
   let imageForensics = null;
   let docForensics = null;
   let videoAudioForensics = null;
@@ -168,6 +170,18 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     }, options);
     imageReportItem.sourceContextComparison = imageSourceContextComparison;
     imageForensics.sourceContextComparison = imageSourceContextComparison;
+    const { collectImageRelatedNews } = require('./imageRelatedNews');
+    relatedImageNews = await collectImageRelatedNews({
+      reverseSearch,
+      visualSummary: visualDescription,
+      ocrText: ocrRes.ocrText || observed.visibleText || '',
+      entities: observed.entities || []
+    }, {
+      ...options,
+      allowExternalVisualSearch: options.allowExternalVisualSearch === true
+    });
+    imageReportItem.relatedNews = relatedImageNews;
+    imageForensics.relatedNews = relatedImageNews;
     if (imageForensics.ela?.manipulationSignals) {
       manipulationSignals.push(...imageForensics.ela.manipulationSignals);
     }
@@ -215,6 +229,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     });
     forensicEvidence = videoAudioForensics.forensicEvidence || [];
     videoContextReport = vidRes.videoContextReport || videoAudioForensics.contextReport || null;
+    relatedVideoNews = videoContextReport?.relatedNews || null;
     forensicVerdict = videoAudioForensics.verdict;
     forensicConfidence = videoAudioForensics.confidence;
   } else if (validation.mediaType === 'AUDIO') {
@@ -283,6 +298,8 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     manipulationSignals,
     reverseSearch,
     imageSourceContextComparison,
+    relatedImageNews,
+    relatedVideoNews,
     forensics: imageForensics || docForensics || videoAudioForensics,
     imageForensics,
     images: imageForensics?.reportItem ? [imageForensics.reportItem] : [],

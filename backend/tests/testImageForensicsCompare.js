@@ -57,7 +57,9 @@ async function testImageForensics() {
   assert.strictEqual(reportWithMatch.originalImageUrl, 'https://static.reuters.example/photo-2026-08-08.jpg');
   assert.strictEqual(reportWithMatch.originalPageUrl, 'https://www.reuters.com/archive/photo/2026-08-08');
   assert.ok(reportWithMatch.changes.includes('Banner text'));
-  assert.ok(parseFloat(reportWithMatch.manipulationLikelihood) >= 0.70);
+  assert.strictEqual(reportWithMatch.manipulationLikelihood, 0, 'a comparison-text mismatch must not invent a pixel manipulation score');
+  assert.ok(reportWithMatch.diffs[0].detail.includes('not proof'));
+  assert.strictEqual(reportWithMatch.diffs[0].box, undefined, 'no fabricated marker coordinates should be emitted');
 
   // Test 3: Genuine Novel Image (No Match Found)
   console.log('\n[Test 3]: Novel Unindexed Image (No Match Found)...');
@@ -75,8 +77,13 @@ async function testImageForensics() {
   console.log('  Status:', reportNoMatch.originalFoundStatus);
   console.log('  Color:', reportNoMatch.originalFoundColor);
 
-  assert.ok(reportNoMatch.originalFound.includes('no indexed candidate') || reportNoMatch.originalFound.includes('inconclusive'));
-  assert.strictEqual(reportNoMatch.originalFoundStatus, 'UNVERIFIED');
+  assert.ok(
+    reportNoMatch.originalFound.includes('unavailable') ||
+    reportNoMatch.originalFound.includes('no locally verified') ||
+    reportNoMatch.originalFound.includes('Not searched') ||
+    reportNoMatch.originalFound.includes('inconclusive')
+  );
+  assert.ok(['UNVERIFIED', 'UNAVAILABLE', 'WITHHELD', 'NO_MATCH'].includes(reportNoMatch.originalFoundStatus));
   assert.strictEqual(reportNoMatch.originalFoundColor, 'ochre');
 
   console.log('\n====================================================');

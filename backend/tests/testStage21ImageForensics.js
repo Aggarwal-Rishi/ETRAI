@@ -82,16 +82,19 @@ async function runStage21ImageForensicsTests() {
   // Test 4: Error Level Analysis & Double-Compression Disparity Detection
   // ----------------------------------------------------------------
   await runTest('4. ELA & recompression analysis detects multi-pass quantization disparities and software tags', async () => {
-    // Construct valid JPEG buffer containing Photoshop APP1 marker and 4 DQT markers (multi-pass composite)
+    // Construct a JPEG-like buffer containing Photoshop metadata and a
+    // conflicting redefinition of quantization table 0.
     const photoshopMarker = Buffer.from('ffe1001a41646f62652050686f746f73686f7020456469746564', 'hex');
-    const dqt1 = Buffer.from([0xFF, 0xDB, 0x00, 0x04, 0x00, 0x00]);
-    const dqt2 = Buffer.from([0xFF, 0xDB, 0x00, 0x04, 0x01, 0x00]);
-    const dqt3 = Buffer.from([0xFF, 0xDB, 0x00, 0x04, 0x02, 0x00]);
-    const dqt4 = Buffer.from([0xFF, 0xDB, 0x00, 0x04, 0x03, 0x00]);
+    const makeDqt = value => Buffer.concat([
+      Buffer.from([0xFF, 0xDB, 0x00, 0x43, 0x00]),
+      Buffer.alloc(64, value)
+    ]);
+    const dqt1 = makeDqt(0x08);
+    const dqt2 = makeDqt(0x18);
     const multiDqtJpeg = Buffer.concat([
       Buffer.from([0xFF, 0xD8]),
       photoshopMarker,
-      dqt1, dqt2, dqt3, dqt4,
+      dqt1, dqt2,
       Buffer.from([0xFF, 0xD9])
     ]);
 

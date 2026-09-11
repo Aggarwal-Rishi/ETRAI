@@ -143,7 +143,7 @@ function detectUrgencyAndEmotionalLanguage(text = '') {
     (detectedTriggers.length * 15) +
     (allCapsRatio * 100) +
     (exclamationDensity * 150) +
-    (sentiment.intensity * 20)
+    0 // Negative subject matter alone is not urgency or sensationalism
   ));
 
   let urgencyTier = 'LOW_URGENCY';
@@ -214,7 +214,7 @@ function evaluateAttributionQuality(text = '', quotes = []) {
     vaguePhrases: vaguePhrasesFound,
     explanation: vagueCount > 0
       ? `Identified ${vagueCount} vague attribution phrase(s) (${vaguePhrasesFound.join(', ')}). Requires primary source cross-referencing.`
-      : (namedQuotes > 0 ? `Attribution quality is high with ${namedQuotes} directly attributed statement(s).` : 'Text contains general factual assertions without direct quotes.')
+      : (namedQuotes > 0 ? `Attribution quality is high with ${namedQuotes} directly attributed statement(s).` : (quotes.length ? 'Quoted statements are present, but speaker attribution could not be established.' : 'No directly attributed quotations were detected.'))
   };
 }
 

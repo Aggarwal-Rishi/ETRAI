@@ -147,9 +147,10 @@ async function runAgent3SemanticRetrievalSuite() {
     const searchRep = buildSearchRepresentation(rawClaim);
     const queries = generateMultiPerspectiveQueries(searchRep);
 
-    const numQuery = queries.find(q => q.strategy === 'numerical_anchor');
+    // An identical numeric query is deliberately deduplicated against the canonical query.
+    const numQuery = queries.find(q => q.strategy === 'numerical_anchor') || queries.find(q => q.strategy === 'canonical');
     assert.ok(numQuery, 'Must generate numerical detail anchor query');
-    assert.ok(numQuery.query.includes('17%') || numQuery.query.includes('450'), 'Numerical query must contain exact metrics');
+    assert.ok(numQuery.query.includes('17%') && numQuery.query.includes('$450 million') && /revenue/i.test(numQuery.query), 'Numerical query must contain exact metrics');
   });
 
   // -------------------------------------------------------------

@@ -24,6 +24,9 @@
 // -------------------------------------------------------------
 // EVENT STATES (9 Canonical Event States)
 // -------------------------------------------------------------
+const { normalizeArticleContext } = require('./articleContext');
+const { guardEvidence } = require('./evidenceGuard');
+
 const EVENT_STATES = {
   PLANNED: 'PLANNED',
   CONSIDERED: 'CONSIDERED',
@@ -62,6 +65,7 @@ function normalizeCanonicalEvent(text) {
   // contains the word "acquisition" which would otherwise cause ACQUISITION to match first.
   // Priority order: SIGNED > all others
   const PRIORITY_EVENTS = ['SIGNED'];
+  if (/\b(?:rejected|turned down|refused|opposed)\b/i.test(lower)) return 'REJECTION';
   for (const eventCode of PRIORITY_EVENTS) {
     const phrases = CANONICAL_EVENTS[eventCode];
     if (phrases && phrases.some(p => lower.includes(p))) {
@@ -159,7 +163,7 @@ function normalizeClaimProposition(claim) {
   const claimObj = typeof claim === 'string' ? { text: claim } : (claim || {});
   const claimText = claimObj.resolvedText || claimObj.text || claimObj.claimText || '';
   const claimMeaning = claimObj.claimMeaning || {};
-  const articleContext = claimObj.articleContext || {};
+  const articleContext = normalizeArticleContext(claimObj.articleContext);
 
   const { textWithoutFrame, reportingSource, reportingVerb } = extractReportingFrame(claimText);
 
@@ -214,7 +218,7 @@ function normalizeClaimProposition(claim) {
     location = extractLocationFromText(claimText);
   }
 
-  let time = claimMeaning.time || articleContext.date || extractTimeFromText(claimText);
+  let time = claimMeaning.time || extractTimeFromText(claimText);
 
   return {
     subject,
@@ -224,7 +228,7 @@ function normalizeClaimProposition(claim) {
     event: claimMeaning.event || articleContext.mainEvent || 'Reported Event',
     topic: claimMeaning.topic || articleContext.mainTopic || 'Topic',
     time,
-    location: location || articleContext.location || null,
+    location: location || null,
     quantity: quantities.join(', ') || null,
     quantities,
     direction,
@@ -544,7 +548,7 @@ function evaluate15Dimensions(claimProp, evidenceProp) {
 
   let quantityMatch = 'UNKNOWN';
   if (claimProp.quantities.length > 0) {
-    const hasExactNum = claimProp.quantities.some(q => {
+    const hasExactNum = claimProp.quantities.every(q => {
       const cleanedQ = getCleanedQuantityWithScale(q);
       if (evidenceProp.quantities && evidenceProp.quantities.length > 0) {
         const matchesEvNum = evidenceProp.quantities.some(eq => {
@@ -670,7 +674,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   }
 
   if (dimensions.location === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN')) {
-    return { stance: 'REFUTES', reason: 'Location mismatch: Evidence places the event in a different location.' };
+    return { stance: 'NEUTRAL', reason: 'Evidence describes a different location; a same-event contradiction has not been established.' };
   }
 
   // Direct Action Rejection / Refutation (e.g. Tribunal rejected request vs claim asserted approved/cleared)
@@ -682,7 +686,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
 
   // If action and event match, but subject entity is different (e.g. Apple acquired X vs Microsoft acquired X) -> REFUTES
   if (dimensions.subject === 'MISMATCH' && dimensions.action === 'MATCH' && dimensions.event === 'MATCH') {
-    return { stance: 'REFUTES', reason: 'Subject entity mismatch: Evidence states a different entity performed this action.' };
+    return { stance: 'NEUTRAL', reason: 'A different actor performing a similar action does not refute the claimed event.' };
   }
 
   // Same-topic evidence that omits the claim's actor/action is insufficient,
@@ -737,7 +741,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   // Support Trigger:
   const isOngoingOwnership = /\b(currently owns|is the owner|owns|holds ownership)\b/i.test((claimProp.action || '') + ' ' + (claimProp.object || ''));
   const timeAllowed = dimensions.time !== 'MISMATCH' || isOngoingOwnership;
-  if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') && dimensions.negation === 'MATCH' && dimensions.quantity !== 'MISMATCH' && timeAllowed) {
+  if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') && dimensions.negation === 'MATCH' && dimensions.quantity === 'MATCH' && dimensions.object !== 'UNKNOWN' && timeAllowed) {
     return { stance: 'SUPPORTS', reason: 'Evidence directly corroborates the core factual proposition of the claim.' };
   }
 
@@ -753,12 +757,13 @@ function evaluateSemanticStance(claim, evidenceItem, options = {}) {
 
   const dimensions = evaluate15Dimensions(claimProp, evidenceProp);
   const componentAnalysis = evaluateComponentLevelSupport(claimProp, evidenceProp, dimensions);
-  const { stance, reason } = classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, evidenceProp);
+  const initial = classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, evidenceProp);
+  const { stance, reason } = guardEvidence(claim, { ...evidenceItem, fetchedPassage: options.fetchedPassage || evidenceItem.fetchedPassage }, { ...initial, entityMatch: dimensions.subject !== 'MISMATCH', eventMatch: dimensions.event !== 'MISMATCH', locationMatch: dimensions.location !== 'MISMATCH' });
 
   const confidence = stance === 'SUPPORTS' ? 0.92 : (stance === 'REFUTES' ? 0.88 : 0.65);
   const evidenceQuality = (dimensions.subject === 'MATCH' && dimensions.action === 'MATCH') ? 'DIRECT' : 'INDIRECT';
-  const sourceAccess = options.fetchedPassage ? 'FULL_ARTICLE' : 'SNIPPET_ONLY';
-  const evidenceCompleteness = sourceAccess === 'FULL_ARTICLE' ? 'HIGH' : 'MEDIUM';
+  const sourceAccess = options.fetchedPassage ? 'ARTICLE_EXCERPT' : 'SNIPPET_ONLY';
+  const evidenceCompleteness = 'PARTIAL';
 
   return {
     stance,

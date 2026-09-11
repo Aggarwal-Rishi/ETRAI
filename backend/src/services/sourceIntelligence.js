@@ -38,6 +38,13 @@ const KNOWN_PUBLICATIONS = {
   'ptinews.com': { name: 'Press Trust of India (PTI)', rank: 2, authority: 90, reliability: 91, type: 'GLOBAL_WIRE', role: 'PROVENANCE_SOURCE', parentCompany: 'Press Trust of India', syndicationGroup: 'PTI_INDIA', purpose: 'National premier wire dispatch agency', directness: 'FIRST_HAND_REPORTING' },
   'aninews.in': { name: 'Asian News International (ANI)', rank: 2, authority: 86, reliability: 85, type: 'GLOBAL_WIRE', role: 'PROVENANCE_SOURCE', parentCompany: 'ANI Media', syndicationGroup: 'ANI_INDIA', purpose: 'Multimedia newsfeed & video wire provider', directness: 'FIRST_HAND_REPORTING' },
 
+  // Publisher identity checked against official company pages; 80 is the configurable regional-newsroom baseline, not an empirical truth probability.
+  // https://www.ndtv.com/convergence/ndtv/corporatepage/index.aspx
+  'ndtv.com': {name:'NDTV',rank:2,authority:80,reliability:80,type:'PRIMARY_NEWSROOM',role:'PRIMARY_REPORTING',parentCompany:'AMG Media Networks',syndicationGroup:'AMG_MEDIA',directness:'FIRST_HAND_REPORTING'},
+  // https://www.nw18.com/corporate
+  'news18.com': {name:'News18',rank:2,authority:80,reliability:80,type:'PRIMARY_NEWSROOM',role:'PRIMARY_REPORTING',parentCompany:'Network18',syndicationGroup:'NETWORK18',directness:'FIRST_HAND_REPORTING'},
+  // https://www.newindianexpress.com/about-us
+  'newindianexpress.com': {name:'The New Indian Express',rank:2,authority:80,reliability:80,type:'PRIMARY_NEWSROOM',role:'PRIMARY_REPORTING',parentCompany:'The New Indian Express Group',syndicationGroup:'TNIE_GROUP',directness:'FIRST_HAND_REPORTING'},
   // Primary Newsrooms (Rank 2: 82-90)
   'thehindu.com': { name: 'The Hindu', rank: 2, authority: 89, reliability: 90, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'Kasturi & Sons Ltd', syndicationGroup: 'KASTURI_GROUP', purpose: 'National newspaper of record & policy analysis', directness: 'FIRST_HAND_REPORTING' },
   'thehindubusinessline.com': { name: 'The Hindu BusinessLine', rank: 2, authority: 87, reliability: 89, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'Kasturi & Sons Ltd', syndicationGroup: 'KASTURI_GROUP', purpose: 'Financial & market reporting', directness: 'FIRST_HAND_REPORTING' },
@@ -51,12 +58,16 @@ const KNOWN_PUBLICATIONS = {
   'nytimes.com': { name: 'The New York Times', rank: 2, authority: 90, reliability: 91, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'The New York Times Company', syndicationGroup: 'NYT_COMPANY', purpose: 'Investigative journalism & international reporting', directness: 'FIRST_HAND_REPORTING' },
   'theguardian.com': { name: 'The Guardian', rank: 2, authority: 89, reliability: 89, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'Scott Trust Limited', syndicationGroup: 'GUARDIAN_SCOTT', purpose: 'Independent investigative newsroom', directness: 'FIRST_HAND_REPORTING' },
 
+  'indiatoday.in': { name: 'India Today', rank: 2, authority: 84, reliability: 85, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'Living Media India', syndicationGroup: 'INDIA_TODAY_GROUP', purpose: 'National news reporting & investigative coverage', directness: 'FIRST_HAND_REPORTING' },
+  'theprint.in': { name: 'The Print', rank: 2, authority: 83, reliability: 84, type: 'PRIMARY_NEWSROOM', role: 'PRIMARY_REPORTING', parentCompany: 'Printline Media Pvt Ltd', syndicationGroup: 'THE_PRINT', purpose: 'Digital investigative newsroom & policy analysis', directness: 'FIRST_HAND_REPORTING' },
+
   // Secondary Outlets & Aggregators (Rank 3: 65-79)
   'deccanherald.com': { name: 'Deccan Herald', rank: 3, authority: 77, reliability: 80, type: 'PRIMARY_NEWSROOM', role: 'SECONDARY_REPORTING', parentCompany: 'The Printers Mysore', syndicationGroup: 'DECCAN_HERALD', purpose: 'Regional state politics & local coverage', directness: 'SECONDARY_ANALYSIS' },
   'techcrunch.com': { name: 'TechCrunch', rank: 3, authority: 79, reliability: 82, type: 'SPECIALIZED_DESK', role: 'SPECIALIST', parentCompany: 'Yahoo', syndicationGroup: 'TECHCRUNCH_YAHOO', purpose: 'Technology venture capital & startup reporting', directness: 'SECONDARY_ANALYSIS' },
   'wikipedia.org': { name: 'Wikipedia', rank: 3, authority: 72, reliability: 74, type: 'SPECIALIZED_DESK', role: 'SECONDARY_REPORTING', parentCompany: 'Wikimedia Foundation', syndicationGroup: 'WIKIMEDIA', purpose: 'Crowdsourced encyclopedia & citation aggregator', directness: 'SECONDARY_ANALYSIS' },
 
   // Signal & Spread Tracking (Rank 4: 30-50)
+  'youtube.com': { name: 'YouTube', rank: 4, authority: 42, reliability: 45, type: 'SOCIAL_MEDIA', role: 'SIGNAL_ONLY', parentCompany: 'Alphabet Inc.', syndicationGroup: 'GOOGLE_ALPHABET', purpose: 'Public video sharing platform & creator channels', directness: 'AGGREGATED' },
   'x.com': { name: 'X / Twitter', rank: 4, authority: 40, reliability: 45, type: 'SOCIAL_MEDIA', role: 'SIGNAL_ONLY', parentCompany: 'X Corp', syndicationGroup: 'X_PLATFORM', purpose: 'Unverified public discourse & citizen posts', directness: 'AGGREGATED' },
   'twitter.com': { name: 'X / Twitter', rank: 4, authority: 40, reliability: 45, type: 'SOCIAL_MEDIA', role: 'SIGNAL_ONLY', parentCompany: 'X Corp', syndicationGroup: 'X_PLATFORM', purpose: 'Unverified public discourse & citizen posts', directness: 'AGGREGATED' },
   'facebook.com': { name: 'Facebook', rank: 4, authority: 38, reliability: 40, type: 'SOCIAL_MEDIA', role: 'SPREAD_TRACKING', parentCompany: 'Meta Platforms', syndicationGroup: 'META_PLATFORM', purpose: 'Social network discourse & post shares', directness: 'AGGREGATED' }
@@ -86,7 +97,9 @@ function extractCanonicalDomain(rawUrlOrDomain) {
       domain = new URL(domain).hostname;
     }
   } catch (_) {}
-  return domain.replace(/^www\./, '').split('/')[0].split('?')[0];
+  domain = domain.replace(/^www\./, '').split('/')[0].split('?')[0];
+  if (KNOWN_PUBLICATIONS[domain]) return domain;
+  return Object.keys(KNOWN_PUBLICATIONS).find(k => domain.endsWith('.' + k)) || domain;
 }
 
 /**
@@ -115,10 +128,10 @@ function deriveDirectness(domain, sourceType) {
  * Determines recency freshness bucket
  */
 function deriveFreshness(publishedDateStr) {
-  if (!publishedDateStr) return 'CURRENT_WEEK';
+  if (!publishedDateStr) return 'UNKNOWN';
   try {
     const pubDate = new Date(publishedDateStr);
-    if (isNaN(pubDate.getTime())) return 'CURRENT_WEEK';
+    if (isNaN(pubDate.getTime())) return 'UNKNOWN';
     const now = new Date();
     const diffHours = (now - pubDate) / (1000 * 60 * 60);
 
@@ -215,7 +228,7 @@ function evaluateSourceIntelligence(sourceHit = {}, customSourcesMap = null) {
 
   let reasoning = `${publication} (${domain}) evaluated as ${sourceRole} (Rank ${rank}, Authority ${authorityScore}/100, Reliability ${reliabilityScore}/100). ` +
     (isIndependent 
-      ? `Original reporting by ${parentCompany}; provides full independent corroboration.` 
+      ? `Reporting origin grouped under ${parentCompany}; independence requires checking shared wire or source material.`
       : `Syndicated wire reprint (${syndicationGroup}); weighted at 35% to prevent duplication bias.`);
 
   return {
@@ -226,6 +239,8 @@ function evaluateSourceIntelligence(sourceHit = {}, customSourcesMap = null) {
     sourceRole,
     rank,
     authorityScore,
+    authorityKnown: !!(known || custom) || sourceType === 'OFFICIAL_GAZETTE',
+    authorityBasis: known || custom ? 'CONFIGURED_EDITORIAL_RATING' : 'UNREVIEWED_HEURISTIC',
     reliabilityScore,
     parentCompany,
     syndicationGroup,

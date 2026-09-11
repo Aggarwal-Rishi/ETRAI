@@ -5,6 +5,113 @@
  */
 
 const crypto = require('crypto');
+const sharp = require('sharp');
+
+function binaryHashToHex(binaryHash = '') {
+  let hexHash = '';
+  for (let index = 0; index < binaryHash.length; index += 4) {
+    hexHash += parseInt(binaryHash.slice(index, index + 4).padEnd(4, '0'), 2).toString(16);
+  }
+  return hexHash.padStart(16, '0').slice(0, 16);
+}
+
+/**
+ * Pixel-decoded perceptual hashes used by the production image pipeline.
+ * The older synchronous helpers below remain for legacy callers, but their
+ * byte-stream output is not used as image evidence.
+ */
+async function computePixelDHash(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return '0000000000000000';
+  const pixels = await sharp(buffer).rotate().resize(9, 8, { fit: 'fill' }).greyscale().raw().toBuffer();
+  let binaryHash = '';
+  for (let row = 0; row < 8; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      const offset = row * 9 + column;
+      binaryHash += pixels[offset] > pixels[offset + 1] ? '1' : '0';
+    }
+  }
+  return binaryHashToHex(binaryHash);
+}
+
+async function computePixelAHash(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) return '0000000000000000';
+  const pixels = await sharp(buffer).rotate().resize(8, 8, { fit: 'fill' }).greyscale().raw().toBuffer();
+  const mean = pixels.reduce((sum, value) => sum + value, 0) / Math.max(1, pixels.length);
+  return binaryHashToHex(Array.from(pixels, value => value >= mean ? '1' : '0').join(''));
+}
+
+function pixelBlockDescriptor(pixels, imageWidth, startX, startY, blockSize) {
+  const values = [];
+  for (let y = 0; y < blockSize; y += 1) {
+    for (let x = 0; x < blockSize; x += 1) values.push(pixels[(startY + y) * imageWidth + startX + x]);
+  }
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
+  const quadrants = [
+    values.filter((_, index) => Math.floor(index / blockSize) < blockSize / 2 && index % blockSize < blockSize / 2),
+    values.filter((_, index) => Math.floor(index / blockSize) < blockSize / 2 && index % blockSize >= blockSize / 2),
+    values.filter((_, index) => Math.floor(index / blockSize) >= blockSize / 2 && index % blockSize < blockSize / 2),
+    values.filter((_, index) => Math.floor(index / blockSize) >= blockSize / 2 && index % blockSize >= blockSize / 2)
+  ].map(group => Math.round((group.reduce((sum, value) => sum + value, 0) / group.length) / 8));
+  return { mean, variance, key: quadrants.join(':') };
+}
+
+async function detectPixelCopyMoveForgery(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
+    return { copyMoveDetected: false, confidence: 0, clonedRegionsCount: 0, clonedRegions: [], method: 'DECODED_PIXEL_BLOCK_SCREEN', rationale: 'No image payload was available.' };
+  }
+  const size = 128;
+  const blockSize = 8;
+  const stride = 4;
+  const pixels = await sharp(buffer).rotate().resize(size, size, { fit: 'fill' }).greyscale().raw().toBuffer();
+  const buckets = new Map();
+  for (let y = 0; y <= size - blockSize; y += stride) {
+    for (let x = 0; x <= size - blockSize; x += stride) {
+      const descriptor = pixelBlockDescriptor(pixels, size, x, y, blockSize);
+      if (descriptor.variance < 80) continue;
+      const list = buckets.get(descriptor.key) || [];
+      list.push({ x, y, mean: descriptor.mean, variance: descriptor.variance });
+      buckets.set(descriptor.key, list);
+    }
+  }
+
+  const displacementCounts = new Map();
+  const candidatePairs = [];
+  for (const matches of buckets.values()) {
+    if (matches.length < 2 || matches.length > 12) continue;
+    for (let leftIndex = 0; leftIndex < matches.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < matches.length; rightIndex += 1) {
+        const left = matches[leftIndex];
+        const right = matches[rightIndex];
+        const dx = right.x - left.x;
+        const dy = right.y - left.y;
+        if (Math.hypot(dx, dy) < 20 || Math.abs(left.mean - right.mean) > 4 || Math.abs(left.variance - right.variance) > 80) continue;
+        const displacementKey = `${dx}:${dy}`;
+        displacementCounts.set(displacementKey, (displacementCounts.get(displacementKey) || 0) + 1);
+        candidatePairs.push({ left, right, displacementKey });
+      }
+    }
+  }
+  const strongestDisplacement = [...displacementCounts.entries()].sort((left, right) => right[1] - left[1])[0];
+  const consistentPairCount = strongestDisplacement?.[1] || 0;
+  const copyMoveDetected = consistentPairCount >= 4;
+  const clonedRegions = copyMoveDetected
+    ? candidatePairs.filter(pair => pair.displacementKey === strongestDisplacement[0]).slice(0, 5).map(pair => ({
+      sourceRegion: { x: pair.left.x / size, y: pair.left.y / size, width: blockSize / size, height: blockSize / size },
+      targetRegion: { x: pair.right.x / size, y: pair.right.y / size, width: blockSize / size, height: blockSize / size }
+    }))
+    : [];
+  return {
+    copyMoveDetected,
+    confidence: copyMoveDetected ? Math.min(90, 58 + consistentPairCount * 5) : 35,
+    clonedRegionsCount: clonedRegions.length,
+    clonedRegions,
+    method: 'DECODED_PIXEL_BLOCK_SCREEN',
+    rationale: copyMoveDetected
+      ? `Decoded-pixel screening found ${consistentPairCount} spatially consistent duplicate texture blocks. Expert review is still required.`
+      : 'Decoded-pixel screening found no spatially consistent copy-move pattern. This screening result cannot prove authenticity.'
+  };
+}
 
 /**
  * Computes 64-bit dHash (Difference Hash) from image buffer
@@ -240,7 +347,10 @@ function detectCopyMoveForgery(buffer, width = 256, height = 256) {
 module.exports = {
   computeDHash,
   computeAHash,
+  computePixelDHash,
+  computePixelAHash,
   calculateHammingDistance,
   evaluatePerceptualMatch,
-  detectCopyMoveForgery
+  detectCopyMoveForgery,
+  detectPixelCopyMoveForgery
 };

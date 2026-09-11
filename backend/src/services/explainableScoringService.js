@@ -1,6 +1,6 @@
 /**
  * ETRAI Fully Explainable & Deterministic Trust Scoring Engine
- * Version: 2.4.0
+ * Version: 2.5.0
  * 
  * Mathematical Formulation:
  *   Final Trust Score = Clamp[0, 100]( Σ (RawScore_i × NormalizedWeight_i) - Σ Penalties + Σ Adjustments )
@@ -14,7 +14,7 @@
 
 'use strict';
 
-const SCORING_VERSION = '2.4.0';
+const SCORING_VERSION = '3.0.0';
 
 // Default Configurable Scoring Weights (Must sum to 1.0)
 const DEFAULT_WEIGHTS = {
@@ -88,6 +88,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   const inputType = (analysisData.inputType || (analysisData.mediaAnalysis ? 'PHOTO' : 'TEXT')).toUpperCase();
   const hasMedia = inputType === 'PHOTO' || inputType === 'VIDEO' || inputType === 'IMAGE' || Boolean(analysisData.mediaAnalysis);
   const hasDocument = inputType === 'FILE' || inputType === 'PDF' || inputType === 'DOCX';
+  const analyzedWordCount = Number(analysisData.textAnalysis?.summary?.wordCount ?? analysisData.textAnalysis?.readability?.wordCount ?? 0);
+  const hasNarrativeText = analyzedWordCount > 0 && (!(inputType === 'PHOTO' || inputType === 'IMAGE') || analysisData.hasAttachedNews === true);
 
   const claims = Array.isArray(analysisData.verifiedClaims) ? analysisData.verifiedClaims : (Array.isArray(analysisData.claims) ? analysisData.claims : []);
   const totalClaims = claims.length;
@@ -106,6 +108,9 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   let claimScoreSum = 0;
   const uniqueSyndicationGroups = new Set();
   const uniqueDomains = new Set();
+  const authorityByOrigin = new Map();
+  const datedEvidence = new Map();
+  let explicitlyUnknownAuthority = 0;
 
   for (const c of claims) {
     const verdict = (c.verdict || c.claimVerificationResult?.verdict || c.status || 'UNVERIFIED').toUpperCase();
@@ -129,18 +134,23 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     }
 
     const sources = Array.isArray(c.evidenceItems) ? c.evidenceItems : (Array.isArray(c.sources) ? c.sources : (Array.isArray(c.evidenceEvaluations) ? c.evidenceEvaluations : []));
-    totalEvidenceCount += sources.length;
 
     for (const s of sources) {
+      const rel = (s.relationship || s.stance || 'NEUTRAL').toUpperCase();
+      const isEvidentiary = ['SUPPORTS', 'SUPPORT', 'VERIFIED', 'REFUTES', 'CONTRADICTS', 'FALSE', 'QUALIFIES'].includes(rel) || s.locallyVerified === true;
+      if (!isEvidentiary) continue;
+      totalEvidenceCount++;
       if (s.domain) uniqueDomains.add(s.domain.toLowerCase());
       const sGroup = s.independenceGroup || s.syndicationGroup || s.domain || 'default';
-      uniqueSyndicationGroups.add(sGroup);
-
+      if(s.sourceType !== 'SOCIAL_MEDIA' && s.authorityKnown !== false)uniqueSyndicationGroups.add(sGroup);
       const auth = typeof s.authorityScore === 'number' ? s.authorityScore : (s.authorityRank === 1 || s.rank === 1 ? 95 : (s.authorityRank === 2 || s.rank === 2 ? 80 : 65));
+      if (s.authorityKnown === false) explicitlyUnknownAuthority++;
+      if (s.authorityKnown !== false) authorityByOrigin.set(sGroup, Math.max(authorityByOrigin.get(sGroup) || 0, auth));
+      const published = Date.parse(s.publishedAt || s.publishedDate || '');
+      const eventDate = Date.parse(c.articleContext?.publishedAt || c.articleContext?.date || analysisData.textAnalysis?.docAuthenticity?.publishedAt || '');
+      if (Number.isFinite(published) && Number.isFinite(eventDate)) datedEvidence.set(s.url || s.link, Math.abs(published-eventDate)/86400000);
       authoritySum += auth;
       authorityCount++;
-
-      const rel = (s.relationship || s.stance || 'NEUTRAL').toUpperCase();
       if (rel === 'SUPPORTS' || rel === 'SUPPORT' || rel === 'VERIFIED') supportingCount++;
       else if (rel === 'REFUTES' || rel === 'CONTRADICTS' || rel === 'FALSE') refutingCount++;
       else if (rel === 'QUALIFIES') qualifyingCount++;
@@ -151,17 +161,24 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   const generalSources = Array.isArray(analysisData.sources) ? analysisData.sources : [];
   if (authorityCount === 0 && generalSources.length > 0) {
     for (const s of generalSources) {
+      const rel = (s.relationship || s.stance || 'NEUTRAL').toUpperCase();
+      const isEvidentiary = ['SUPPORTS', 'SUPPORT', 'REFUTES', 'CONTRADICTS', 'QUALIFIES'].includes(rel) || s.locallyVerified === true;
+      if (!isEvidentiary) continue;
       if (s.domain) uniqueDomains.add(s.domain.toLowerCase());
       const auth = typeof s.authorityScore === 'number' ? s.authorityScore : (s.authorityRank === 1 ? 95 : (s.authorityRank === 2 ? 80 : 65));
       authoritySum += auth;
       authorityCount++;
       totalEvidenceCount++;
-      const rel = (s.stance || 'NEUTRAL').toUpperCase();
       if (rel === 'SUPPORTS' || rel === 'SUPPORT') supportingCount++;
       else if (rel === 'REFUTES' || rel === 'CONTRADICTS') refutingCount++;
     }
   }
 
+  if (authorityByOrigin.size || explicitlyUnknownAuthority > 0) {
+    authoritySum = [...authorityByOrigin.values()].reduce((a,b)=>a+b,0);
+    authorityCount = authorityByOrigin.size;
+  }
+  const freshnessScore = datedEvidence.size ? Math.round([...datedEvidence.values()].reduce((sum,days)=>sum+(days<=7?100:days<=30?85:days<=365?60:30),0)/datedEvidence.size) : null;
   // ── Factor Scores Derivations ─────────────────────────────────────────────
   
   // 1. Claim Truthfulness / Evidence Match
@@ -179,7 +196,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   if (verifiedCount > 0 && totalEvidenceCount >= 2) evidenceGrounding = Math.max(85, evidenceGrounding);
 
   // 3. Source Authority
-  let sourceAuthority = 75; // Baseline high-tier publisher expectation
+  let sourceAuthority = 0;
   if (authorityCount > 0) {
     sourceAuthority = Math.round(authoritySum / authorityCount);
   } else if (verifiedCount > 0) {
@@ -188,7 +205,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
 
   // 4. Stance Alignment / Contradictory Evidence
   const totalStanceSources = supportingCount + refutingCount;
-  let stanceAlignment = 80;
+  let stanceAlignment = 50;
   if (totalStanceSources > 0) {
     stanceAlignment = Math.round((supportingCount / totalStanceSources) * 100);
   } else if (verifiedCount > 0 && falseCount === 0) {
@@ -198,30 +215,30 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   }
 
   // 5. Source Independence / Corroboration
-  let sourceIndependence = 80;
-  if (uniqueDomains.size >= 3) sourceIndependence = 95;
-  else if (uniqueDomains.size === 2) sourceIndependence = 85;
-  else if (uniqueDomains.size === 1) sourceIndependence = 70;
-  else if (totalEvidenceCount === 0 && verifiedCount === 0) sourceIndependence = 40;
+  let sourceIndependence = 0;
+  if (uniqueSyndicationGroups.size >= 3) sourceIndependence = 95;
+  else if (uniqueSyndicationGroups.size === 2) sourceIndependence = 85;
+  else if (uniqueSyndicationGroups.size === 1) sourceIndependence = 70;
 
   // 6. Provenance Quality
-  const originConf = analysisData.provenance?.originConfidence || 'UNKNOWN';
-  let provenanceConfidence = 75;
-  if (originConf === 'CONFIRMED') provenanceConfidence = 100;
+  const originConf = analysisData.provenance?.originAnalysis?.originConfidence ?? analysisData.provenance?.originConfidence ?? null;
+  let provenanceConfidence = 0;
+  if (typeof originConf === 'number') provenanceConfidence = Math.max(0,Math.min(100,originConf));
+  else if (originConf === 'CONFIRMED') provenanceConfidence = 100;
   else if (originConf === 'PROBABLE') provenanceConfidence = 85;
   else if (originConf === 'EARLIEST_DISCOVERED') provenanceConfidence = 75;
-  else if (verifiedCount > 0) provenanceConfidence = 80;
-  else provenanceConfidence = 50;
+  // Missing provenance stays unknown and is excluded from active factors.
 
   // 7. Language & Framing / Attribution Quality
-  let attributionQuality = 85;
-  if (analysisData.textAnalysis?.attributionQuality?.attributionGrade === 'EXCELLENT') attributionQuality = 95;
-  else if (analysisData.textAnalysis?.attributionQuality?.attributionGrade === 'LOW') attributionQuality = 55;
+  const attributionAnalysis = analysisData.textAnalysis?.attribution || analysisData.textAnalysis?.attributionQuality;
+  let attributionQuality = hasNarrativeText ? Number(attributionAnalysis?.attributionScore ?? 50) : 0;
+  attributionQuality = Math.max(0, Math.min(100, attributionQuality));
 
   // 8. Amplification Pattern / Context Quality
-  let contextFramingQuality = 85;
-  if (analysisData.textAnalysis?.urgency?.urgencyTier === 'HIGH_SENSATIONALISM') contextFramingQuality = 40;
-  else if (analysisData.spreadAnalysis?.amplificationPattern === 'COORDINATED_AMPLIFICATION_SUSPECTED') contextFramingQuality = 35;
+  let contextFramingQuality = hasNarrativeText
+    ? Math.max(0, 100 - Number(analysisData.textAnalysis?.urgency?.urgencyScore || 0))
+    : 0;
+  if (analysisData.spreadAnalysis?.amplificationPattern === 'COORDINATED_AMPLIFICATION_SUSPECTED') contextFramingQuality = Math.min(contextFramingQuality || 100, 35);
 
   // 9. Media Integrity (ONLY active if media is present)
   let mediaIntegrity = 85;
@@ -234,7 +251,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     else if (videoContextVerdict === 'Manipulated') mediaIntegrity = 45;
     else if (videoContextVerdict === 'Deceptive Context') mediaIntegrity = 60;
     else if (forensicVerdict === 'INCONCLUSIVE_LIMITED_ANALYSIS') mediaIntegrity = 50;
-    else if (mediaFindings.integrity && !mediaFindings.integrity.isIntegrityIntact) mediaIntegrity = 40;
+    else if (mediaFindings.integrity && mediaFindings.integrity.isValid === false) mediaIntegrity = 40;
     else mediaIntegrity = 90;
   }
 
@@ -250,9 +267,13 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   let activeFactorKeys = isLegacyWeightSet
     ? Object.keys(DEFAULT_WEIGHTS)
     : Object.keys(GLOBAL_SCORING_FACTORS).filter(k => {
-        if (GLOBAL_SCORING_FACTORS[k].requiresMedia && !hasMedia) return false;
-        if (GLOBAL_SCORING_FACTORS[k].requiresDocument && !hasDocument) return false;
-        return true;
+      if (k === 'sourceAuthority' && authorityCount === 0 && explicitlyUnknownAuthority > 0) return false;
+      if (k === 'evidenceFreshness' && freshnessScore == null) return false;
+      if (k === 'provenanceQuality' && originConf == null) return false;
+      if (GLOBAL_SCORING_FACTORS[k].requiresMedia && !hasMedia) return false;
+      if (GLOBAL_SCORING_FACTORS[k].requiresDocument && !hasDocument) return false;
+      if ((k === 'attributionQuality' || k === 'contextFramingQuality') && !hasNarrativeText) return false;
+      return true;
       });
 
   const normalizedWeights = normalizeActiveWeights(activeFactorKeys, customWeights);
@@ -270,7 +291,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     provenanceQuality: provenanceConfidence,
     attributionQuality,
     contextFramingQuality,
-    evidenceFreshness: evidenceGrounding,
+    evidenceFreshness: freshnessScore ?? 0,
     mediaIntegrity,
     documentIntegrity
   };
@@ -297,7 +318,9 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
       description: GLOBAL_SCORING_FACTORS[key]?.description || key,
       raw: rawScore,
       rawScore,
-      w: Math.round(weight * 100),
+      // Preserve the normalized weight used by the calculation so consumers
+      // can reproduce the final score exactly from the audit breakdown.
+      w: weight * 100,
       weight: Number((weight * 100).toFixed(1)),
       weightedContribution: contribution,
       contribution: Number(contribution.toFixed(1)),
@@ -320,11 +343,11 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
 
   // 1. Direct Factual Contradiction Penalty
   if (falseCount > 0) {
-    const penalty = Math.min(45, falseCount * 25);
+    const penalty = Math.round(25 * falseCount / Math.max(1, totalClaims) * 10) / 10;
     appliedPenalties.push({
       ...PENALTY_CATALOG.DIRECT_REFUTATION,
       label: 'Direct factual contradiction',
-      val: `-${penalty}.0`,
+      val: `-${penalty.toFixed(1)}`,
       value: penalty,
       pointsDeducted: penalty,
       reason: `Direct factual contradiction detected across ${falseCount} claim(s).`,
@@ -441,22 +464,22 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
 
   // ── Verdict Mapping ───────────────────────────────────────────────────────
   let finalVerdict = 'UNCERTAIN';
-  if (falseCount > 0 && finalTrustScore < 40) finalVerdict = 'FALSE';
+  if (falseCount > 0 && falseCount === totalClaims) finalVerdict = 'FALSE';
   else if (falseCount > 0) finalVerdict = 'MISLEADING';
   else if (disputedCount > 0 || (supportingCount > 0 && refutingCount > 0)) finalVerdict = 'MIXED';
   else if (finalTrustScore >= 85 && unverifiedCount === 0) finalVerdict = 'HIGHLY_SUPPORTED';
   else if (finalTrustScore >= 70) finalVerdict = 'SUPPORTED';
   else if (finalTrustScore >= 50) finalVerdict = 'MIXED';
   else if (totalEvidenceCount === 0) finalVerdict = 'UNCERTAIN';
-  else finalVerdict = 'FALSE';
+  else finalVerdict = 'UNCERTAIN';
 
   // ── Drivers ───────────────────────────────────────────────────────────────
   const positiveDrivers = [];
   const negativeDrivers = [];
 
-  if (verifiedCount > 0) positiveDrivers.push(`Corroborated ${verifiedCount} factual proposition(s) against official sources.`);
+  if (verifiedCount > 0) positiveDrivers.push(`Corroborated ${verifiedCount} factual proposition(s) against attributable evidence.`);
   if (sourceAuthority >= 80) positiveDrivers.push(`High average source authority score (${sourceAuthority}/100).`);
-  if (uniqueDomains.size >= 2) positiveDrivers.push(`Corroborated across ${uniqueDomains.size} independent domains.`);
+  if (uniqueDomains.size >= 2) positiveDrivers.push(`Corroborated across ${uniqueSyndicationGroups.size} reporting-origin groups (ownership/syndication metadata where available).`);
   if (originConf === 'CONFIRMED') positiveDrivers.push('Primary content provenance origin is cryptographically or archival confirmed.');
   if (mediaFindings?.c2pa?.hasC2paManifest) positiveDrivers.push('Signed C2PA Content Credentials verify original unmanipulated media.');
 
@@ -468,86 +491,18 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   // ── Real Sensitivity / What Would Move This Score ──────────────────────────
   const counterfactualConditions = [];
 
-  if (unverifiedCount > 0) {
-    const potImpact = Math.min(30, unverifiedCount * 12);
-    counterfactualConditions.push({
-      label: `Official gazette or primary citation confirming ${unverifiedCount} unverified assertion(s)`,
-      change: `+${potImpact}`,
-      condition: `Discovering Tier-1 official gazettes confirming the ${unverifiedCount} unverified claim(s)`,
-      potentialImpact: `+${potImpact} points`,
-      impactScore: potImpact
-    });
+  // Counterfactuals rerun the exact formula; no fixed promised point changes.
+  if (!analysisData.skipSensitivity && unverifiedCount > 0) {
+    const changedClaims = claims.map(c => ['UNVERIFIED','INSUFFICIENT_EVIDENCE','UNSUPPORTED','SUSPICIOUS'].includes((c.verdict || c.status || 'UNVERIFIED').toUpperCase()) ? {...c, verdict:'VERIFIED', status:'TRUSTED', confidence:90} : c);
+    const hypothetical = computeExplainableTrustScore({...analysisData, verifiedClaims:changedClaims, skipSensitivity:true},customWeights);
+    const delta = hypothetical.finalTrustScore-finalTrustScore;
+    counterfactualConditions.push({label:'All unresolved details supported at 90% confidence; existing source factors held constant',change:(delta>=0?'+':'')+delta,condition:'Illustrative assumption: all unverified details become supported at 90% confidence; actual new evidence also changes source factors.',potentialImpact:delta+' points under stated assumptions',impactScore:delta});
   }
-
-  if (uniqueDomains.size < 3 && totalClaims > 0) {
-    counterfactualConditions.push({
-      label: 'Two additional independent Tier-1 press outlets corroborating findings',
-      change: '+15',
-      condition: 'Two additional independent Tier-1 press outlets carrying the claim',
-      potentialImpact: '+15 points',
-      impactScore: 15
-    });
-  }
-
-  if (disputedCount > 0) {
-    const potImpact = disputedCount * 15;
-    counterfactualConditions.push({
-      label: `Official clarification resolving ${disputedCount} contested assertion(s)`,
-      change: `+${potImpact}`,
-      condition: 'Official retraction or clarification resolving disputed claims',
-      potentialImpact: `+${potImpact} points`,
-      impactScore: potImpact
-    });
-  }
-
-  if (finalTrustScore >= 80) {
-    counterfactualConditions.push({
-      label: 'Emergence of conflicting regulatory filings or official corrections',
-      change: '-30',
-      condition: 'Emergence of conflicting regulatory filings or official corrections',
-      potentialImpact: '-30 points',
-      impactScore: -30
-    });
-    counterfactualConditions.push({
-      label: 'Discovery of earlier contradictory wire dispatch or archival retraction',
-      change: '-15',
-      condition: 'Discovery of earlier contradictory wire dispatch or archival retraction',
-      potentialImpact: '-15 points',
-      impactScore: -15
-    });
-  } else if (falseCount > 0) {
-    counterfactualConditions.push({
-      label: 'Retraction or official correction with primary gazette citations',
-      change: '+35',
-      condition: 'Retracting or correcting refuted assertions with primary gazette citations',
-      potentialImpact: '+35 points',
-      impactScore: 35
-    });
-  }
-
-  // Fallback if none added
-  if (counterfactualConditions.length === 0) {
-    counterfactualConditions.push({
-      label: 'Providing independent third-party evidence citations',
-      change: '+10',
-      condition: 'Providing independent third-party evidence citations',
-      potentialImpact: '+10 points',
-      impactScore: 10
-    });
-  }
-
-  let counterfactualExplanation = '';
-  if (finalTrustScore >= 80) {
-    counterfactualExplanation = 'Trust score is high. If conflicting official press statements or regulatory retractions emerge, the score will adjust downwards.';
-  } else if (falseCount > 0) {
-    counterfactualExplanation = `Trust score is depressed due to ${falseCount} refuted claim(s). Retracting or correcting refuted assertions with primary gazette citations would raise the score by up to 35 points.`;
-  } else if (unverifiedCount > 0) {
-    counterfactualExplanation = `Trust score is limited by ${unverifiedCount} unverified claim(s). Discovering Tier-1 official gazettes confirming these claims would increase the trust score by ~${Math.min(30, unverifiedCount * 12)} points.`;
-  } else {
-    counterfactualExplanation = 'Providing independent third-party evidence citations will monotonically increase the trust score.';
-  }
+  const counterfactualExplanation = 'An unverified claim indicates limited evidence coverage, not established falsehood. Score changes depend on the actual new evidence; any scenario shown states its assumptions.';
 
   return {
+    evidenceCoverage: totalClaims ? Math.round(100*(totalClaims-unverifiedCount)/totalClaims) : 0,
+    limitations: [freshnessScore == null ? 'Evidence freshness was not scored because comparable publication dates were unavailable.' : null, originConf == null ? 'Provenance was not scored because origin confidence was unavailable.' : null].filter(Boolean),
     scoringVersion: SCORING_VERSION,
     overallTrustScore: finalTrustScore,
     finalTrustScore,

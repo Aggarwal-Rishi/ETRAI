@@ -10,7 +10,6 @@ import {
   FileSearch,
   Gem,
   History,
-  Home,
   LayoutDashboard,
   Link2,
   Menu,
@@ -26,6 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
 import { FEATURE_FLAGS } from '../utils/featureFlags';
 import GlobalSearchModal from '../components/GlobalSearchModal';
+import ThemeToggle from '../components/ThemeToggle';
 import './HomePage.css';
 
 const createDotTexture = () => {
@@ -412,19 +412,21 @@ export default function HomePage() {
               </span>
             </Link>
 
-            <button
-              type="button"
-              className="home3d-mobile-menu-toggle"
-              aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={isMobileNavOpen}
-              aria-controls="home3d-mobile-menu"
-              onClick={() => setIsMobileNavOpen(open => !open)}
-            >
-              {isMobileNavOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
+            <div className="home3d-mobile-actions">
+              <ThemeToggle />
+              <button
+                type="button"
+                className="home3d-mobile-menu-toggle"
+                aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={isMobileNavOpen}
+                aria-controls="home3d-mobile-menu"
+                onClick={() => setIsMobileNavOpen(open => !open)}
+              >
+                {isMobileNavOpen ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
             
             <div className="home3d-nav-links">
-              <Link to="/" className="home3d-nav-item active"><Home size={15} /> <span>Home</span></Link>
               <Link to="/dashboard" className="home3d-nav-item"><LayoutDashboard size={15} /> <span>Dashboard</span></Link>
               <Link to="/news" className="home3d-nav-item"><Radio size={15} /> <span>Latest News</span></Link>
               {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION && (
@@ -451,6 +453,11 @@ export default function HomePage() {
                 <span>Upgrade</span>
               </Link>
 
+              {/* Day/Night Theme Toggle */}
+              <div className="home3d-theme-toggle-wrap">
+                <ThemeToggle />
+              </div>
+
               {/* Start New Analysis CTA */}
               <Link className="home3d-nav-cta" to="/analysis">
                 <Plus size={15} />
@@ -461,7 +468,6 @@ export default function HomePage() {
 
           {isMobileNavOpen && (
             <div id="home3d-mobile-menu" className="home3d-mobile-menu">
-              <Link to="/" className="active" aria-current="page" onClick={() => setIsMobileNavOpen(false)}><Home size={17} />Home</Link>
               <Link to="/dashboard" onClick={() => setIsMobileNavOpen(false)}><LayoutDashboard size={17} />Dashboard</Link>
               <Link to="/news" onClick={() => setIsMobileNavOpen(false)}><Radio size={17} />Latest News</Link>
               {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION && (
@@ -477,6 +483,13 @@ export default function HomePage() {
               >
                 <Search size={17} />Search
               </button>
+
+              {/* Mobile Drawer Theme Row */}
+              <div className="home3d-mobile-theme-row">
+                <span>Theme Appearance</span>
+                <ThemeToggle />
+              </div>
+
               <div className="home3d-mobile-menu-actions">
                 <Link to="/billing" onClick={() => setIsMobileNavOpen(false)}><Gem size={17} />Upgrade</Link>
                 <Link to="/analysis" className="primary" onClick={() => setIsMobileNavOpen(false)}><Plus size={17} />New Analysis</Link>

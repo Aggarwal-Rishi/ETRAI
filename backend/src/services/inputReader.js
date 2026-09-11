@@ -6,6 +6,8 @@ const { processMediaAnalysis } = require('./media/mediaOrchestrator');
 const { fetchRemoteMediaBuffer, fetchRemoteText } = require('./media/remoteMediaFetcher');
 const { isSsrfSafeUrl } = require('./ssrfGuard');
 
+const { preserveParagraphs } = require('./articleContext');
+
 const MIN_WORD_COUNT = 1;
 const MAX_CHAR_LIMIT = 48000; // ~12,000 tokens
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
@@ -259,17 +261,20 @@ function extractHtmlAssetsAndMetadata(html, url = '') {
 function cleanHtml(html) {
   if (!html) return '';
 
+  // Remove only explicitly marked related-story teasers, retaining surrounding article paragraphs.
+  const cleanBody = body => preserveParagraphs(decodeHtmlEntities(body).replace(/(?:^|\n)[ \t]*(?:Also Read|Read Also)\s*\|[^\n]*(?:\n|$)/gi,'\n'));
+  html = html.replace(/<(?:div|aside)[^>]+class=["'][^"']*(?:related-articles|related-story|also-read)[^"']*["'][^>]*>[\s\S]*?<\/(?:div|aside)>/gi,'');
   // 1. Priority: Extract JSON-LD NewsArticle / Article schema articleBody if available
   const jsonLdMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
   for (const scriptTag of jsonLdMatches) {
     try {
       const jsonContent = scriptTag.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '');
       const parsed = JSON.parse(jsonContent);
-      const objects = Array.isArray(parsed) ? parsed : [parsed];
+      const objects = (Array.isArray(parsed) ? parsed : [parsed]).flatMap(o=>[o,...(Array.isArray(o?.['@graph'])?o['@graph']:[])]);
       for (const obj of objects) {
         if (obj && (obj['@type'] === 'NewsArticle' || obj['@type'] === 'Article') && obj.articleBody) {
           const headline = obj.headline ? `${obj.headline}. ` : '';
-          return decodeHtmlEntities(`${headline}${obj.articleBody}`).replace(/\s+/g, ' ').trim();
+          return cleanBody(`${headline}\n\n${obj.articleBody}`);
         }
       }
     } catch (e) {}
@@ -279,8 +284,8 @@ function cleanHtml(html) {
   const articleTagMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
   if (articleTagMatch) {
     let articleHtml = articleTagMatch[1].replace(/<(script|style|nav|footer|header)[^>]*>[\s\S]*?<\/\1>/gi, '');
-    let clean = articleHtml.replace(/<[^>]+>/g, ' ');
-    clean = decodeHtmlEntities(clean).replace(/\s+/g, ' ').trim();
+    let clean = articleHtml.replace(/<\/(?:p|div|section|h[1-6]|li)>|<br\s*\/?>/gi, '\n\n').replace(/<[^>]+>/g, ' ');
+    clean = preserveParagraphs(decodeHtmlEntities(clean));
     if (clean.length > 200) {
       return clean;
     }
@@ -292,13 +297,13 @@ function cleanHtml(html) {
                       html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
 
   let clean = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
-  clean = clean.replace(/<[^>]+>/g, ' ');
+  clean = clean.replace(/<\/(?:p|div|section|h[1-6]|li)>|<br\s*\/?>/gi, '\n\n').replace(/<[^>]+>/g, ' ');
   clean = decodeHtmlEntities(clean);
   if (ogTitleMatch && ogDescMatch) {
     clean = `${decodeHtmlEntities(ogTitleMatch[1])}. ${decodeHtmlEntities(ogDescMatch[1])}. ${clean}`;
   }
   clean = clean.replace(/(?<=[.?!])(?=[A-Z])/g, ' ');
-  return clean.replace(/\s+/g, ' ').trim();
+  return preserveParagraphs(clean);
 }
 
 /**
@@ -309,7 +314,7 @@ function cleanExtractedText(rawStr) {
   let str = rawStr;
 
   str = str
-    .replace(/\\n/g, ' ')
+    .replace(/\\n/g, '\n')
     .replace(/\\t/g, ' ')
     .replace(/\\r/g, ' ')
     .replace(/\\"/g, '"')
@@ -326,7 +331,7 @@ function cleanExtractedText(rawStr) {
   str = str.replace(/\[\s*\]/g, '');
   str = str.replace(/\s+([.,;:?!])/g, '$1');
 
-  return str.replace(/\s+/g, ' ').trim();
+  return preserveParagraphs(str);
 }
 
 /**
@@ -682,6 +687,36 @@ async function processInputContent({ inputType, text, url, file }, options = {})
     }
 
     rawText = cleanHtml(htmlContent);
+
+    // If an article contains a lead image, analyze it so image forensics and compare can work
+    const leadImgUrl = discoveredAssets.images?.find(img => img.isLead)?.url || discoveredAssets.images?.[0]?.url;
+    if (leadImgUrl && options.enableMediaAnalysis !== false) {
+      try {
+        const remote = await fetchRemoteMediaBuffer(leadImgUrl, { expectedKind: 'image', timeoutMs: 6000 });
+        if (remote && remote.buffer) {
+          const remoteFile = {
+            originalname: remote.filename || 'article_lead_photo.jpg',
+            mimetype: remote.mimeType || 'image/jpeg',
+            buffer: remote.buffer,
+            size: remote.sizeBytes
+          };
+          const imgMedia = await processMediaAnalysis({
+            inputType: 'IMAGE',
+            file: remoteFile,
+            url: remote.finalUrl || leadImgUrl,
+            text: rawText
+          }, options);
+          if (imgMedia) {
+            mediaAnalysis = imgMedia;
+            metadata.imageForensics = imgMedia.imageForensics;
+            metadata.forensicEvidence = imgMedia.forensicEvidence || [];
+            metadata.forensicVerdict = imgMedia.forensicVerdict;
+          }
+        }
+      } catch (mediaErr) {
+        console.warn(`[Article Lead Image Analysis Warning]: ${mediaErr.message}`);
+      }
+    }
   } else {
     const err = new Error('Invalid input type specified. Must be URL, FILE, TEXT, PHOTO, or VIDEO.');
     err.status = 400;

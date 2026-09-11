@@ -70,8 +70,9 @@
   inset: 0 0 auto;
   z-index: 100;
   border-bottom: 1px solid rgba(0, 0, 0, 0.3);
-  background: #000D59;
+  background: var(--color-header-bg, #000D59);
   box-shadow: 0 1px 0 rgba(240, 237, 233, 0.07) inset, 0 10px 25px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
 }
 
 .home3d-nav-inner {
@@ -219,6 +220,16 @@
 
 .home3d-nav-upgrade:hover .home3d-gem-icon {
   transform: scale(1.15) rotate(6deg);
+}
+
+.home3d-theme-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-inline: 4px;
+}
+
+.home3d-mobile-actions {
+  display: none;
 }
 
 .home3d-nav-links .home3d-nav-cta {
@@ -790,6 +801,12 @@
     display: none;
   }
 
+  .home3d-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
   .home3d-mobile-menu-toggle {
     display: grid;
     width: 44px;
@@ -810,8 +827,23 @@
     overflow-y: auto;
     padding: 10px 18px 16px;
     border-top: 1px solid rgba(240, 237, 233, 0.16);
-    background: #000D59;
+    background: var(--color-header-bg, #000D59);
     box-shadow: 0 22px 45px rgba(0, 0, 0, 0.38);
+    transition: background-color 0.3s ease;
+  }
+
+  .home3d-mobile-theme-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(240, 237, 233, 0.07);
+    border: 1px solid rgba(240, 237, 233, 0.14);
+    color: #F0EDE9;
+    font-size: 13px;
+    font-weight: 600;
+    margin-block: 4px;
   }
 
   .home3d-mobile-menu > a,
@@ -948,3 +980,210 @@
     transform: none;
   }
 }
+
+/* ============================================================
+   DeepTrust — Night Mode Theme (base: #0A0E1A)
+   Scope: apply `data-theme="dark"` to <html> or your app root
+   ============================================================ */
+
+/* ---------- 1. Global dark tokens ---------- */
+[data-theme='dark'] {
+  /* Surfaces */
+  --home-bg: #0A0E1A;
+  --home-panel: rgba(17, 24, 43, 0.75);
+  --paper-2: #0C1220;
+  --card: rgba(18, 26, 46, 0.72);
+  --card-2: rgba(26, 36, 62, 0.85);
+  --color-header-bg: #070B16;
+  --color-page-bg: #0A0E1A;
+
+  /* Lines & borders */
+  --home-line: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-2: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --home-text: #E8ECF7;
+  --ink: #E8ECF7;
+  --ink-2: #A6B1CB;
+  --ink-3: #6F7C9C;
+
+  /* Brand palette (brightened for dark contrast) */
+  --home-indigo: #5B8CFF;
+  --home-violet: #8FA8FF;
+  --home-cyan: #FF8A5C;
+  --home-green: #5FB87F;
+  --home-amber: #E8B34B;
+  --home-red: #FF6B5E;
+  --home-muted: #8E9BBD;
+
+  /* Accent washes (dark translucent) */
+  --clay: #E88F6B;
+  --clay-deep: #FF9E75;
+  --clay-wash: rgba(232, 143, 107, 0.12);
+  --moss: #5FB87F;
+  --moss-wash: rgba(95, 184, 127, 0.12);
+  --ochre: #E8B34B;
+  --ochre-wash: rgba(232, 179, 75, 0.12);
+  --brick: #FF6B5E;
+  --brick-wash: rgba(255, 107, 94, 0.12);
+
+  /* Sapphire (used by toggle focus ring) */
+  --color-sapphire: #5B8CFF;
+
+  /* Shadows */
+  --shadow-s: 0 2px 10px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  --shadow-m: 0 10px 34px rgba(0, 0, 0, 0.55), 0 0 30px rgba(91, 140, 255, 0.06);
+  --shadow-l: 0 28px 70px rgba(0, 0, 0, 0.6), 0 0 60px rgba(91, 140, 255, 0.08);
+}
+
+/* ---------- 2. Homepage overrides ---------- */
+[data-theme='dark'] .etrai-home3d {
+  background:
+    radial-gradient(1000px 600px at 80% -10%, rgba(91, 140, 255, 0.10), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgba(232, 143, 107, 0.08), transparent 60%),
+    #0A0E1A;
+  color: var(--ink);
+}
+
+/* Ambient glows — re-tuned for the dark bg */
+[data-theme='dark'] .home3d-glow-a { background: rgba(232, 143, 107, 0.18); opacity: 0.28; }
+[data-theme='dark'] .home3d-glow-b { background: rgba(91, 140, 255, 0.20); opacity: 0.30; }
+
+/* Nav */
+[data-theme='dark'] .home3d-nav {
+  background: rgba(7, 11, 22, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+[data-theme='dark'] .home3d-mobile-menu { background: rgba(7, 11, 22, 0.97); }
+
+/* Hero pill */
+[data-theme='dark'] .home3d-pill {
+  color: #FF9E75;
+  background: rgba(232, 143, 107, 0.10);
+  border-color: rgba(232, 143, 107, 0.35);
+  box-shadow: 0 0 30px rgba(232, 143, 107, 0.15), inset 0 0 20px rgba(232, 143, 107, 0.05);
+}
+
+/* Hero gradient headline — neon version */
+[data-theme='dark'] .home3d-gradient-text {
+  background: linear-gradient(90deg, #6FA0FF, #A78BFF 45%, #FF8A5C);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Primary button (Start New Analysis) in night mode — deeper midnight navy */
+[data-theme='dark'] .home3d-btn-primary {
+  background: linear-gradient(135deg, #0D2A63 0%, #061738 100%);
+  border: 1px solid rgba(91, 140, 255, 0.32);
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(11, 92, 213, 0.2) !important;
+}
+
+[data-theme='dark'] .home3d-btn-primary:hover {
+  background: linear-gradient(135deg, #123780 0%, #091F4A 100%) !important;
+  border-color: rgba(91, 140, 255, 0.55) !important;
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.6), 0 0 28px rgba(11, 92, 213, 0.3) !important;
+}
+
+[data-theme='dark'] .home3d-nav-links .home3d-nav-cta {
+  background: #09275E;
+  box-shadow: inset 0 0 0 1px rgba(91, 140, 255, 0.28), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .home3d-nav-links .home3d-nav-cta:hover {
+  background: #0F3882;
+  box-shadow: inset 0 0 0 1px rgba(91, 140, 255, 0.45), 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='dark'] .home3d-cta .home3d-btn-primary {
+  background: var(--clay);
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 32px rgba(232, 143, 107, 0.4) !important;
+}
+
+[data-theme='dark'] .home3d-cta .home3d-btn-primary:hover {
+  background: var(--clay-deep) !important;
+}
+
+/* Ghost button */
+[data-theme='dark'] .home3d-btn-ghost {
+  background: rgba(18, 26, 46, 0.7);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+[data-theme='dark'] .home3d-btn-ghost:hover {
+  border-color: rgba(232, 143, 107, 0.55);
+  background: rgba(26, 36, 62, 0.9);
+  box-shadow: 0 0 24px rgba(232, 143, 107, 0.22);
+}
+
+/* Scroll hint */
+[data-theme='dark'] .home3d-scroll-wheel { border-color: rgba(255, 255, 255, 0.22); }
+[data-theme='dark'] .home3d-scroll-hint { color: var(--ink-3); }
+
+/* Cards */
+[data-theme='dark'] .home3d-tilt {
+  background: var(--card);
+  border-color: var(--line);
+  box-shadow: var(--shadow-s);
+}
+[data-theme='dark'] .home3d-tilt::before {
+  background: radial-gradient(400px circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(232, 143, 107, 0.14), transparent 45%);
+}
+[data-theme='dark'] .home3d-pipeline-card:hover {
+  border-color: rgba(232, 143, 107, 0.45);
+  box-shadow: var(--shadow-m);
+}
+
+/* Step number watermark */
+[data-theme='dark'] .home3d-step { color: rgba(111, 160, 255, 0.16); }
+
+/* Kicker text */
+[data-theme='dark'] .home3d-kicker { color: #FF9E75; }
+
+/* CTA banner */
+[data-theme='dark'] .home3d-cta {
+  background:
+    radial-gradient(600px 300px at 50% -20%, rgba(91, 140, 255, 0.18), transparent 70%),
+    #0D1428;
+  border-color: rgba(255, 255, 255, 0.10);
+}
+[data-theme='dark'] .home3d-cta p { color: #A6B1CB; }
+
+/* Footer */
+[data-theme='dark'] .home3d-footer {
+  background: var(--paper-2);
+  border-top-color: var(--line);
+  color: var(--ink-3);
+}
+
+/* Brand flip logo — slightly stronger glow on dark */
+[data-theme='dark'] .home3d-brand-logo {
+  box-shadow: 0 0 30px rgba(91, 140, 255, 0.45);
+}
+
+/* Search pill in nav */
+[data-theme='dark'] .home3d-nav-search {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #A6B1CB;
+}
+[data-theme='dark'] .home3d-nav-search:hover {
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.10);
+}
+[data-theme='dark'] .home3d-nav-kbd {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #A6B1CB;
+}
+
+/* ---------- 3. Theme toggle track tweak ---------- */
+[data-theme='dark'] .theme-toggle:focus-visible {
+  box-shadow: 0 0 0 2px #0A0E1A, 0 0 0 4px var(--color-sapphire);
+}
+

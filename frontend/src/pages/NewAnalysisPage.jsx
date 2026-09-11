@@ -69,8 +69,8 @@ export default function NewAnalysisPage() {
 
   // Pipeline Toggles
   const [optReverseSearch, setOptReverseSearch] = useState(true);
-  const [optExternalVisualSearch, setOptExternalVisualSearch] = useState(false);
-  const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(false);
+  const [optExternalVisualSearch, setOptExternalVisualSearch] = useState(true);
+  const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(true);
   const [optTraceProvenance, setOptTraceProvenance] = useState(true);
   const [optDetectEntities, setOptDetectEntities] = useState(true);
   const [optDeepArchive, setOptDeepArchive] = useState(false);
@@ -253,8 +253,8 @@ export default function NewAnalysisPage() {
         if (urlInput.trim()) formData.append('url', urlInput.trim());
         formData.append('selectedTypes', JSON.stringify(['FACT_CHECKING', 'FAKE_NEWS_DETECTION']));
         formData.append('enableReverseSearch', String(optReverseSearch));
-        formData.append('allowExternalVisualSearch', String((selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && optExternalVisualSearch));
-        formData.append('allowExternalTranscriptSearch', String(selectedCard === 'VIDEO' && optExternalTranscriptSearch));
+        formData.append('allowExternalVisualSearch', String(optExternalVisualSearch));
+        formData.append('allowExternalTranscriptSearch', String(optExternalTranscriptSearch));
         formData.append('traceProvenance', String(optTraceProvenance));
         formData.append('detectEntities', String(optDetectEntities));
         body = formData;
@@ -266,8 +266,8 @@ export default function NewAnalysisPage() {
           text: textInput.trim() || undefined,
           selectedTypes: ['FACT_CHECKING', 'FAKE_NEWS_DETECTION'],
           enableReverseSearch: optReverseSearch,
-          allowExternalVisualSearch: (selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && optExternalVisualSearch,
-          allowExternalTranscriptSearch: selectedCard === 'VIDEO' && optExternalTranscriptSearch,
+          allowExternalVisualSearch: optExternalVisualSearch,
+          allowExternalTranscriptSearch: optExternalTranscriptSearch,
           traceProvenance: optTraceProvenance,
           detectEntities: optDetectEntities
         });

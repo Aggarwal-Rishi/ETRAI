@@ -115,7 +115,7 @@ async function runStage32AccountSecurityTests() {
   await runTest('3. Two-factor authentication: Setup, TOTP verification, and secure disable', async () => {
     const setup = setup2fa(user.id, user.email);
     assert.ok(setup.secret);
-    assert.ok(setup.otpauthUrl.includes('otpauth://totp/ETRAI'));
+    assert.ok(setup.otpauthUrl.includes('otpauth://totp/DeepTrust'));
     assert.strictEqual(setup.recoveryCodes.length, 8);
 
     // Verify & enable

@@ -50,7 +50,7 @@ const config = {
   limits: {
     maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '10', 10),
     maxSearchQueriesPerClaim: parseInt(process.env.MAX_SEARCH_QUERIES_PER_CLAIM || '4', 10),
-    pipelineTimeoutMs: parseInt(process.env.PIPELINE_TIMEOUT_MS || '120000', 10),
+    pipelineTimeoutMs: parseInt(process.env.PIPELINE_TIMEOUT_MS || '600000', 10),
     maxUploadSizeMb: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '50', 10),
     rateLimits: {
       generalRpm: parseInt(process.env.RATE_LIMIT_GENERAL_RPM || '150', 10),

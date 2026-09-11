@@ -1,4 +1,7 @@
 const fetch = require('node-fetch');
+const { normalizeArticleContext, selectEvidencePassage } = require('./articleContext');
+const { evaluateSemanticStance } = require('./semanticVerification');
+const { guardEvidence } = require('./evidenceGuard');
 const { cleanHtml } = require('./inputReader');
 const { getDomainTrustScore, getDomainTier } = require('./domainTrust');
 const { getProviderStatus, isKeyValid, createGeminiClient } = require('./providerManager');
@@ -30,7 +33,7 @@ async function fetchFullPageText(url) {
     if (res.ok) {
       const html = await res.text();
       const cleaned = cleanHtml(html);
-      return cleaned.slice(0, 3000); // Top 3000 chars of full page text
+      return cleaned.slice(0, 120000); // Bounded source body; callers select relevant passages and label excerpts.
     }
   } catch (e) {
     // Graceful fallback on network timeout or fetch block
@@ -42,13 +45,14 @@ async function fetchFullPageText(url) {
  * PART 0 — ARTICLE-LEVEL DEEP RESEARCH (Runs ONCE per article before per-claim verification)
  */
 async function performArticleDeepResearch(articleContext, claims = []) {
+  articleContext = normalizeArticleContext(articleContext);
   const mainTopic = articleContext?.mainTopic || 'Article Story';
   const location = articleContext?.location || '';
   const date = articleContext?.date || '';
   const event = articleContext?.event || '';
 
   // Gather entities across all claims
-  const allEntities = new Set();
+  const allEntities = new Set(articleContext.entities);
   claims.forEach(c => {
     if (Array.isArray(c.entities)) {
       c.entities.forEach(e => allEntities.add(e));
@@ -103,7 +107,7 @@ async function performArticleDeepResearch(articleContext, claims = []) {
   }
 
   // 2. Fetch full-page content for top 2-3 most authoritative results
-  const topSources = overallSources.slice(0, 3);
+  const topSources = overallSources.sort((a, b) => getDomainTrustScore(b.domain) - getDomainTrustScore(a.domain)).slice(0, 3);
   for (const src of topSources) {
     const fullText = await fetchFullPageText(src.link);
     articleEvidencePool.push({
@@ -131,7 +135,7 @@ Main Topic: ${mainTopic}
 Location: ${location}
 Date: ${date}
 Evidence Hits:
-${JSON.stringify(articleEvidencePool.map(e => ({ title: e.title, snippet: e.snippet })))}`;
+${JSON.stringify(articleEvidencePool.map(e => ({ title: e.title, snippet: e.snippet, passage: selectEvidencePassage(e.fullText, mainTopic), url: e.url })))}`;
 
       const response = await ai.models.generateContent({
         model: modelName,
@@ -149,13 +153,14 @@ ${JSON.stringify(articleEvidencePool.map(e => ({ title: e.title, snippet: e.snip
 
   if (!summary) {
     if (articleEvidencePool.length > 0) {
-      summary = `Independent media coverage confirms ${mainTopic}${location ? ' in ' + location : ''}. Authoritative reporting from ${articleEvidencePool.map(e => e.domain).join(', ')} corroborates the core event and surrounding circumstances.`;
+      summary = `Retrieved ${articleEvidencePool.length} source page(s) about ${mainTopic}; their presence alone does not establish support for any claim. No research synthesis is available.`;
     } else {
-      summary = `No independent media coverage or official records were found corroborating the reported claims regarding ${mainTopic}.`;
+      summary = `No usable article-level research was retrieved for ${mainTopic}. This is a retrieval limitation, not evidence that the story is false.`;
     }
   }
 
   return {
+    ...articleContext,
     summary,
     overallSources: topSources,
     articleEvidencePool,
@@ -172,19 +177,27 @@ ${JSON.stringify(articleEvidencePool.map(e => ({ title: e.title, snippet: e.snip
  */
 async function performPerClaimDeepResearch(claim, articleResearchContext = null, isManualTrigger = false, mockDeepHits = null) {
   const claimObject = typeof claim === 'string' ? { text: claim } : (claim || {});
-  const claimText = String(claimObject.text || claimObject.claimText || '').trim();
+  if (claimObject.extractionWarning) {
+    return { evidenceState: 'INSUFFICIENT', confidence: 0, updatedConfidence: 0,
+      updatedStatus: 'SUSPICIOUS', reasoning: claimObject.extractionWarning,
+      evaluatedSources: [], deepResearchHits: [], supportingSources: [], refutingSources: [], neutralSources: [],
+      decomposedQueries: [], fullPagesFetched: [], fullPagesFetchedCount: 0,
+      limitations: ['Re-run article extraction to resolve the flagged wording before re-searching this detail.'],
+      searchedAt: new Date().toISOString(), triggerType: isManualTrigger ? 'MANUAL' : 'AUTOMATIC' };
+  }
+  const claimText = String(claimObject.resolvedText || claimObject.text || claimObject.claimText || '').trim();
   if (!claimText) throw new Error('Claim text is required for individual research.');
   const searchQ = String(claimObject.searchQuery || claimText).trim();
   const entities = Array.isArray(claimObject.entities) ? claimObject.entities.filter(Boolean).map(String) : [];
-  const claimContext = claimObject.articleContext || articleResearchContext || {};
+  const claimContext = normalizeArticleContext(claimObject.articleContext || articleResearchContext || {});
 
   // 1. QUERY DECOMPOSITION: 3-5 distinct search angles
-  const decomposedQueries = Array.from(new Set([
-    entities[0] ? `"${entities[0]}" ${searchQ.split(/\s+/).slice(0, 6).join(' ')}` : '',
-    `${claimContext.location || ''} ${claimContext.date || ''} ${searchQ}`,
-    `official report ${searchQ}`,
-    searchQ
-  ].map(query => query.replace(/\s+/g, ' ').trim()).filter(query => query.length > 5))).slice(0, 4);
+  const {buildSearchRepresentation,generateMultiPerspectiveQueries}=require('./factVerifier');
+  const planned=generateMultiPerspectiveQueries(buildSearchRepresentation(claimObject));
+  const selected=['local_context','search_ready','required_detail','metric_context','entity_event','source_discovery','canonical']
+    .map(strategy=>planned.find(q=>q.strategy===strategy)?.query).filter(Boolean);
+  const decomposedQueries=[...new Set([...selected,`official report ${planned.find(q=>q.strategy==='local_context')?.query || searchQ}`])].slice(0,6);
+
 
   const deepHits = Array.isArray(mockDeepHits) ? [...mockDeepHits] : [];
   const searchLimitations = [];
@@ -250,8 +263,9 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
     deepHits.splice(12);
   }
 
+  deepHits.sort((a,b) => Number(/(?:instagram|facebook|youtube|x)\.com$/.test(a.domain || '')) - Number(/(?:instagram|facebook|youtube|x)\.com$/.test(b.domain || '')));
   // 2. DEEPER CONTENT RETRIEVAL: Fetch top source pages concurrently.
-  const fullPagesFetched = await Promise.all(deepHits.slice(0, 3).map(async hit => {
+  const fullPagesFetched = await Promise.all(deepHits.slice(0, 5).map(async hit => {
     const linkUrl = hit.link || hit.url || '';
     const pageText = linkUrl.startsWith('http') ? await fetchFullPageText(linkUrl) : (hit.snippet || '');
     return {
@@ -260,7 +274,7 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
       title: hit.title || '',
       textLength: pageText.length,
       snippet: hit.snippet || '',
-      fetchedPassage: pageText.slice(0, 3000)
+      fetchedPassage: selectEvidencePassage(pageText, claimText)
     };
   }));
   const fetchedTextByUrl = new Map(fullPagesFetched.map(page => [page.url, page.fetchedPassage || '']));
@@ -273,7 +287,10 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
   const claimLocation = claimContext.location || '';
 
   const seenSignatures = new Set();
-  const evaluatedSources = deepHits.map(hit => {
+  const batchSources = deepHits.map((hit,index)=>({...hit,index,url:hit.url||hit.link,fetchedPassage:fetchedTextByUrl.get(hit.url||hit.link)||''}));
+  const batch = await require('./evidenceEvaluator').evaluateEvidenceBatch(claimObject,batchSources,{heuristicOnly:Array.isArray(mockDeepHits)});
+  if(batch.limitation)searchLimitations.push(batch.limitation);
+  const evaluatedSources = deepHits.map((hit,index) => {
     const title = (hit.title || '').toLowerCase();
     const snippet = (hit.snippet || '').toLowerCase();
     const sourceUrl = hit.link || hit.url || '';
@@ -303,21 +320,12 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
     const domainTier = getDomainTier(hit.domain);
     const domainTrust = getDomainTrustScore(hit.domain);
 
-    // Stance Evaluation
-    let stance = 'NEUTRAL';
-    const isRefute = /\b(hoax|debunked|false|misinformation|fake news|untrue|fabricated|denied|disproved|rejected|refused|opposed|turned down|declined|dismissed|refuted)\b/i.test(fullContent);
-    const isSupport = /\b(confirmed|reported|announced|agreed|passed|signed|approved|official|record|surge|invested|invests|investment|pours|poured|authorized|authorizes|cleared|inaugurated|launched|acquired|purchased)\b/i.test(fullContent);
-
-    if (isRefute && entityMatch) {
-      stance = 'REFUTES';
-    } else if (isSupport && entityMatch && eventMatch) {
-      stance = 'SUPPORTS';
-    } else if (!entityMatch && relevanceScore < 25) {
-      stance = 'NEUTRAL';
-    }
+    // Evaluate the proposition, not whether the article contains words such as "rejected".
+    const checked = batch.evidenceEvaluations.find(e=>e.sourceIndex===index) || {stance:'NEUTRAL',reason:'No evidence assessment available'};
+    const stance = checked.stance;
 
     // Source Independence (syndication check)
-    const titleSig = title.replace(/[^\w]/g, '').slice(0, 30);
+    const titleSig = title.replace(/[^\p{L}\p{N}]/gu, '');
     const isSyndicatedCopy = seenSignatures.has(titleSig);
     if (titleSig.length > 8) seenSignatures.add(titleSig);
 
@@ -327,13 +335,18 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
       domain: hit.domain,
       title: hit.title,
       snippet: hit.snippet,
-      fetchedPassage: fetchedPassage.slice(0, 1500),
+      fetchedPassage,
+      sourceAccess: fetchedPassage ? 'ARTICLE_EXCERPT' : 'SNIPPET_ONLY',
       relevanceScore,
       entityMatch,
       eventMatch,
       dateMatch,
       locationMatch,
       stance,
+      reason: checked.reason,
+      supportingPassage: checked.supportingPassage || null,
+      allEssentialDetailsSupported: checked.allEssentialDetailsSupported ?? null,
+      ...require('./sourceIntelligence').evaluateSourceIntelligence(hit),
       domainTier,
       domainTrust,
       isIndependent: !isSyndicatedCopy
@@ -349,14 +362,17 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
 
   // Compute Evidence State
   let evidenceState = 'INSUFFICIENT';
+  const isSocial = source => source.sourceType === 'SOCIAL_MEDIA' || /(?:instagram|facebook|youtube|twitter|x)\.com$/i.test(source.domain || '');
+  const credibleRefute = refutingSources.filter(source => !isSocial(source) && Number(source.authorityScore || 0) >= 65);
+  const strongRefute = credibleRefute.some(source => Number(source.authorityScore || 0) >= 80) || credibleRefute.length >= 2;
   if (supportingSources.length > 0 && refutingSources.length === 0) {
     evidenceState = 'SUPPORTED';
-  } else if (refutingSources.length > 0 && supportingSources.length === 0) {
+  } else if (credibleRefute.length > 0 && supportingSources.length === 0) {
     evidenceState = 'REFUTED';
   } else if (supportingSources.length > 0 && refutingSources.length > 0) {
     const maxRefuteTrust = Math.max(0, ...refutingSources.map(s => s.domainTrust || 0));
     const maxSupportTrust = Math.max(0, ...supportingSources.map(s => s.domainTrust || 0));
-    if (maxRefuteTrust >= 0.95 && maxSupportTrust <= 0.50) {
+    if (strongRefute && maxRefuteTrust >= 0.80 && maxSupportTrust <= 0.50) {
       evidenceState = 'REFUTED';
     } else {
       evidenceState = 'MIXED';
@@ -365,33 +381,23 @@ async function performPerClaimDeepResearch(claim, articleResearchContext = null,
     evidenceState = 'INSUFFICIENT';
   }
 
-  // Calculate Dynamic Confidence Score (NO FIXED VALUES!)
-  let confidence = 0;
-  if (evidenceState === 'SUPPORTED') {
-    const avgTrust = supportingSources.reduce((acc, s) => acc + s.domainTrust, 0) / Math.max(1, supportingSources.length);
-    const independentCount = supportingSources.filter(s => s.isIndependent).length;
-    confidence = Math.round(avgTrust * 60 + Math.min(independentCount * 15, 40));
-  } else if (evidenceState === 'REFUTED') {
-    const avgTrust = refutingSources.reduce((acc, s) => acc + s.domainTrust, 0) / Math.max(1, refutingSources.length);
-    confidence = Math.round(avgTrust * 70 + 25);
-  } else if (evidenceState === 'MIXED') {
-    confidence = 50;
-  } else {
-    confidence = 25;
-  }
-  confidence = Math.max(10, Math.min(95, confidence));
+  const confidenceMetrics=require('./evidenceConfidence').calculateEvidenceConfidence(independentSources);
+  const confidence=confidenceMetrics.confidence;
 
   const reasoning = `Deep Research analyzed ${decomposedQueries.length} search vectors and evaluated ${evaluatedSources.length} source(s): ${supportingSources.length} SUPPORTS, ${refutingSources.length} REFUTES, ${neutralSources.length} NEUTRAL. Calculated evidence confidence: ${confidence}%.`;
 
   // Map to status for legacy compatibility
   let updatedStatus = 'SUSPICIOUS';
-  if (evidenceState === 'SUPPORTED' && confidence >= 60) updatedStatus = 'TRUSTED';
-  else if (evidenceState === 'REFUTED') updatedStatus = 'FABRICATED';
+  if (evidenceState === 'SUPPORTED' && confidence >= 55) updatedStatus = 'TRUSTED';
+  else if (evidenceState === 'REFUTED' && strongRefute) updatedStatus = 'FABRICATED';
   else if (evidenceState === 'MIXED') updatedStatus = 'PARTIALLY_VERIFIED';
 
   return {
     evidenceState,
     confidence,
+    evidenceQuality: confidenceMetrics.evidenceQuality,
+    sourceAgreement: confidenceMetrics.sourceAgreement,
+    sourceIndependence: confidenceMetrics.sourceIndependence,
     supportingSources,
     refutingSources,
     neutralSources,

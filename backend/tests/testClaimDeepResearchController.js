@@ -72,6 +72,14 @@ async function run() {
     assert.strictEqual(preserved.verdict, 'VERIFIED');
     assert.strictEqual(preserved.confidence, 88);
 
+    const cleared = buildClaimResearchUpdate(
+      { claimText: 'Existing claim', status: 'FABRICATED', verdict: 'FALSE', confidence: 30, sources: [{ url: 'https://instagram.com/weak', stance: 'REFUTES' }] },
+      { updatedStatus: 'SUSPICIOUS', updatedConfidence: 30, evidenceState: 'INSUFFICIENT', reasoning: 'Completed search found no decisive evidence.', decomposedQueries: ['contextual query'], evaluatedSources: [{ url: 'https://news.test/context', stance: 'NEUTRAL' }], fullPagesFetchedCount: 1 },
+      { hasCorrection: false, correctedClaim: null, correctionBasis: null, partiallyAccurate: false }
+    );
+    assert.strictEqual(cleared.verdict, 'UNVERIFIED', 'a completed search must clear a stale weak false verdict');
+    assert.strictEqual(cleared.sources.length, 0);
+
     console.log('Individual claim research controller tests passed.');
   } finally {
     if (originalSerperKey === undefined) delete process.env.SERPER_API_KEY;

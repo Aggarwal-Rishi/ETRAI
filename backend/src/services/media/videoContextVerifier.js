@@ -786,12 +786,45 @@ async function generateVideoContextReport({ fileInfo = {}, durationSeconds, temp
     });
   }
   const report = await synthesizeVideoReport(segments, forensics || {}, effectiveOptions);
-  const completeness = buildVideoCompletenessAssessment({ durationSeconds, report, provenanceEvidence });
+  const { collectVideoRelatedNews } = require('./videoRelatedNews');
+  const relatedNews = collectVideoRelatedNews({
+    provenance: provenanceEvidence,
+    videoSummary: (frames || []).map(frame => frame.description).filter(Boolean).join(' '),
+    transcript: (transcriptSegments || []).map(segment => segment.translatedText || segment.text).filter(Boolean).join(' '),
+    entities: Array.from(new Set((frames || []).flatMap(frame => [
+      ...(frame.entities || []),
+      ...(frame.publicFigures || []).map(figure => figure?.name || figure).filter(Boolean),
+      ...(frame.landmarks || []),
+      ...(frame.logos || [])
+    ]).filter(Boolean)))
+  }, effectiveOptions);
+  const reportWithRelatedContext = {
+    ...report,
+    related_news_context: relatedNews.overallContextVerdict,
+    full_truth_summary: relatedNews.status === 'AVAILABLE'
+      ? `${report.full_truth_summary} Related video/news review: ${relatedNews.summary}`
+      : report.full_truth_summary
+  };
+  const completeness = buildVideoCompletenessAssessment({ durationSeconds, report: reportWithRelatedContext, provenanceEvidence });
+  if (relatedNews.overallContextVerdict === 'CONTEXT_MISREPRESENTED' && relatedNews.refutingCount > 0 && completeness.verdict !== 'COMPLETE_ORIGINAL_VIDEO') {
+    completeness.verdict = 'MISLEADING_OUT_OF_CONTEXT';
+    completeness.label = 'Partial clip with misleading context';
+    completeness.explanation = 'Media-linked source context indicates that the submitted excerpt changes or omits material context.';
+    completeness.isExcerpt = true;
+    completeness.contextIntegrity = { verdict: 'CONTEXT_MISREPRESENTED', sourceGrounded: true, rationale: relatedNews.summary };
+  } else if (relatedNews.overallContextVerdict === 'CONTEXT_SUPPORTED' && relatedNews.supportingCount > 0 && completeness.verdict === 'PARTIAL_CLIP_CONTEXT_UNVERIFIED') {
+    completeness.verdict = 'FAITHFUL_EXCERPT';
+    completeness.label = 'Short but contextually faithful excerpt';
+    completeness.explanation = 'The submitted video is shorter than the matched source, and media-linked source context supports the same meaning.';
+    completeness.isExcerpt = true;
+    completeness.contextIntegrity = { verdict: 'CONTEXT_SUPPORTED', sourceGrounded: true, rationale: relatedNews.summary };
+  }
   const reproducibility = buildReproducibilityMetadata({ fileInfo, durationSeconds, temporalBoundaries, temporalBoundaryDetection, transcriptMetadata, segments, forensics: forensics || {} }, effectiveOptions);
   return {
-    ...report,
+    ...reportWithRelatedContext,
     methodology: 'ETRAI_SEGMENT_CONTEXT_V3',
     completeness,
+    relatedNews,
     provenance: { ...provenanceEvidence, completeness },
     reproducibility,
     generated_at: new Date().toISOString()

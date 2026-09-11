@@ -398,6 +398,22 @@ async function verifyVisualCandidatesLocally(buffer, matches) {
   }))).filter(Boolean).sort((a, b) => b.similarity - a.similarity);
 
   const best = checked[0] || null;
+  const verifiedMatches = checked
+    .filter(candidate => candidate.similarity >= VERIFIED_VISUAL_MATCH_THRESHOLD)
+    .map(candidate => ({
+      ...candidate.match,
+      similarity: candidate.similarity,
+      matchType: 'LOCAL_PERCEPTUAL_MATCH'
+    }));
+  const presentableMatches = checked
+    .filter(candidate => candidate.similarity >= PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD)
+    .map(candidate => ({
+      ...candidate.match,
+      similarity: candidate.similarity,
+      matchType: candidate.similarity >= VERIFIED_VISUAL_MATCH_THRESHOLD
+        ? 'LOCAL_PERCEPTUAL_MATCH'
+        : 'UNVERIFIED_VISUAL_CANDIDATE'
+    }));
   if (!best || best.similarity < VERIFIED_VISUAL_MATCH_THRESHOLD) {
     const presentableCandidate = isPresentableVisualCandidate(best?.similarity) ? best : null;
     return {
@@ -408,17 +424,17 @@ async function verifyVisualCandidatesLocally(buffer, matches) {
         matchType: 'UNVERIFIED_VISUAL_CANDIDATE'
       } : null,
       checked: checked.length,
+      verifiedMatches: [],
+      presentableMatches,
       reason: presentableCandidate ? 'NO_VERIFIED_PERCEPTUAL_MATCH' : 'WEAK_LOOKALIKE_REJECTED',
       bestSimilarity: best?.similarity || 0
     };
   }
 
   return {
-    verifiedMatch: {
-      ...best.match,
-      similarity: best.similarity,
-      matchType: 'LOCAL_PERCEPTUAL_MATCH'
-    },
+    verifiedMatch: verifiedMatches[0],
+    verifiedMatches,
+    presentableMatches,
     checked: checked.length,
     reason: 'VERIFIED',
     bestSimilarity: best.similarity
@@ -583,7 +599,9 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
 
   // Provider Availability Check
   const effectiveProviderStatus = options.providerStatus || getProviderStatus();
-  if (effectiveProviderStatus.webSearch === 'UNAVAILABLE' && effectiveProviderStatus.googleVision === 'UNAVAILABLE' && effectiveProviderStatus.googleLens === 'UNAVAILABLE') {
+  const configuredProviderAvailable = ['webSearch', 'googleVision', 'googleLens']
+    .some(providerName => effectiveProviderStatus?.[providerName] === 'AVAILABLE');
+  if (!configuredProviderAvailable) {
     return {
       status: 'UNAVAILABLE',
       provider: 'UNAVAILABLE',
@@ -632,6 +650,7 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
       const verification = await verifyVisualCandidatesLocally(buffer, lensResults.matches);
       if (verification.verifiedMatch) {
         const verified = verification.verifiedMatch;
+        const verifiedMatches = verification.verifiedMatches || [verified];
         return {
           ...lensResults,
           status: 'AVAILABLE',
@@ -640,8 +659,8 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           sourceArticleUrl: verified.sourceUrl,
           sourceTitle: verified.title,
           domain: verified.domain,
-          matches: [verified],
-          matchCount: 1,
+          matches: verifiedMatches,
+          matchCount: verifiedMatches.length,
           limitations: [
             ...(lensResults.limitations || []),
             `Local perceptual comparison confirmed the Google Lens result with ${Math.round(verified.similarity * 100)}% similarity.`
@@ -653,10 +672,10 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           ...lensResults,
           status: 'CANDIDATES_ONLY',
           provider: 'SERPAPI_GOOGLE_LENS_LOCAL_VERIFIED',
-          originalImageUrl: null,
-          sourceArticleUrl: null,
-          sourceTitle: null,
-          domain: null,
+          originalImageUrl: verification.bestCandidate.originalImageUrl || verification.bestCandidate.thumbnailUrl || null,
+          sourceArticleUrl: verification.bestCandidate.sourceUrl || null,
+          sourceTitle: verification.bestCandidate.title || null,
+          domain: verification.bestCandidate.domain || null,
           matches: [],
           matchCount: 0,
           bestCandidate: verification.bestCandidate,
@@ -675,7 +694,45 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
   if (buffer && Buffer.isBuffer(buffer)) {
     const visionResults = await searchGoogleCloudVision(buffer);
     if (visionResults && visionResults.matches && visionResults.matches.length > 0) {
-      return visionResults;
+      const verification = await verifyVisualCandidatesLocally(buffer, visionResults.matches);
+      if (verification.verifiedMatch) {
+        const verifiedMatches = verification.verifiedMatches || [verification.verifiedMatch];
+        const verified = verifiedMatches[0];
+        return {
+          ...visionResults,
+          status: 'AVAILABLE',
+          provider: 'GOOGLE_VISION_LOCAL_VERIFIED',
+          originalImageUrl: verified.originalImageUrl,
+          sourceArticleUrl: verified.sourceUrl,
+          sourceTitle: verified.title,
+          domain: verified.domain,
+          matches: verifiedMatches,
+          matchCount: verifiedMatches.length,
+          limitations: [
+            ...(visionResults.limitations || []),
+            `${verifiedMatches.length} Google Vision result${verifiedMatches.length === 1 ? '' : 's'} passed local perceptual verification.`
+          ]
+        };
+      }
+      if (verification.bestCandidate) {
+        return {
+          ...visionResults,
+          status: 'CANDIDATES_ONLY',
+          originalImageUrl: verification.bestCandidate.originalImageUrl || verification.bestCandidate.thumbnailUrl || null,
+          sourceArticleUrl: verification.bestCandidate.sourceUrl || null,
+          sourceTitle: verification.bestCandidate.title || null,
+          domain: verification.bestCandidate.domain || null,
+          matches: [],
+          matchCount: 0,
+          bestCandidate: verification.bestCandidate,
+          candidateMatches: verification.presentableMatches || [verification.bestCandidate],
+          candidateCount: verification.presentableMatches?.length || 1,
+          limitations: [
+            ...(visionResults.limitations || []),
+            'Google Vision results did not pass the local same-image verification threshold.'
+          ]
+        };
+      }
     }
   }
 
@@ -741,7 +798,7 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
 
       if (verification.verifiedMatch) {
         const verified = verification.verifiedMatch;
-        const reordered = [verified, ...combinedMatches.filter(match => match.originalImageUrl !== verified.originalImageUrl)];
+        const verifiedMatches = verification.verifiedMatches || [verified];
         return {
           ...imageRes,
           provider: 'SERPER_IMAGES_LOCAL_VERIFIED',
@@ -749,8 +806,8 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           sourceArticleUrl: verified.sourceUrl,
           sourceTitle: verified.title,
           domain: verified.domain,
-          matches: reordered,
-          matchCount: reordered.length,
+          matches: verifiedMatches,
+          matchCount: verifiedMatches.length,
           limitations: [
             ...(imageRes.limitations || []),
             `Local perceptual comparison confirmed a same-image candidate with ${Math.round(verified.similarity * 100)}% similarity.`
@@ -763,10 +820,10 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
         status: hasPresentableCandidate ? 'CANDIDATES_ONLY' : 'NO_MATCH',
         provider: 'SERPER_IMAGES_LOCAL_VERIFIED',
         query: primaryQuery,
-        originalImageUrl: null,
-        sourceArticleUrl: null,
-        sourceTitle: null,
-        domain: null,
+        originalImageUrl: verification.bestCandidate?.originalImageUrl || verification.bestCandidate?.thumbnailUrl || null,
+        sourceArticleUrl: verification.bestCandidate?.sourceUrl || null,
+        sourceTitle: verification.bestCandidate?.title || null,
+        domain: verification.bestCandidate?.domain || null,
         publishedDate: null,
         matchCount: 0,
         matches: [],

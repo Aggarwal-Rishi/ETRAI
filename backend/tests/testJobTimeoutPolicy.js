@@ -10,11 +10,13 @@ const timeoutKeys = [
 const originalEnvironment = Object.fromEntries(timeoutKeys.map(key => [key, process.env[key]]));
 
 try {
-  process.env.PIPELINE_TIMEOUT_MS = '180000';
+  delete process.env.PIPELINE_TIMEOUT_MS;
   process.env.PHOTO_PIPELINE_TIMEOUT_MS = '300000';
   process.env.VIDEO_PIPELINE_TIMEOUT_MS = '600000';
 
-  assert.strictEqual(resolveJobTimeoutMs('TEXT'), 180000);
+  assert.strictEqual(resolveJobTimeoutMs('TEXT'), 600000, 'text jobs need enough time for multi-pass article verification');
+  process.env.PIPELINE_TIMEOUT_MS = '180000';
+  assert.strictEqual(resolveJobTimeoutMs('TEXT'), 180000, 'an explicit deployment override must still be honored');
   assert.strictEqual(resolveJobTimeoutMs('PHOTO'), 300000);
   assert.strictEqual(resolveJobTimeoutMs('VIDEO'), 600000);
 

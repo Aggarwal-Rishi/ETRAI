@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const { normalizeArticleContext, searchText, verificationContext, selectEvidencePassage } = require('./articleContext');
+const { guardEvidence } = require('./evidenceGuard');
 const { GoogleGenAI } = require('@google/genai');
 const { evaluateSourceCredibility, getDomainTrustScore } = require('./domainTrust');
 const { evaluateFuzzyVerdict, CONFIGURABLE_THRESHOLDS } = require('./fuzzyEngine');
@@ -13,33 +15,7 @@ const { isSsrfSafeUrl } = require('./ssrfGuard');
 function extractSearchKeywords(claimText) {
   if (!claimText || typeof claimText !== 'string') return '';
 
-  const stopWords = new Set([
-    'a', 'an', 'the', 'and', 'or', 'but', 'if', 'because', 'as', 'until', 'while', 'of', 'at',
-    'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before',
-    'after', 'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over',
-    'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how',
-    'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
-    'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just',
-    'don', 'should', 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn',
-    'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn', 'needn', 'shan',
-    'shouldn', 'wasn', 'weren', 'won', 'wouldn', 'according', 'stated', 'announced', 'claims',
-    'claimed', 'reported', 'says', 'said', 'today', 'yesterday', 'advertisement', 'read', 'full',
-    'story', 'local', 'sources', 'allegedly', 'report', 'news', 'article'
-  ]);
-
-  const cleaned = claimText.replace(/[^\w\s$%.-]/g, ' ').replace(/\s+/g, ' ');
-  const words = cleaned.split(' ');
-
-  const keyTerms = words.filter(word => {
-    const wLower = word.toLowerCase().trim();
-    if (!wLower || stopWords.has(wLower)) return false;
-    if (/\d+/.test(word)) return true;
-    if (word.length >= 3) return true;
-    return false;
-  });
-
-  const query = keyTerms.slice(0, 8).join(' ');
-  return query.length >= 5 ? query : claimText.substring(0, 100);
+  return searchText(claimText);
 }
 
 /**
@@ -48,18 +24,7 @@ function extractSearchKeywords(claimText) {
 function broadenSearchQuery(claimText) {
   if (!claimText || typeof claimText !== 'string') return '';
   
-  const cleaned = claimText.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
-  const words = cleaned.split(' ');
-  
-  const coreEntities = words.filter(w => 
-    w.length >= 4 && !/^(the|a|an|is|are|was|were|and|or|in|on|at|to|for|with|by|from|about|over|under|after|before)$/i.test(w)
-  );
-
-  if (coreEntities.length >= 2) {
-    return coreEntities.slice(0, 4).join(' ');
-  }
-
-  return extractSearchKeywords(claimText).split(' ').slice(0, 4).join(' ');
+  return searchText(claimText).replace(/\b(?:according to|reportedly|allegedly)\b/gi, '').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -213,6 +178,7 @@ async function searchSerper(queryInput, forceBroad = false) {
   }
 
   const apiKey = process.env.SERPER_API_KEY;
+  let serperHttpStatus = null;
 
   try {
     if (apiKey && apiKey.length > 10) {
@@ -233,6 +199,7 @@ async function searchSerper(queryInput, forceBroad = false) {
       });
       clearTimeout(timeout);
 
+      serperHttpStatus = res.status;
       if (res.ok) {
         const data = await res.json();
         const organic = data.organic || [];
@@ -246,17 +213,17 @@ async function searchSerper(queryInput, forceBroad = false) {
         }));
 
         if (items.length > 0) {
-          return { searchQuery, results: items };
+          return { searchQuery, results: items, provider: 'serper', serperHttpStatus, rawResultCount: organic.length };
         }
       }
     }
 
     // Fallback to DuckDuckGo search if Serper is unavailable or returned 0 results
     const ddgResults = await searchDuckDuckGo(searchQuery);
-    return { searchQuery, results: ddgResults };
+    return { searchQuery, results: ddgResults, provider: 'duckduckgo', serperHttpStatus: typeof serperHttpStatus === 'number' ? serperHttpStatus : null, rawResultCount: ddgResults.length };
   } catch (err) {
     const ddgResults = await searchDuckDuckGo(searchQuery);
-    return { searchQuery, results: ddgResults };
+    return { searchQuery, results: ddgResults, provider: 'duckduckgo', serperHttpStatus: typeof serperHttpStatus === 'number' ? serperHttpStatus : null, rawResultCount: ddgResults.length };
   }
 }
 
@@ -311,10 +278,10 @@ async function searchSerperX(queryText) {
     }
 
     const ddgResults = await searchDuckDuckGo(searchQuery);
-    return { searchQuery, results: ddgResults };
+    return { searchQuery, results: ddgResults, provider: 'duckduckgo', serperHttpStatus: typeof serperHttpStatus === 'number' ? serperHttpStatus : null, rawResultCount: ddgResults.length };
   } catch (err) {
     const ddgResults = await searchDuckDuckGo(searchQuery);
-    return { searchQuery, results: ddgResults };
+    return { searchQuery, results: ddgResults, provider: 'duckduckgo', serperHttpStatus: typeof serperHttpStatus === 'number' ? serperHttpStatus : null, rawResultCount: ddgResults.length };
   }
 }
 
@@ -435,8 +402,8 @@ function deduplicateWireSources(evaluations, searchResults) {
 
   return evaluations.map((e, idx) => {
     const src = searchResults.find(s => (s.index !== undefined ? s.index : idx) === e.sourceIndex) || searchResults[idx] || {};
-    const titleSig = (src.title || '').toLowerCase().replace(/[^\w]/g, '').slice(0, 40);
-    const snippetSig = (src.snippet || '').toLowerCase().replace(/[^\w]/g, '').slice(0, 60);
+    const titleSig = (src.title || '').toLowerCase().replace(/[^\w]/g, '');
+    const snippetSig = (src.snippet || '').toLowerCase().replace(/[^\w]/g, '');
     const signature = `${titleSig}_${snippetSig}`;
 
     if (signature.length > 10 && seenSignatures.has(signature)) {
@@ -486,13 +453,18 @@ function buildSearchRepresentation(claim) {
   const claimObj = typeof claim === 'string' ? { text: claim } : (claim || {});
   const claimText = claimObj.resolvedText || claimObj.text || claimObj.claimText || '';
   const claimMeaning = claimObj.claimMeaning || {};
-  const articleContext = claimObj.articleContext || {};
+  const articleContext = normalizeArticleContext(claimObj.articleContext);
 
+  const contextText = `${require('./articleContext').contextualClaimText(claimObj)} ${claimObj.claimGroup?.topic || claimObj.groupTopic || ''}`.toLowerCase();
+  const isUsefulEntity = value => typeof value === 'string' && value.trim().length >= 3 && contextText.includes(value.trim().toLowerCase()) &&
+    !/^(?:also read|after delhi|related stories?|reported factual event|labrador retriever)$/i.test(value.trim());
   const entities = Array.from(new Set([
     ...(claimMeaning.entities || []),
     ...(claimObj.entities || []),
-    ...(articleContext.entities || [])
-  ])).filter(Boolean);
+    ...(articleContext.entities || []),
+    ...(articleContext.organizations || []),
+    ...(articleContext.locations || [])
+  ].filter(isUsefulEntity).map(value => value.trim())));
 
   const quantities = Array.isArray(claimMeaning.quantities) && claimMeaning.quantities.length > 0
     ? claimMeaning.quantities
@@ -501,6 +473,8 @@ function buildSearchRepresentation(claim) {
   return {
     claimId: claimObj.id || 'claim_1',
     canonicalClaim: claimText,
+    contextualClaim: require('./articleContext').contextualClaimText(claimObj),
+    groupSearchQuery: claimObj.claimGroup?.topic && claimObj.claimGroup.topic !== 'Related facts' ? `${claimObj.claimGroup.topic} ${claimText}` : null,
     searchReadyText: claimObj.searchReadyText || claimObj.searchQuery || claimText,
     subject: claimMeaning.subject || (entities[0] || 'Subject'),
     predicate: claimMeaning.predicate || 'asserted',
@@ -508,7 +482,7 @@ function buildSearchRepresentation(claim) {
     objectDetails: claimMeaning.objectDetails || null,
     event: claimMeaning.event || articleContext.mainEvent || 'Reported Event',
     topic: claimMeaning.topic || articleContext.mainTopic || 'Topic',
-    location: claimMeaning.location || articleContext.location || null,
+    location: claimMeaning.location || null,
     time: claimMeaning.time || articleContext.date || null,
     entities,
     quantities,
@@ -526,7 +500,7 @@ function generateMultiPerspectiveQueries(searchRep) {
 
   const addQuery = (qText, strategy, description) => {
     if (!qText || typeof qText !== 'string') return;
-    const cleaned = qText.replace(/[^\w\s$%.-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cleaned = searchText(qText);
     if (cleaned.length < 4) return;
     const normalizedKey = cleaned.toLowerCase();
     if (!seenQueryTexts.has(normalizedKey)) {
@@ -536,7 +510,16 @@ function generateMultiPerspectiveQueries(searchRep) {
   };
 
   // Strategy A: Canonical Context-Resolved Claim Query
-  addQuery(searchRep.searchReadyText || searchRep.canonicalClaim, 'canonical', 'Context-resolved search-ready claim query');
+  addQuery(searchRep.canonicalClaim, 'canonical', 'Exact context-resolved verification target');
+  addQuery(searchRep.contextualClaim, 'local_context', 'Original neighboring sentence resolves dependent references without inventing an actor');
+  const metricAnchors=(searchRep.entities||[]).length ? searchRep.entities.slice(0,4) : [searchRep.location].filter(Boolean);
+  const metricUnits=[...require('./evidenceGuard').measurements(searchRep.canonicalClaim).totals.keys()];
+  if(metricUnits.length && metricAnchors.length) addQuery([...metricAnchors,...metricUnits,searchRep.event==='Reported Event'?'':searchRep.event||''].join(' '),'metric_context','Find descriptions of the required metrics, including per-unit figures; numbers remain in the canonical query');
+  addQuery(searchRep.groupSearchQuery, 'claim_group', 'Current detail anchored to its event topic');
+  addQuery(searchRep.searchReadyText, 'search_ready', 'Extracted search wording');
+  if (metricAnchors.length && (searchRep.quantities || []).length) {
+    addQuery([...metricAnchors, searchRep.event, ...searchRep.quantities, ...metricUnits, searchRep.location || ''].join(' '), 'required_detail', 'Search the missing quantitative detail with its entity, event and unit');
+  }
 
   // Strategy B: Semantic Paraphrase Query (synonyms / verb variations preserving meaning, numbers & negation)
   let paraphraseText = searchRep.canonicalClaim;
@@ -556,30 +539,31 @@ function generateMultiPerspectiveQueries(searchRep) {
   addQuery(paraphraseText, 'semantic_paraphrase', 'Semantic synonym / verb variation query');
 
   // Strategy C: Entity + Event Query
-  const entityStr = searchRep.entities.slice(0, 3).join(' ');
+  const usable = value => typeof value === 'string' && !/^(?:topic|related facts|reported (?:factual )?event|subject(?: entity)?|asserted(?: proposition)?)$/i.test(value.trim()) ? value.trim() : '';
+  const entityStr = (searchRep.entities || []).map(usable).filter(Boolean).slice(0, 3).join(' ');
   const locStr = searchRep.location || '';
   const timeStr = searchRep.time || '';
-  const eventStr = (searchRep.event && searchRep.event !== 'Reported Event') ? searchRep.event : searchRep.topic;
-  addQuery(`${entityStr} ${eventStr} ${locStr} ${timeStr}`, 'entity_event', 'Entity, event, location & temporal anchor query');
+  const eventStr = usable(searchRep.event) || usable(searchRep.topic);
+  if (entityStr && eventStr) addQuery(`${entityStr} ${eventStr} ${locStr} ${timeStr}`, 'entity_event', 'Entity, event, location & temporal anchor query');
 
   // Strategy D: Subject + Action + Object Query
-  const subj = searchRep.subject !== 'Subject' ? searchRep.subject : '';
-  const obj = typeof searchRep.object === 'string' ? searchRep.object.substring(0, 60) : '';
-  addQuery(`${subj} ${searchRep.predicate} ${obj}`, 'subject_action_object', 'Subject-predicate-object tuple query');
+  const subj = usable(searchRep.subject);
+  const obj = typeof searchRep.object === 'string' ? searchRep.object : '';
+  if (subj && usable(searchRep.predicate) && obj && !obj.toLowerCase().startsWith(subj.toLowerCase())) addQuery(`${subj} ${searchRep.predicate} ${obj}`, 'subject_action_object', 'Subject-predicate-object tuple query');
 
   // Strategy E: Source Discovery Query (Story-level background query)
-  if (searchRep.topic || searchRep.event) {
+  if (usable(searchRep.topic) && usable(searchRep.event)) {
     addQuery(`${searchRep.topic} ${searchRep.event} ${locStr}`, 'source_discovery', 'Story-level background discovery query');
   }
 
   // Strategy F: Numerical Detail Anchor Query (if quantities exist)
   if (Array.isArray(searchRep.quantities) && searchRep.quantities.length > 0) {
-    addQuery(`${subj} ${searchRep.quantities.join(' ')} ${searchRep.topic}`, 'numerical_anchor', 'Exact numerical and statistical metric query');
+    addQuery(`${locStr} ${timeStr} ${searchRep.canonicalClaim}`, 'numerical_anchor', 'Exact numerical and statistical metric query');
   }
 
   // Strategy G: Location & Time Anchor Query
   if (locStr || timeStr) {
-    addQuery(`${subj} ${locStr} ${timeStr} ${searchRep.topic}`, 'location_time_anchor', 'Location and date anchor query');
+    addQuery(`${locStr} ${timeStr} ${searchRep.canonicalClaim}`, 'location_time_anchor', 'Location and date anchor query');
   }
 
   return queries.slice(0, 7); // Maximum 7 distinct queries per claim
@@ -645,7 +629,7 @@ function deduplicateAndRankCandidates(rawCandidateHits, searchRep) {
       normalizedUrl = `${parsedUrl.hostname}${parsedUrl.pathname}`.replace(/\/$/, '').toLowerCase();
     } catch (e) {}
 
-    const titleSig = (hit.title || '').toLowerCase().replace(/[^\w]/g, '').slice(0, 40);
+    const titleSig = (hit.title || '').toLowerCase().replace(/[^\w]/g, '');
     const domainSig = (hit.domain || '').toLowerCase();
     const signature = `${domainSig}_${titleSig}`;
 
@@ -776,10 +760,29 @@ async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
 
   const rawCandidateHits = [];
   let queryFailedCount = 0;
+  const queryDiagnostics = [];
 
-  for (const qObj of queries) {
+  const executeQuery = async (qObj) => {
     try {
-      const searchRes = await searchSerper(qObj.query);
+      const searchRes = await searchSerper({ text: qObj.query, searchQuery: qObj.query });
+      return { qObj, searchRes };
+    } catch (error) {
+      return { qObj, error };
+    }
+  };
+
+  // Preserve every semantic search angle while avoiding the old worst case of
+  // seven consecutive 10-second provider waits for each claim. Two requests per
+  // claim keeps provider load bounded across the four claim workers.
+  for (let start = 0; start < queries.length; start += 2) {
+    const batch = await Promise.all(queries.slice(start, start + 2).map(executeQuery));
+    batch.forEach(({ qObj, searchRes, error }) => {
+      if (error || !searchRes) {
+        queryFailedCount++;
+        queryDiagnostics.push({ query: qObj.query, strategy: qObj.strategy, provider: null, httpStatus: null, resultCount: 0, failed: true });
+        return;
+      }
+      queryDiagnostics.push({ query: searchRes.searchQuery, strategy: qObj.strategy, provider: searchRes.provider || null, httpStatus: searchRes.serperHttpStatus ?? null, resultCount: searchRes.rawResultCount ?? searchRes.results?.length ?? 0 });
       if (Array.isArray(searchRes.results)) {
         searchRes.results.forEach(hit => {
           rawCandidateHits.push({
@@ -789,44 +792,28 @@ async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
           });
         });
       }
-    } catch (e) {
-      queryFailedCount++;
-    }
+    });
   }
 
   const deduped = deduplicateAndRankCandidates(rawCandidateHits, searchRep);
   const candidateList = deduped.candidates;
 
   // Staged Full Source Page Fetching for TOP_CANDIDATE_FETCH_LIMIT candidates
-  const topCandidatesToFetch = candidateList.slice(0, TOP_CANDIDATE_FETCH_LIMIT);
+  // Fetch a diverse set of readable publications before repeated social posts.
+  const fetchCandidates = [...candidateList].sort((a,b) => Number(/(?:instagram|facebook|youtube|x)\.com$/.test(a.domain)) - Number(/(?:instagram|facebook|youtube|x)\.com$/.test(b.domain)) || b.retrievalRelevance-a.retrievalRelevance);
+  const fetchedDomains = new Set();
+  const distinct = fetchCandidates.filter(c => { if(fetchedDomains.has(c.domain)) return false; fetchedDomains.add(c.domain); return true; });
+  const topCandidatesToFetch = [...distinct, ...fetchCandidates.filter(c=>!distinct.includes(c))].slice(0, TOP_CANDIDATE_FETCH_LIMIT);
   await Promise.allSettled(
     topCandidatesToFetch.map(async (candidate) => {
       if (!candidate.url) return;
       try {
         const fullText = await fetchFullPageText(candidate.url);
         if (fullText && fullText.length > 100) {
-          // Extract most relevant paragraph window matching claim entities or topic
-          const paragraphs = fullText.split(/\n+/).filter(p => p.trim().length > 40);
-          let bestPassage = candidate.snippet || '';
-          let maxScore = -1;
-
-          paragraphs.forEach(p => {
-            const pLower = p.toLowerCase();
-            let score = 0;
-            if (Array.isArray(searchRep.entities)) {
-              searchRep.entities.forEach(e => { if (pLower.includes(e.toLowerCase())) score += 10; });
-            }
-            if (searchRep.topic && pLower.includes(searchRep.topic.toLowerCase())) score += 10;
-            if (searchRep.location && pLower.includes(searchRep.location.toLowerCase())) score += 5;
-            if (score > maxScore) {
-              maxScore = score;
-              bestPassage = p.trim().substring(0, 400);
-            }
-          });
-
-          candidate.fetchedPassage = bestPassage;
-          candidate.sourceAccess = 'FULL_ARTICLE';
-          candidate.evidenceCompleteness = 'HIGH';
+          candidate.fetchedPassage = selectEvidencePassage(fullText, searchRep.canonicalClaim);
+          candidate.sourceAccess = 'ARTICLE_EXCERPT';
+          candidate.evidenceCompleteness = 'PARTIAL';
+          candidate.fetchedCharacterCount = fullText.length;
         } else {
           candidate.sourceAccess = 'SNIPPET_ONLY';
           candidate.evidenceCompleteness = 'MEDIUM';
@@ -845,6 +832,9 @@ async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
 
   return {
     retrievalStatus,
+    rawCount: rawCandidateHits.length,
+    dedupedCount: candidateList.length,
+    queryDiagnostics,
     searchRepresentation: searchRep,
     queries,
     results: candidateList,
@@ -859,11 +849,20 @@ async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
  * Evaluates a single claim independently (thread worker)
  */
 async function verifySingleClaim(claim, i, optionsObj, thresholds, articleResearchContext, primarySourceUrl, openai) {
+  if (claim.extractionWarning) {
+    return { ...createFallbackVerifiedClaim(claim, i, claim.extractionWarning),
+      evaluationMode: 'EXTRACTION_REVIEW_REQUIRED', explanation: claim.extractionWarning };
+  }
+  if (primarySourceUrl) claim = { ...claim, articleContext: { ...(claim.articleContext || {}), sourceUrl: primarySourceUrl } };
   const { generateClaimCorrection } = require('./correctionsService');
   const { performPerClaimDeepResearch } = require('./articleResearch');
 
   const scope = claim.claimScope || inferClaimScope(claim.text);
   
+  // The social pass is independent of candidate retrieval, so begin it now.
+  // Awaiting it later avoids adding another provider timeout to the critical path.
+  const xSearchPromise = searchSerperX(claim.text);
+
   // Execute Primary Multi-Perspective Semantic Web Candidate Retrieval
   const retrievalRes = Array.isArray(optionsObj.mockSearchResults)
     ? { searchQuery: claim.text, results: optionsObj.mockSearchResults }
@@ -879,7 +878,7 @@ async function verifySingleClaim(claim, i, optionsObj, thresholds, articleResear
   }
 
   // Execute Secondary Pass: X / Twitter Scoped Search
-  const xSearch = await searchSerperX(claim.text);
+  const xSearch = await xSearchPromise;
   const xSearchResults = xSearch.results;
 
   // Evaluate VADER Sentiment
@@ -920,7 +919,7 @@ async function verifySingleClaim(claim, i, optionsObj, thresholds, articleResear
     : "[] (Zero search results returned)";
 
   const entitiesStr = JSON.stringify(claim.entities || []);
-  const articleContextStr = JSON.stringify(claim.articleContext || {});
+  const articleContextStr = verificationContext(claim);
   const articleSummaryStr = articleResearchContext?.summary ? `Article-Level Research Context Summary: "${articleResearchContext.summary}"` : '';
 
   gptPromptSent = `You are Agent 3 (Fact Verification Agent). Evaluate the claim below against EACH search evidence item individually.
@@ -1105,6 +1104,7 @@ Return ONLY a valid JSON object matching this schema:
   if (!searchResults || searchResults.length === 0) {
     const pCheck = computePlausibilityFlag(claim.text);
     return {
+      ...claim,
       claimId: claim.id || `claim_${i + 1}`,
       claimText: claim.text,
       category: claim.category || 'Factual Statement',
@@ -1150,107 +1150,13 @@ Return ONLY a valid JSON object matching this schema:
     };
   }
 
-  // Agent 3 Gemini Semantic Stance Evaluator (if not already verified via Search Grounding)
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (!geminiSuccess && isKeyValid(geminiKey) && getProviderStatus().mode !== 'MOCK' && !Array.isArray(optionsObj.mockSearchResults)) {
-    const { GoogleGenAI } = require('@google/genai');
-    const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
-
-    const evidenceListFormatted = searchResults.map((s, idx) => ({
-      sourceIndex: s.index !== undefined ? s.index : idx,
-      title: s.title,
-      domain: s.domain,
-      url: s.url,
-      snippet: s.snippet,
-      fullPassage: s.fetchedPassage || null,
-      sourceAccess: s.sourceAccess || (s.fetchedPassage ? 'FULL_ARTICLE' : 'SNIPPET_ONLY')
-    }));
-
-    gptPromptSent = `You are Agent 3 (Fact Verification & Semantic Stance Evaluator) in an AI Fact-Checking platform.
-
-Your task is to perform GENUINE SEMANTIC FACT VERIFICATION comparing the MEANING of the claim against the MEANING of each retrieved article/evidence item.
-
-Claim to verify: "${claim.text}"
-Claim Scope: ${scope}
-Claim Entities: ${entitiesStr}
-Article Context: ${articleContextStr}
-${articleSummaryStr}
-
-Search Evidence Items (Indexed):
-${JSON.stringify(evidenceListFormatted, null, 2)}
-
-═══ CRITICAL EVALUATION RULES ═══
-1. Compare MEANING vs MEANING, not exact keyword matching.
-2. Paraphrases or different wording expressing the same underlying proposition MUST be evaluated as SUPPORTS.
-3. Distinguish Event States: SIGNED != COMPLETED, PLANNED != COMPLETED, ANNOUNCED != IMPLEMENTED. Event state mismatches must NOT be marked SUPPORTS.
-4. Entity Mismatch: If a DIFFERENT entity performed the action, classify as REFUTES.
-5. Quantity Mismatch: Numerical discrepancies (e.g. $2B vs $500M) must NOT be marked SUPPORTS.
-6. Location Mismatch: Events in different locations (e.g. Mumbai vs New York) must be classified as REFUTES.
-
-Return ONLY a valid JSON object matching this schema:
-{
-  "evidenceEvaluations": [
-    {
-      "sourceIndex": 0,
-      "stance": "SUPPORTS | REFUTES | NEUTRAL | IRRELEVANT",
-      "entityMatch": true,
-      "eventMatch": true,
-      "temporalMatch": true,
-      "locationMatch": true,
-      "relevanceScore": 85,
-      "reason": "Detailed explanation of semantic stance comparison"
-    }
-  ],
-  "emotionalIntensity": 50,
-  "modelConfidence": 80,
-  "explanation": "Executive summary of evidence stance evaluation",
-  "plausibilityFlag": false,
-  "plausibilityReasoning": null
-}`;
-
-    try {
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Gemini Agent 3 API call timed out after 20000ms')), 20000);
-      });
-
-      const apiPromise = ai.models.generateContent({
-        model: modelName,
-        contents: gptPromptSent,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.0,
-          maxOutputTokens: 4096
-        }
-      });
-
-      const geminiResponse = await Promise.race([apiPromise, timeoutPromise]);
-      let rawText = null;
-      if (typeof geminiResponse.text === 'string') rawText = geminiResponse.text;
-      else if (typeof geminiResponse.text === 'function') rawText = geminiResponse.text();
-      else if (geminiResponse.candidates?.[0]?.content?.parts) {
-        rawText = geminiResponse.candidates[0].content.parts.map(p => p.text || '').join('');
-      }
-
-      if (rawText) {
-        gptRawResponse = JSON.parse(rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
-        gptEmotionalIntensity = typeof gptRawResponse.emotionalIntensity === 'number' ? gptRawResponse.emotionalIntensity : vaderSentiment.intensity;
-        modelConfidence = typeof gptRawResponse.modelConfidence === 'number' ? gptRawResponse.modelConfidence : 80;
-        
-        let rawEvals = Array.isArray(gptRawResponse.evidenceEvaluations) ? gptRawResponse.evidenceEvaluations : [];
-        if (rawEvals.length > 0) {
-          evidenceEvaluations = deduplicateWireSources(rawEvals, searchResults);
-          geminiSuccess = true;
-        }
-        gptExplanation = gptRawResponse.explanation || '';
-        plausibilityFlag = typeof gptRawResponse.plausibilityFlag === 'boolean' ? gptRawResponse.plausibilityFlag : computePlausibilityFlag(claim.text).plausibilityFlag;
-        plausibilityReasoning = gptRawResponse.plausibilityReasoning || computePlausibilityFlag(claim.text).plausibilityReasoning;
-      }
-    } catch (err) {
-      console.warn('[Agent 3 Gemini Reasoning Exception]:', err.message);
-      gptRawResponse = { error: err.message, fallbackActive: true, evaluationMode: 'LLM_FALLBACK' };
-    }
+  {
+    // Grounding supplies candidates; it does not bypass the shared acceptance rules.
+    const batch = await require('./evidenceEvaluator').evaluateEvidenceBatch(claim, searchResults, {heuristicOnly:Array.isArray(optionsObj.mockSearchResults)});
+    evidenceEvaluations = deduplicateWireSources(batch.evidenceEvaluations, searchResults);
+    geminiSuccess = true;
+    gptRawResponse = batch;
+    gptPromptSent = 'Shared evidence evaluator: all essential details and traceable passages required.';
   }
 
   if (!geminiSuccess) {
@@ -1264,6 +1170,11 @@ Return ONLY a valid JSON object matching this schema:
       gptRawResponse = { status: 'HEURISTIC_FALLBACK', fallbackActive: true, evaluationMode: 'LLM_UNAVAILABLE' };
     }
   }
+
+  evidenceEvaluations = evidenceEvaluations.map(ev => {
+    const source = searchResults.find(s => s.index === ev.sourceIndex);
+    return source ? guardEvidence(claim, source, ev) : { ...ev, stance: 'IRRELEVANT', reason: 'The cited source index does not exist.' };
+  });
 
   supportingIndices = evidenceEvaluations
     .filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate)
@@ -1296,15 +1207,17 @@ Return ONLY a valid JSON object matching this schema:
     if (!srcUrl || isRejectableUrl(srcUrl)) continue;
 
     // Match stance evaluation for candidate
-    const evalObj = evidenceEvaluations.find(e => e.sourceIndex === idx || e.sourceIndex === src.index);
+    const evalObj = evidenceEvaluations.find(e => e.sourceIndex === (src.index ?? idx));
 
     // Filter out off-topic / IRRELEVANT sources or sources with low relevance score (< 30)
     if (evalObj && evalObj.stance === 'IRRELEVANT') continue;
     if (evalObj && typeof evalObj.relevanceScore === 'number' && evalObj.relevanceScore < 30) continue;
-    if (irrelevantIndices.includes(idx) || (src.index !== undefined && irrelevantIndices.includes(src.index))) continue;
+    if (irrelevantIndices.includes(src.index ?? idx)) continue;
 
     const isTestDomain = srcUrl.includes('.local') || srcUrl.includes('.test');
-    const isValid = isTestDomain || await validateSourceUrl(srcUrl);
+    // A successfully fetched passage already establishes retrieval; avoid losing it to a second transient request.
+    const alreadyFetched = typeof src.fetchedPassage === 'string' && src.fetchedPassage.trim().length > 100;
+    const isValid = isTestDomain || alreadyFetched || await validateSourceUrl(srcUrl);
     if (isValid) {
       let cleanDomain = src.domain;
       try {
@@ -1325,6 +1238,10 @@ Return ONLY a valid JSON object matching this schema:
         sourceType: intel.sourceType,
         authorityRank: intel.rank,
         authorityScore: intel.authorityScore,
+        authorityKnown: intel.authorityKnown,
+        authorityBasis: intel.authorityBasis,
+        syndicationGroup: intel.syndicationGroup,
+        independenceGroup: intel.syndicationGroup,
         directness: intel.directness,
         primarySecondaryStatus: intel.primarySecondaryStatus,
         accessibility: intel.accessibility,
@@ -1333,6 +1250,8 @@ Return ONLY a valid JSON object matching this schema:
         sourceReasoning: intel.reasoning,
         stance: evalStance,
         relevanceScore: evalRelevance,
+        supportingPassage: evalObj?.supportingPassage || null,
+        allEssentialDetailsSupported: evalObj?.allEssentialDetailsSupported ?? null,
         reason: evalObj ? evalObj.reason : intel.reasoning
       });
     }
@@ -1341,6 +1260,31 @@ Return ONLY a valid JSON object matching this schema:
   // Sort validated sources by relevance score descending
   validatedSources.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
 
+  // Social posts and unknown sites are discovery signals. They must never be
+  // the decisive evidence that marks a factual claim true or false.
+  for (const source of validatedSources) {
+    const url = source.url || source.link || '';
+    const isFixture = /\.(?:local|test)(?:\/|$)/i.test(url);
+    const signalOnly = !isFixture && (source.sourceType === 'SOCIAL_MEDIA' || source.authorityKnown === false);
+    if (signalOnly && ['SUPPORTS', 'REFUTES'].includes(source.stance)) {
+      source.preliminaryStance = source.stance;
+      source.stance = 'NEUTRAL';
+      source.reason = 'This low-authority or social source is retained as a discovery signal and cannot determine the factual verdict by itself.';
+    }
+  }
+
+  const acceptedIndices = new Set(validatedSources.map(s => s.index));
+  evidenceEvaluations = evidenceEvaluations.map(e => {
+    if (!acceptedIndices.has(e.sourceIndex) && ['SUPPORTS','REFUTES'].includes(e.stance)) {
+      return {...e, preliminaryStance:e.stance, stance:'NEUTRAL', reason:'The preliminary assessment was not accepted because source accessibility or relevance validation failed. This is an evidence-access limitation, not a contradiction.'};
+    }
+    const accepted = validatedSources.find(source => source.index === e.sourceIndex);
+    return accepted?.preliminaryStance
+      ? {...e, preliminaryStance:e.stance, stance:'NEUTRAL', reason:accepted.reason}
+      : e;
+  });
+  supportingIndices = evidenceEvaluations.filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate).map(e => e.sourceIndex);
+  refutingIndices = evidenceEvaluations.filter(e => e.stance === 'REFUTES' && !e.isSyndicatedDuplicate).map(e => e.sourceIndex);
   const supportingCount = supportingIndices.length;
   const refutingCount = refutingIndices.length;
   corroborationScore = supportingCount > 0 ? Math.min(10.0, supportingCount * 3.33) : 0.0;
@@ -1375,31 +1319,9 @@ Return ONLY a valid JSON object matching this schema:
   }
 
   const evidenceState = fuzzyEval.evidenceState || 'INSUFFICIENT';
-  const evidenceQuality = Math.round((sourceCredibilityEval.averageTrustScore || 0) * 100);
-  const totalStanceHits = supportingCount + refutingCount;
-  
-  let sourceAgreement = 0;
-  if (evidenceState === 'SUPPORTED') {
-    sourceAgreement = 100;
-  } else if (evidenceState === 'REFUTED') {
-    sourceAgreement = 100;
-  } else if (evidenceState === 'MIXED') {
-    sourceAgreement = Math.round((supportingCount / Math.max(1, totalStanceHits)) * 100);
-  } else {
-    sourceAgreement = 0;
-  }
-
-  const nonDuplicateSupportingCount = evidenceEvaluations.filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate).length;
-  const totalHitCount = Math.max(1, evidenceEvaluations.length);
-  const sourceIndependence = Math.round((nonDuplicateSupportingCount / totalHitCount) * 100);
-
-  let derivedConfidence = 0;
-  if (evidenceState === 'INSUFFICIENT') {
-    derivedConfidence = 30;
-  } else {
-    derivedConfidence = Math.round(evidenceQuality * 0.4 + sourceAgreement * 0.3 + sourceIndependence * 0.3);
-  }
-  derivedConfidence = Math.max(0, Math.min(100, derivedConfidence));
+  const confidenceMetrics=require('./evidenceConfidence').calculateEvidenceConfidence(validatedSources.map(s=>({...s,isSyndicatedDuplicate:evidenceEvaluations.find(e=>e.sourceIndex===s.index)?.isSyndicatedDuplicate})));
+  const {evidenceQuality,sourceAgreement,sourceIndependence}=confidenceMetrics;
+  const derivedConfidence=evidenceState==='INSUFFICIENT'?30:confidenceMetrics.confidence;
 
   let canonicalVerdict = 'UNVERIFIED';
   const maxRefutingAuthority = Math.max(0, ...refutingIndices.map(idx => {
@@ -1435,7 +1357,7 @@ Return ONLY a valid JSON object matching this schema:
     recencyNote = ' Note: This claim describes a very recent event; limited search coverage may reflect search indexing delay rather than inaccuracy.';
   }
 
-  const explanationText = `${gptExplanation} Fuzzy Engine evaluated ${fuzzyEval.ruleActivations.length} active rule(s), yielding crisp trust score of ${confidenceScore}% (${finalStatus}).${recencyNote}`;
+  const explanationText = `Evidence review: ${canonicalVerdict}. ${supportingCount} supporting and ${refutingCount} refuting assessments; evidence confidence ${derivedConfidence}%. ${evidenceEvaluations.filter(e => acceptedIndices.has(e.sourceIndex) && !e.isSyndicatedDuplicate && ['SUPPORTS','REFUTES'].includes(e.stance)).map(e => e.reason).filter(Boolean).slice(0, 3).join(' ')}${recencyNote}`;
 
   const auditTrail = {
     searchQueries: {
@@ -1451,13 +1373,14 @@ Return ONLY a valid JSON object matching this schema:
     },
     searchDiagnostics: {
       query: retrievalRes.searchQuery || claim.searchQuery || claim.text || '',
-      serperHttpStatus: 200,
-      rawResultCount: retrievalRes.rawCount || (searchResults.length * 2),
-      normalizedResultCount: retrievalRes.dedupedCount || searchResults.length,
+      serperHttpStatus: retrievalRes.queryDiagnostics?.find(q => q.httpStatus != null)?.httpStatus ?? null,
+      queries: retrievalRes.queryDiagnostics || [],
+      rawResultCount: retrievalRes.rawCount ?? null,
+      normalizedResultCount: retrievalRes.dedupedCount ?? searchResults.length,
       filteredResultCount: searchResults.length,
       fetchedArticleCount: searchResults.filter(s => s.sourceAccess === 'FULL_ARTICLE' || s.fetchedPassage).length,
       usableEvidenceCount: evidenceEvaluations.length,
-      finalEvidenceCount: searchResults.length,
+      finalEvidenceCount: validatedSources.filter(s => ['SUPPORTS', 'REFUTES'].includes(s.stance)).length,
       discardedResults: retrievalRes.discardedResults || []
     },
     evidenceEvaluations: evidenceEvaluations,
@@ -1487,8 +1410,17 @@ Return ONLY a valid JSON object matching this schema:
   };
 
   let verifiedObj = {
+    ...claim,
     claimId: claim.id || `claim_${i + 1}`,
     claimText: claim.text,
+    originalText: claim.originalText || null,
+    sourceContext: claim.sourceContext || null,
+    articleContext: normalizeArticleContext(claim.articleContext),
+    claimMeaning: claim.claimMeaning || {},
+    searchReadyText: claim.searchReadyText || claim.text,
+    searchQuery: claim.searchQuery || claim.text,
+    entities: claim.entities || [],
+    importanceScore: claim.importanceScore || 70,
     category: claim.category || 'Factual Statement',
     extractionMode: claim.extractionMode || 'REAL_LLM',
     status: canonicalVerdict === 'VERIFIED' ? 'TRUSTED' : canonicalVerdict === 'FALSE' ? 'FABRICATED' : 'SUSPICIOUS',
@@ -1531,13 +1463,13 @@ Return ONLY a valid JSON object matching this schema:
   };
 
   // PART B — AUTOMATIC DEEP RESEARCH ESCALATION SYSTEM
-  if (finalStatus === 'SUSPICIOUS') {
+  if (canonicalVerdict === 'UNVERIFIED' && supportingCount === 0 && refutingCount === 0) {
     try {
       const deepRes = await performPerClaimDeepResearch(claim, articleResearchContext, false, optionsObj.mockSearchResults);
       verifiedObj.deepResearch = deepRes;
-      if (deepRes && deepRes.updatedConfidence !== undefined) {
+      if (deepRes && ['SUPPORTED', 'REFUTED', 'MIXED'].includes(deepRes.evidenceState) && deepRes.evaluatedSources?.some(s => ['SUPPORTS', 'REFUTES'].includes(s.stance))) {
         verifiedObj.status = deepRes.updatedStatus;
-        verifiedObj.verdict = (deepRes.evidenceState === 'SUPPORTED' || deepRes.evidenceState === 'Verified') 
+        verifiedObj.verdict = (deepRes.updatedStatus === 'TRUSTED')
           ? 'VERIFIED' 
           : ((deepRes.evidenceState === 'REFUTES' || deepRes.evidenceState === 'REFUTED') 
             ? 'FALSE' 
@@ -1547,11 +1479,16 @@ Return ONLY a valid JSON object matching this schema:
           evidenceState: deepRes.evidenceState,
           verdict: verifiedObj.verdict,
           confidence: deepRes.updatedConfidence,
-          evidenceQuality: deepRes.confidence,
-          sourceAgreement: deepRes.evidenceState === 'SUPPORTED' || deepRes.evidenceState === 'REFUTES' ? 100 : 50,
-          sourceIndependence: 100
+          evidenceQuality: deepRes.evidenceQuality,
+          sourceAgreement: deepRes.sourceAgreement,
+          sourceIndependence: deepRes.sourceIndependence
         };
-        verifiedObj.explanation = verifiedObj.explanation.replace(/yielding crisp trust score of [\d.]+% \([A-Z]+\)/i, `yielding crisp trust score of ${verifiedObj.confidence}% (${verifiedObj.status})`);
+        verifiedObj.explanation = deepRes.reasoning;
+        verifiedObj.sources = (deepRes.evaluatedSources || []).filter(s => ['SUPPORTS', 'REFUTES', 'NEUTRAL'].includes(s.stance));
+        verifiedObj.evidenceState = deepRes.evidenceState;
+        verifiedObj.evidenceEvaluations = verifiedObj.sources.map((source, sourceIndex) => ({ ...source, sourceIndex }));
+        verifiedObj.supportingSourceIndices = verifiedObj.sources.flatMap((s, idx) => s.stance === 'SUPPORTS' ? [idx] : []);
+        verifiedObj.refutingSourceIndices = verifiedObj.sources.flatMap((s, idx) => s.stance === 'REFUTES' ? [idx] : []);
       }
     } catch (err) {
       console.warn('[Part B Automatic Deep Research Warning]:', err.message);
@@ -1578,6 +1515,7 @@ Return ONLY a valid JSON object matching this schema:
 
 function createFallbackVerifiedClaim(claim, i, errorMsg) {
   return {
+    ...claim,
     claimId: claim.id || `claim_${i + 1}`,
     claimText: claim.text || '',
     category: claim.category || 'Factual Statement',

@@ -1,3 +1,4 @@
+const { summarizeClaimGroups } = require('../services/claimGroups');
 const { v4: uuidv4 } = require('crypto'); // or custom uuid generator
 const { runVerificationPipeline } = require('../services/verificationPipeline');
 const { registerStream } = require('../services/sseManager');
@@ -5,6 +6,8 @@ const upload = require('../middleware/uploadMiddleware');
 const { checkVerificationQuota } = require('../services/subscriptionBillingService');
 const { operationalIntelligence } = require('../services/operationalIntelligenceService');
 const { prisma } = require('../utils/prisma');
+const { calculateCategoryScores } = require('../services/reportGenerator');
+const { computeExplainableTrustScore } = require('../services/explainableScoringService');
 
 function generateJobId() {
   return `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -150,15 +153,88 @@ function mergeSourcesByUrl(existingSources = [], researchSources = []) {
   return Array.from(merged.values());
 }
 
+function isEvidentiaryResearchSource(source = {}) {
+  const stance = String(source.stance || source.relationship || '').toUpperCase();
+  const hasMeasuredRelevance = source.relevanceScore !== undefined && source.relevanceScore !== null;
+  const relevance = Number(source.relevanceScore || 0);
+  return ['SUPPORTS', 'SUPPORT', 'REFUTES', 'CONTRADICTS', 'QUALIFIES', 'VERIFIED'].includes(stance)
+    && (source.locallyVerified === true || !hasMeasuredRelevance || relevance >= 35);
+}
+
+function rebuildReportScoring(reportPayload, updatedClaims) {
+  const evidenceSources = Array.from(new Map(updatedClaims
+    .flatMap(claim => Array.isArray(claim.sources) ? claim.sources : [])
+    .filter(isEvidentiaryResearchSource)
+    .map((source, index) => [source.url || source.link || `${source.domain || 'source'}:${index}`, source])).values());
+  const category = calculateCategoryScores(
+    updatedClaims,
+    reportPayload.selectedTypes,
+    reportPayload.articleSentiment,
+    reportPayload.sourceTitle,
+    reportPayload.internalConsistencyIssues,
+    reportPayload.sourcingTransparency
+  );
+  const explainableScoring = computeExplainableTrustScore({
+    verifiedClaims: updatedClaims,
+    sources: evidenceSources,
+    provenance: reportPayload.provenance,
+    mediaAnalysis: reportPayload.mediaAnalysis,
+    extractedText: reportPayload.extractedText,
+    hasAttachedNews: reportPayload.hasAttachedNews === true,
+    textAnalysis: reportPayload.textAnalysis,
+    numericalAnalysis: reportPayload.numericalAnalysis,
+    linkIntelligence: reportPayload.linkIntelligence,
+    inputType: reportPayload.inputType
+  });
+  const trustScore = explainableScoring.finalTrustScore;
+  const mediaVerdict = reportPayload.mediaAnalysis?.forensicVerdict || reportPayload.mediaAnalysis?.imageForensics?.verdict || reportPayload.mediaAnalysis?.forensics?.verdict;
+  const mediaSentence = reportPayload.mediaAnalysis
+    ? (mediaVerdict === 'NO_MANIPULATION_SIGNAL_FOUND'
+      ? 'Local forensic screening found no manipulation signal, which is not proof of provenance or originality.'
+      : `Local media-forensic status: ${String(mediaVerdict || 'INCONCLUSIVE').replaceAll('_', ' ')}.`)
+    : '';
+  return {
+    ...reportPayload,
+    claims: updatedClaims,
+    claimGroups: summarizeClaimGroups(updatedClaims),
+    sources: evidenceSources,
+    factualAccuracyScore: category.factualAccuracyScore,
+    evidenceCoverage: explainableScoring.evidenceCoverage,
+    claimResolutionScore: category.factualAccuracyScore,
+    trustScore,
+    confidenceRating: category.evidenceConfidence,
+    evidenceConfidence: category.evidenceConfidence,
+    articleVerdict: category.articleVerdict,
+    verdict: category.articleVerdict,
+    breakdown: category.breakdown,
+    explainableScoring,
+    scores: {
+      ...(reportPayload.scores || {}),
+      overallTrustScore: trustScore,
+      factualAccuracyScore: category.factualAccuracyScore,
+      claimResolutionScore: category.factualAccuracyScore,
+      confidenceRating: category.evidenceConfidence,
+      evidenceConfidence: category.evidenceConfidence,
+      explainableScoring
+    },
+    summary: `Analysis evaluated ${category.breakdown.totalClaims} extracted claim${category.breakdown.totalClaims === 1 ? '' : 's'} and observations. Verdict: ${String(category.articleVerdict).replaceAll('_', ' ')}. Overall trust score: ${trustScore}/100, based on ${evidenceSources.length} evidentiary source${evidenceSources.length === 1 ? '' : 's'}. ${mediaSentence}`.trim(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function buildClaimResearchUpdate(claim, deepRes, correctionData) {
   const claimObject = typeof claim === 'string' ? { claimText: claim } : (claim || {});
   const researchSources = Array.isArray(deepRes.evaluatedSources) ? deepRes.evaluatedSources : [];
-  const hasNewEvidence = researchSources.length > 0;
-  const nextStatus = hasNewEvidence ? deepRes.updatedStatus : (claimObject.status || deepRes.updatedStatus);
-  const nextVerdict = hasNewEvidence
+  const evidentiarySources = researchSources.filter(isEvidentiaryResearchSource);
+  const hasNewEvidence = evidentiarySources.length > 0;
+  const completedResearch = Array.isArray(deepRes.decomposedQueries) && deepRes.decomposedQueries.length > 0 &&
+    (researchSources.length > 0 || Number(deepRes.fullPagesFetchedCount || 0) > 0);
+  const replacePrevious = hasNewEvidence || completedResearch;
+  const nextStatus = replacePrevious ? deepRes.updatedStatus : (claimObject.status || deepRes.updatedStatus);
+  const nextVerdict = replacePrevious
     ? mapResearchStatusToVerdict(deepRes.updatedStatus)
     : (claimObject.verdict || mapResearchStatusToVerdict(nextStatus));
-  const nextConfidence = hasNewEvidence
+  const nextConfidence = replacePrevious
     ? deepRes.updatedConfidence
     : (Number.isFinite(Number(claimObject.confidence)) ? Number(claimObject.confidence) : deepRes.updatedConfidence);
   return {
@@ -166,11 +242,20 @@ function buildClaimResearchUpdate(claim, deepRes, correctionData) {
     status: nextStatus,
     verdict: nextVerdict,
     confidence: nextConfidence,
-    explanation: hasNewEvidence
+    explanation: replacePrevious
       ? deepRes.reasoning
-      : `${deepRes.reasoning} The previous claim verdict was preserved because no new evidence source was retrieved.`,
-    sources: mergeSourcesByUrl(claimObject.sources || [], researchSources),
-    evidenceEvaluations: researchSources,
+      : `${deepRes.reasoning} The previous verdict was preserved because the research provider returned no reviewable results.`,
+    sources: replacePrevious ? evidentiarySources : (claimObject.sources || []),
+    evidenceEvaluations: replacePrevious ? evidentiarySources.map((source, sourceIndex) => ({ ...source, sourceIndex })) : (claimObject.evidenceEvaluations || []),
+    supportingSourceIndices: replacePrevious ? evidentiarySources.flatMap((s, i) => s.stance === 'SUPPORTS' ? [i] : []) : (claimObject.supportingSourceIndices || []),
+    refutingSourceIndices: replacePrevious ? evidentiarySources.flatMap((s, i) => s.stance === 'REFUTES' ? [i] : []) : (claimObject.refutingSourceIndices || []),
+    evidenceState: replacePrevious ? deepRes.evidenceState : claimObject.evidenceState,
+    claimVerificationResult: replacePrevious ? {
+      evidenceState: deepRes.evidenceState, verdict: nextVerdict, confidence: nextConfidence,
+      evidenceQuality: deepRes.evidenceQuality, sourceAgreement: deepRes.sourceAgreement,
+      sourceIndependence: deepRes.sourceIndependence
+    } : claimObject.claimVerificationResult,
+    previousEvidence: replacePrevious ? { sources: claimObject.sources || [], verdict: claimObject.verdict, confidence: claimObject.confidence } : claimObject.previousEvidence,
     deepResearch: deepRes,
     hasCorrection: correctionData.hasCorrection,
     correctedClaim: correctionData.correctedClaim,
@@ -214,15 +299,11 @@ async function loadOwnedClaimForResearch(analysisId, userId, claimIndex) {
 }
 
 async function persistClaimResearchResult(ownedClaim, claimIndex, updatedClaim) {
-  if (!ownedClaim) return false;
+  if (!ownedClaim) return null;
   const { analysis, reportPayload, storedClaim } = ownedClaim;
   const updatedClaims = [...reportPayload.claims];
   updatedClaims[claimIndex] = updatedClaim;
-  const updatedReport = {
-    ...reportPayload,
-    claims: updatedClaims,
-    sources: mergeSourcesByUrl(reportPayload.sources || [], updatedClaim.sources || [])
-  };
+  const updatedReport = rebuildReportScoring(reportPayload, updatedClaims);
 
   const storedText = String(storedClaim.claimText || storedClaim.text || storedClaim.claim || '').trim();
   const relationalClaim = analysis.claims.find(item => item.claimText.trim() === storedText) || analysis.claims[claimIndex] || null;
@@ -250,7 +331,7 @@ async function persistClaimResearchResult(ownedClaim, claimIndex, updatedClaim) 
     }));
 
     const existingUrls = new Set((relationalClaim.evidenceItems || []).map(item => item.url).filter(Boolean));
-    (updatedClaim.deepResearch?.evaluatedSources || []).forEach((source, sourceIndex) => {
+    (updatedClaim.deepResearch?.evaluatedSources || []).filter(isEvidentiaryResearchSource).forEach((source, sourceIndex) => {
       const sourceUrl = source.url || source.link;
       if (!sourceUrl || existingUrls.has(sourceUrl)) return;
       existingUrls.add(sourceUrl);
@@ -282,7 +363,7 @@ async function persistClaimResearchResult(ownedClaim, claimIndex, updatedClaim) 
   }
 
   await prisma.$transaction(operations);
-  return true;
+  return updatedReport;
 }
 
 const deepResearchClaim = async (req, res) => {
@@ -325,7 +406,8 @@ const deepResearchClaim = async (req, res) => {
       };
 
     const updatedClaim = buildClaimResearchUpdate(claimToResearch, deepRes, correctionData);
-    const persisted = await persistClaimResearchResult(ownedClaim, parsedClaimIndex, updatedClaim);
+    const updatedReport = await persistClaimResearchResult(ownedClaim, parsedClaimIndex, updatedClaim);
+    const persisted = Boolean(updatedReport);
 
     return res.status(200).json({
       success: true,
@@ -338,6 +420,7 @@ const deepResearchClaim = async (req, res) => {
       deepResearch: deepRes,
       sources: updatedClaim.sources,
       updatedClaim,
+      updatedReport,
       persisted,
       hasCorrection: correctionData.hasCorrection,
       correctedClaim: correctionData.correctedClaim,
@@ -414,5 +497,7 @@ module.exports = {
   proxyImage,
   mapResearchStatusToVerdict,
   mergeSourcesByUrl,
-  buildClaimResearchUpdate
+  buildClaimResearchUpdate,
+  isEvidentiaryResearchSource,
+  rebuildReportScoring
 };

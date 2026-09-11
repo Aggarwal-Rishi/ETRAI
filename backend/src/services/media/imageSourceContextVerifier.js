@@ -157,6 +157,7 @@ function extractSourcePageContext(html = '', url = '') {
     videoTranscript: metadata.videoTranscript || null,
     videoContentUrl: metadata.videoContentUrl || null,
     videoEmbedUrl: metadata.videoEmbedUrl || null,
+    images: Array.isArray(extracted.discoveredAssets?.images) ? extracted.discoveredAssets.images.slice(0, 20) : [],
     articleText,
     evidenceText
   };

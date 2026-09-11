@@ -50,7 +50,7 @@ async function runTests() {
 
     const res = computeExplainableTrustScore(textAnalysis);
     assert.strictEqual(res.scoringVersion, SCORING_VERSION);
-    assert.strictEqual(res.activeFactorsCount, 8, 'Text-only analysis must only activate 8 non-media non-doc factors');
+    assert.strictEqual(res.activeFactorsCount, 4, 'Text without narrative or dates must also exclude unknown freshness and provenance');
 
     const totalNormalizedWeight = res.factorBreakdown.reduce((sum, f) => sum + f.weight, 0);
     assert(Math.abs(totalNormalizedWeight - 100) < 0.2, `Weights must sum to ~100%, got ${totalNormalizedWeight}`);
@@ -71,7 +71,7 @@ async function runTests() {
     };
 
     const res = computeExplainableTrustScore(mediaAnalysis);
-    assert.strictEqual(res.activeFactorsCount, 9, 'Photo analysis must activate 9 factors (including Media Integrity)');
+    assert.strictEqual(res.activeFactorsCount, 5, 'Photo without dates must activate four measurable evidence factors plus Media Integrity');
     const mediaFactor = res.factorBreakdown.find(f => f.factorKey === 'mediaIntegrity');
     assert(mediaFactor, 'Must contain mediaIntegrity factor');
     assert.strictEqual(mediaFactor.rawScore, 100, 'Signed C2PA manifest must yield 100 media score');

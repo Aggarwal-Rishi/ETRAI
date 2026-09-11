@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Loader2 } from 'lucide-react';
 
 import LoginPage from './pages/LoginPage';
@@ -45,115 +46,117 @@ export default function App() {
   const location = useLocation();
   const isHome = location.pathname === '/';
   return (
-    <AuthProvider>
-      <AppExperience />
-      <div className={`etrai-route-stage ${isHome ? 'etrai-route-stage--home' : 'etrai-route-stage--app'}`}>
-        <Routes>
-        <Route
-          path="/"
-          element={
-            <React.Suspense fallback={<div className="min-h-screen bg-[#050810]" aria-label="Loading homepage" />}>
-              <HomePage />
-            </React.Suspense>
-          }
-        />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/news"
-          element={
-            <ProtectedRoute>
-              <LatestNewsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/fake-news"
-          element={
-            <ProtectedRoute>
-              {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? <FakeNewsPage /> : <Navigate to="/dashboard" replace />}
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analysis"
-          element={
-            <ProtectedRoute>
-              <NewAnalysisPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results/:id"
-          element={
-            <ProtectedRoute>
-              <ResultsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results"
-          element={
-            <ProtectedRoute>
-              <ResultsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute>
-              <HistoryPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/workspace"
-          element={
-            <ProtectedRoute>
-              <WorkspacePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/security"
-          element={
-            <ProtectedRoute>
-              <AccountSecurityPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/billing"
-          element={
-            <ProtectedRoute>
-              <BillingPage />
-            </ProtectedRoute>
-          }
-        />
+    <ThemeProvider>
+      <AuthProvider>
+        <AppExperience />
+        <div className={`etrai-route-stage ${isHome ? 'etrai-route-stage--home' : 'etrai-route-stage--app'}`}>
+          <Routes>
+          <Route
+            path="/"
+            element={
+              <React.Suspense fallback={<div className="min-h-screen bg-[#050810]" aria-label="Loading homepage" />}>
+                <HomePage />
+              </React.Suspense>
+            }
+          />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          
+          {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/news"
+            element={
+              <ProtectedRoute>
+                <LatestNewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fake-news"
+            element={
+              <ProtectedRoute>
+                {FEATURE_FLAGS.SHOW_FAKE_NEWS_SECTION ? <FakeNewsPage /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analysis"
+            element={
+              <ProtectedRoute>
+                <NewAnalysisPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/results/:id"
+            element={
+              <ProtectedRoute>
+                <ResultsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/results"
+            element={
+              <ProtectedRoute>
+                <ResultsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace"
+            element={
+              <ProtectedRoute>
+                <WorkspacePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/security"
+            element={
+              <ProtectedRoute>
+                <AccountSecurityPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute>
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </div>
-    </AuthProvider>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

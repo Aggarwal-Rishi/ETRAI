@@ -146,7 +146,7 @@ async function runFormalSemanticVerificationSuite() {
     const claim = { resolvedText: 'The robbery occurred in Mumbai on Monday.', claimMeaning: { subject: 'robbery', action: 'occurred', location: 'Mumbai' } };
     const evidence = { title: 'The robbery occurred in Delhi on Monday.' };
     const res = evaluateSemanticStance(claim, evidence);
-    assert.strictEqual(res.stance, 'REFUTES', 'Location mismatch on specific event must return REFUTES');
+    assert.strictEqual(res.stance, 'NEUTRAL', 'A robbery in another city does not establish a contradiction without same-event evidence');
     assert.strictEqual(res.dimensionAnalysis.location, 'MISMATCH');
   });
 
