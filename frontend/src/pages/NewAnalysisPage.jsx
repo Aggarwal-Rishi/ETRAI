@@ -70,7 +70,7 @@ export default function NewAnalysisPage() {
 
   // Pipeline Toggles
   const [optReverseSearch, setOptReverseSearch] = useState(true);
-  const [optExternalVisualSearch, setOptExternalVisualSearch] = useState(false);
+  const [optExternalVisualSearch, setOptExternalVisualSearch] = useState(true);
   const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(false);
   const [optTraceProvenance, setOptTraceProvenance] = useState(true);
   const [optDetectEntities, setOptDetectEntities] = useState(true);

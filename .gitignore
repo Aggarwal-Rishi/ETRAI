@@ -19,6 +19,8 @@ vite.config.js.timestamp*
 # Database / Prisma
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.sqlite
 backend/prisma/dev.db
 backend/prisma/migrations/*.sql.bak

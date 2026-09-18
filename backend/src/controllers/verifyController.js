@@ -43,7 +43,7 @@ const analyze = async (req, res) => {
     const { inputType, text, url } = req.body;
     const analysisOptions = {
       enableReverseSearch: parseOptionalBoolean(req.body.enableReverseSearch),
-      allowExternalVisualSearch: parseOptionalBoolean(req.body.allowExternalVisualSearch, false),
+      allowExternalVisualSearch: parseOptionalBoolean(req.body.allowExternalVisualSearch, true),
       allowExternalTranscriptSearch: parseOptionalBoolean(req.body.allowExternalTranscriptSearch, false),
       traceProvenance: parseOptionalBoolean(req.body.traceProvenance),
       detectEntities: parseOptionalBoolean(req.body.detectEntities)

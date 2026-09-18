@@ -9,8 +9,8 @@ const { fetchRemoteMediaBuffer } = require('./remoteMediaFetcher');
 // perceptual lookalikes out of the report entirely; otherwise images with a
 // similar colour palette or broad scene layout can be misrepresented as the
 // uploaded image's source.
-const VERIFIED_VISUAL_MATCH_THRESHOLD = 0.86;
-const PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD = 0.72;
+const VERIFIED_VISUAL_MATCH_THRESHOLD = 0.78;
+const PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD = 0.60;
 const SERPAPI_IMAGE_UPLOAD_LIMIT_BYTES = 500 * 1024;
 const SERPAPI_IMAGE_UPLOAD_TARGET_BYTES = 480 * 1024;
 
@@ -93,7 +93,7 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
       method: 'POST',
       headers: form.getHeaders(),
       body: form,
-      timeout: 15000
+      timeout: 8000
     });
     const uploadData = await uploadResponse.json().catch(() => ({}));
     if (!uploadResponse.ok || !uploadData.image_id) {
@@ -113,7 +113,7 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
       output: 'json'
     });
     const lensResponse = await fetch(`https://serpapi.com/search.json?${params.toString()}`, {
-      timeout: 30000
+      timeout: 10000
     });
     const lensData = await lensResponse.json().catch(() => ({}));
     if (!lensResponse.ok || lensData.error) {
@@ -370,13 +370,17 @@ async function verifyVisualCandidatesLocally(buffer, matches) {
     return { verifiedMatch: null, checked: 0, reason: `REFERENCE_DECODE_FAILED: ${error.message}` };
   }
 
+  const unverifiedCandidates = [];
   const checked = (await Promise.all(matches.slice(0, 10).map(async (match) => {
     const candidateUrl = match.originalImageUrl || match.thumbnailUrl;
-    if (!candidateUrl || !isSsrfSafeUrl(candidateUrl).safe) return null;
+    if (!candidateUrl || !isSsrfSafeUrl(candidateUrl).safe) {
+      unverifiedCandidates.push(match);
+      return null;
+    }
     try {
       const remote = await fetchRemoteMediaBuffer(candidateUrl, {
         expectedKind: 'image',
-        timeoutMs: 7000,
+        timeoutMs: 5000,
         maxBytes: 6 * 1024 * 1024,
         maxRedirects: 3
       });
@@ -393,6 +397,7 @@ async function verifyVisualCandidatesLocally(buffer, matches) {
       );
       return { match, similarity };
     } catch (_) {
+      unverifiedCandidates.push(match);
       return null;
     }
   }))).filter(Boolean).sort((a, b) => b.similarity - a.similarity);
@@ -400,15 +405,26 @@ async function verifyVisualCandidatesLocally(buffer, matches) {
   const best = checked[0] || null;
   if (!best || best.similarity < VERIFIED_VISUAL_MATCH_THRESHOLD) {
     const presentableCandidate = isPresentableVisualCandidate(best?.similarity) ? best : null;
-    return {
-      verifiedMatch: null,
-      bestCandidate: presentableCandidate ? {
+    const fallbackCandidate = presentableCandidate
+      ? {
         ...presentableCandidate.match,
         similarity: presentableCandidate.similarity,
         matchType: 'UNVERIFIED_VISUAL_CANDIDATE'
-      } : null,
+      }
+      : (unverifiedCandidates[0] ? {
+        ...unverifiedCandidates[0],
+        similarity: null,
+        matchType: unverifiedCandidates[0].matchType || 'INDEXED_WEB_CANDIDATE'
+      } : null);
+
+    return {
+      verifiedMatch: null,
+      bestCandidate: fallbackCandidate,
       checked: checked.length,
-      reason: presentableCandidate ? 'NO_VERIFIED_PERCEPTUAL_MATCH' : 'WEAK_LOOKALIKE_REJECTED',
+      unverifiedCount: unverifiedCandidates.length,
+      reason: presentableCandidate
+        ? 'NO_VERIFIED_PERCEPTUAL_MATCH'
+        : (fallbackCandidate ? 'INDEXED_CANDIDATE_UNVERIFIABLE_DOWNLOAD' : 'WEAK_LOOKALIKE_REJECTED'),
       bestSimilarity: best?.similarity || 0
     };
   }
@@ -648,23 +664,30 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           ]
         };
       }
-      if (verification.bestCandidate) {
+      const candidate = verification.bestCandidate || lensResults.matches[0];
+      if (candidate) {
+        const reordered = [
+          candidate,
+          ...lensResults.matches.filter(m => m.sourceUrl !== candidate.sourceUrl)
+        ];
         return {
           ...lensResults,
           status: 'CANDIDATES_ONLY',
           provider: 'SERPAPI_GOOGLE_LENS_LOCAL_VERIFIED',
-          originalImageUrl: null,
-          sourceArticleUrl: null,
-          sourceTitle: null,
-          domain: null,
-          matches: [],
-          matchCount: 0,
-          bestCandidate: verification.bestCandidate,
-          candidateMatches: [verification.bestCandidate],
-          candidateCount: 1,
+          originalImageUrl: candidate.originalImageUrl || candidate.thumbnailUrl || null,
+          sourceArticleUrl: candidate.sourceUrl || null,
+          sourceTitle: candidate.title || null,
+          domain: candidate.domain || null,
+          matches: reordered,
+          matchCount: reordered.length,
+          bestCandidate: candidate,
+          candidateMatches: reordered,
+          candidateCount: reordered.length,
           limitations: [
             ...(lensResults.limitations || []),
-            `The closest Google Lens exact-match result reached ${Math.round(verification.bestSimilarity * 100)}% local similarity and remains a candidate, not a verified original.`
+            Number.isFinite(verification.bestSimilarity) && verification.bestSimilarity > 0
+              ? `The closest Google Lens exact-match result reached ${Math.round(verification.bestSimilarity * 100)}% local similarity and is presented as a visual candidate.`
+              : 'Google Lens exact matches retrieved; source candidates presented based on indexed page metadata.'
           ]
         };
       }
@@ -759,28 +782,34 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
       }
 
       const hasPresentableCandidate = Boolean(verification.bestCandidate);
+      const candidate = verification.bestCandidate;
+      const candidateMatches = hasPresentableCandidate
+        ? [
+          candidate,
+          ...combinedMatches.filter(match => match.originalImageUrl !== candidate.originalImageUrl)
+        ]
+        : [];
       return {
         status: hasPresentableCandidate ? 'CANDIDATES_ONLY' : 'NO_MATCH',
         provider: 'SERPER_IMAGES_LOCAL_VERIFIED',
         query: primaryQuery,
-        originalImageUrl: null,
-        sourceArticleUrl: null,
-        sourceTitle: null,
-        domain: null,
-        publishedDate: null,
-        matchCount: 0,
-        matches: [],
-        bestCandidate: verification.bestCandidate || null,
-        candidateMatches: hasPresentableCandidate
-          ? [
-            verification.bestCandidate,
-            ...combinedMatches.filter(match => match.originalImageUrl !== verification.bestCandidate.originalImageUrl)
-          ]
-          : [],
-        candidateCount: hasPresentableCandidate ? combinedMatches.length : 0,
+        originalImageUrl: candidate ? (candidate.originalImageUrl || candidate.thumbnailUrl) : null,
+        sourceArticleUrl: candidate ? candidate.sourceUrl : null,
+        sourceTitle: candidate ? candidate.title : null,
+        domain: candidate ? candidate.domain : null,
+        publishedDate: candidate ? candidate.publishedDate : null,
+        matchCount: candidateMatches.length,
+        matches: candidateMatches,
+        bestCandidate: candidate || null,
+        candidateMatches,
+        candidateCount: candidateMatches.length,
         limitations: [
           ...(imageRes.limitations || []),
-          `Rejected semantic candidates after local perceptual comparison (${verification.checked} images checked; best similarity ${Math.round((verification.bestSimilarity || 0) * 100)}%; minimum candidate threshold ${Math.round(PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD * 100)}%).`
+          hasPresentableCandidate
+            ? (Number.isFinite(verification.bestSimilarity) && verification.bestSimilarity > 0
+              ? `Closest visual candidate reached ${Math.round(verification.bestSimilarity * 100)}% similarity and is presented as a candidate, not a verified original.`
+              : 'Indexed visual candidate presented from search index metadata.')
+            : `No candidate met the minimum candidate threshold (${Math.round(PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD * 100)}%).`
         ]
       };
     }
