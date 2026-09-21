@@ -188,7 +188,7 @@ async function searchDuckDuckGo(searchQuery) {
 /**
  * Pass 1: General Web Search via Serper API with DuckDuckGo Fallback
  */
-async function searchSerper(queryInput, forceBroad = false) {
+async function searchSerper(queryInput, forceBroad = false, apiCallsCollector = null) {
   const queryText = typeof queryInput === 'string' ? queryInput : (queryInput.text || '');
   const agent2Query = typeof queryInput === 'object' && queryInput.searchQuery ? queryInput.searchQuery : null;
   let searchQuery = forceBroad 
@@ -206,9 +206,25 @@ async function searchSerper(queryInput, forceBroad = false) {
 
   // MOCK Mode: Return test fixture evidence clearly marked as test-fixture.local
   if (providerStatus.mode === 'MOCK') {
+    const mockResults = getMockSearchFixtures(searchQuery);
+    if (Array.isArray(apiCallsCollector)) {
+      apiCallsCollector.push({
+        id: `call_mock_serper_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        service: 'Google Serper API (MOCK)',
+        operation: forceBroad ? 'Broadened Query Web Search' : 'Primary Candidate Web Search',
+        endpoint: 'https://test-fixture.local/search',
+        method: 'GET',
+        requestPayload: { q: searchQuery, mode: 'MOCK' },
+        status: 200,
+        latencyMs: 15,
+        resultCount: mockResults.length,
+        responsePayload: { organic: mockResults },
+        timestamp: new Date().toISOString()
+      });
+    }
     return {
       searchQuery,
-      results: getMockSearchFixtures(searchQuery)
+      results: mockResults
     };
   }
 
@@ -218,6 +234,8 @@ async function searchSerper(queryInput, forceBroad = false) {
     if (apiKey && apiKey.length > 10) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout guardrail
+      const startTime = Date.now();
+      const reqPayload = { q: searchQuery, num: 5 };
 
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -225,17 +243,32 @@ async function searchSerper(queryInput, forceBroad = false) {
           'X-API-KEY': apiKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          q: searchQuery,
-          num: 5
-        }),
+        body: JSON.stringify(reqPayload),
         signal: controller.signal
       });
       clearTimeout(timeout);
+      const latencyMs = Date.now() - startTime;
 
       if (res.ok) {
         const data = await res.json();
         const organic = data.organic || [];
+
+        if (Array.isArray(apiCallsCollector)) {
+          apiCallsCollector.push({
+            id: `call_serper_web_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            service: 'Google Serper API',
+            operation: forceBroad ? 'Broadened Query Web Search' : 'Primary Candidate Web Search',
+            endpoint: 'https://google.serper.dev/search',
+            method: 'POST',
+            requestHeaders: { 'X-API-KEY': '***REDACTED***', 'Content-Type': 'application/json' },
+            requestPayload: reqPayload,
+            status: res.status,
+            latencyMs,
+            resultCount: organic.length,
+            responsePayload: data,
+            timestamp: new Date().toISOString()
+          });
+        }
 
         const items = organic.map((item, idx) => ({
           index: idx,
@@ -248,11 +281,42 @@ async function searchSerper(queryInput, forceBroad = false) {
         if (items.length > 0) {
           return { searchQuery, results: items };
         }
+      } else {
+        if (Array.isArray(apiCallsCollector)) {
+          apiCallsCollector.push({
+            id: `call_serper_err_${Date.now()}`,
+            service: 'Google Serper API',
+            operation: forceBroad ? 'Broadened Query Web Search' : 'Primary Candidate Web Search',
+            endpoint: 'https://google.serper.dev/search',
+            method: 'POST',
+            requestPayload: reqPayload,
+            status: res.status,
+            latencyMs,
+            error: `Serper HTTP ${res.status}`,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     }
 
     // Fallback to DuckDuckGo search if Serper is unavailable or returned 0 results
+    const ddgStartTime = Date.now();
     const ddgResults = await searchDuckDuckGo(searchQuery);
+    if (Array.isArray(apiCallsCollector)) {
+      apiCallsCollector.push({
+        id: `call_ddg_fallback_${Date.now()}`,
+        service: 'DuckDuckGo HTML Fallback',
+        operation: 'HTML Search Scraping',
+        endpoint: 'https://html.duckduckgo.com/html/',
+        method: 'POST',
+        requestPayload: { q: searchQuery },
+        status: ddgResults.length > 0 ? 200 : 404,
+        latencyMs: Date.now() - ddgStartTime,
+        resultCount: ddgResults.length,
+        responsePayload: ddgResults,
+        timestamp: new Date().toISOString()
+      });
+    }
     return { searchQuery, results: ddgResults };
   } catch (err) {
     const ddgResults = await searchDuckDuckGo(searchQuery);
@@ -263,7 +327,7 @@ async function searchSerper(queryInput, forceBroad = false) {
 /**
  * Pass 2: X/Twitter Scoped Search with Fallback
  */
-async function searchSerperX(queryText) {
+async function searchSerperX(queryText, apiCallsCollector = null) {
   const searchQuery = extractSearchKeywords(queryText) + ' site:x.com OR site:twitter.com';
   const providerStatus = getProviderStatus();
 
@@ -277,6 +341,8 @@ async function searchSerperX(queryText) {
     if (apiKey && apiKey.length > 10) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
+      const startTime = Date.now();
+      const reqPayload = { q: searchQuery, num: 5 };
 
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -284,17 +350,32 @@ async function searchSerperX(queryText) {
           'X-API-KEY': apiKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          q: searchQuery,
-          num: 5
-        }),
+        body: JSON.stringify(reqPayload),
         signal: controller.signal
       });
       clearTimeout(timeout);
+      const latencyMs = Date.now() - startTime;
 
       if (res.ok) {
         const data = await res.json();
         const organic = data.organic || [];
+
+        if (Array.isArray(apiCallsCollector)) {
+          apiCallsCollector.push({
+            id: `call_serper_x_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            service: 'Google Serper API',
+            operation: 'X / Twitter Social Search',
+            endpoint: 'https://google.serper.dev/search',
+            method: 'POST',
+            requestHeaders: { 'X-API-KEY': '***REDACTED***', 'Content-Type': 'application/json' },
+            requestPayload: reqPayload,
+            status: res.status,
+            latencyMs,
+            resultCount: organic.length,
+            responsePayload: data,
+            timestamp: new Date().toISOString()
+          });
+        }
 
         const items = organic.map((item, idx) => ({
           index: idx,
@@ -729,7 +810,7 @@ function deduplicateAndRankCandidates(rawCandidateHits, searchRep) {
 /**
  * Multi-Perspective Candidate Retrieval Engine
  */
-async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
+async function executeSemanticCandidateRetrieval(claim, optionsObj = {}, apiCallsCollector = null) {
   const { fetchFullPageText } = require('./articleResearch');
   const searchRep = buildSearchRepresentation(claim);
   const queries = generateMultiPerspectiveQueries(searchRep);
@@ -779,7 +860,7 @@ async function executeSemanticCandidateRetrieval(claim, optionsObj = {}) {
 
   for (const qObj of queries) {
     try {
-      const searchRes = await searchSerper(qObj.query);
+      const searchRes = await searchSerper(qObj.query, false, apiCallsCollector);
       if (Array.isArray(searchRes.results)) {
         searchRes.results.forEach(hit => {
           rawCandidateHits.push({
@@ -862,25 +943,49 @@ async function verifySingleClaim(claim, i, optionsObj, thresholds, articleResear
   const { generateClaimCorrection } = require('./correctionsService');
   const { performPerClaimDeepResearch } = require('./articleResearch');
 
+  const claimApiCalls = [];
+  const claimStartTime = Date.now();
+  const onDebugEvent = typeof optionsObj?.onDebugEvent === 'function' ? optionsObj.onDebugEvent : null;
+
+  onDebugEvent?.({
+    agent: 'Agent 3',
+    claimIndex: i,
+    claimId: claim.id || `claim_${i + 1}`,
+    claimText: claim.text,
+    phase: 'WEB_VERIFICATION',
+    action: 'CLAIM_START',
+    detail: `Agent 3 starting multi-perspective search verification for Claim #${i + 1}: "${claim.text.slice(0, 60)}..."`,
+    timestamp: new Date().toISOString()
+  });
+
   const scope = claim.claimScope || inferClaimScope(claim.text);
   
   // Execute Primary Multi-Perspective Semantic Web Candidate Retrieval
   const retrievalRes = Array.isArray(optionsObj.mockSearchResults)
     ? { searchQuery: claim.text, results: optionsObj.mockSearchResults }
-    : await executeSemanticCandidateRetrieval(claim, optionsObj);
+    : await executeSemanticCandidateRetrieval(claim, optionsObj, claimApiCalls);
   let searchResults = retrievalRes.results || [];
   let webRetryQueryExecuted = null;
 
   if (searchResults.length === 0 && !Array.isArray(optionsObj.mockSearchResults) && getProviderStatus().webSearch === 'AVAILABLE') {
     const broadenedQuery = broadenSearchQuery(claim.text);
-    const retrySearch = await searchSerper(broadenedQuery, true);
+    const retrySearch = await searchSerper(broadenedQuery, true, claimApiCalls);
     searchResults = retrySearch.results;
     webRetryQueryExecuted = retrySearch.searchQuery;
   }
 
   // Execute Secondary Pass: X / Twitter Scoped Search
-  const xSearch = await searchSerperX(claim.text);
+  const xSearch = await searchSerperX(claim.text, claimApiCalls);
   const xSearchResults = xSearch.results;
+
+  onDebugEvent?.({
+    agent: 'Agent 3',
+    claimIndex: i,
+    phase: 'WEB_VERIFICATION',
+    action: 'SEARCH_RETRIEVAL_DONE',
+    detail: `Claim #${i + 1}: Retrieved ${searchResults.length} web source(s) and ${xSearchResults.length} social discourse item(s).`,
+    timestamp: new Date().toISOString()
+  });
 
   // Evaluate VADER Sentiment
   const vaderSentiment = analyzeSentiment(claim.text);
@@ -981,19 +1086,30 @@ Claim Entities: ${entitiesStr}
 Article Context: ${articleContextStr}
 ${articleSummaryStr}
 
-═══ CRITICAL EVALUATION RULES ═══
-1. Use Google Search to retrieve actual news articles and reports regarding this claim.
-2. Compare MEANING vs MEANING, not exact keyword matching.
-3. For each retrieved source, evaluate:
-   - stance: "SUPPORTS | REFUTES | NEUTRAL | IRRELEVANT"
-   - entityMatch: true/false
-   - eventMatch: true/false
-   - temporalMatch: true/false
-   - locationMatch: true/false
-   - relevanceScore: 0 to 100
-   - reason: detailed semantic comparison explanation
-4. Determine overallStance: "SUPPORTS | REFUTES | NEUTRAL | INSUFFICIENT"
-5. If no credible sources report on this event at all, overallStance MUST be "INSUFFICIENT".
+═══ CRITICAL STANCE DEFINITIONS & EVALUATION RULES ═══
+1. STANCE DETERMINATION:
+   - SUPPORTS:
+     * The evidence confirms, affirms, reports, or quotes official sources verifying that the core claim occurred or is factual.
+     * Journalist reporting that covers the event, states facts matching the claim, or provides affirmative details counts as SUPPORTS.
+     * Paraphrases, alternative headlines, or different sentence structures stating the same underlying event MUST be marked SUPPORTS.
+     * DO NOT require word-for-word identity. If the news story corroborates the event, it is SUPPORTS.
+   - REFUTES:
+     * The evidence explicitly denies, contradicts, fact-checks as false, debunks, or presents mutually exclusive facts (e.g. official denial, different perpetrator, completely contrary outcome).
+     * Direct numerical contradictions or cancelled/rejected outcomes must be classified as REFUTES.
+   - NEUTRAL:
+     * STRICT LIMITATION: Do NOT default to NEUTRAL out of excessive caution.
+     * Use NEUTRAL ONLY when:
+       (a) The source mentions the company/person/topic in general background or historical context without mentioning whether the claimed event occurred.
+       (b) The source explicitly states that reports are unconfirmed, under active dispute, or cannot yet be verified.
+     * If an article confirms the event happened, it is NEVER NEUTRAL — it is SUPPORTS.
+   - IRRELEVANT:
+     * The evidence discusses an entirely different subject or unrelated event.
+
+2. MANDATORY CONCISE DECISION REASON FOR EVERY SOURCE:
+   - For EACH indexed item, provide a clear, informative 1-2 sentence "reason" explicitly justifying why that specific source SUPPORTS, REFUTES, or is NEUTRAL towards this claim.
+
+3. OVERALL CLAIM STANCE REASON:
+   - Provide "claimStanceReason": a 1-2 sentence executive explanation of why the entire claim is corroborated, contradicted, or unverified overall across all sources.
 
 Return ONLY a valid JSON object matching this schema:
 {
@@ -1010,10 +1126,11 @@ Return ONLY a valid JSON object matching this schema:
       "temporalMatch": true,
       "locationMatch": true,
       "relevanceScore": 90,
-      "reason": "explanation"
+      "reason": "Clear 1-2 sentence rationale for this source's stance"
     }
   ],
   "overallStance": "SUPPORTS | REFUTES | NEUTRAL | INSUFFICIENT",
+  "claimStanceReason": "Executive summary explaining why the claim is supported, refuted, or unverified",
   "confidence": 95,
   "explanation": "Executive summary of evidence evaluation"
 }`;
@@ -1181,13 +1298,30 @@ ${articleSummaryStr}
 Search Evidence Items (Indexed):
 ${JSON.stringify(evidenceListFormatted, null, 2)}
 
-═══ CRITICAL EVALUATION RULES ═══
-1. Compare MEANING vs MEANING, not exact keyword matching.
-2. Paraphrases or different wording expressing the same underlying proposition MUST be evaluated as SUPPORTS.
-3. Distinguish Event States: SIGNED != COMPLETED, PLANNED != COMPLETED, ANNOUNCED != IMPLEMENTED. Event state mismatches must NOT be marked SUPPORTS.
-4. Entity Mismatch: If a DIFFERENT entity performed the action, classify as REFUTES.
-5. Quantity Mismatch: Numerical discrepancies (e.g. $2B vs $500M) must NOT be marked SUPPORTS.
-6. Location Mismatch: Events in different locations (e.g. Mumbai vs New York) must be classified as REFUTES.
+═══ CRITICAL STANCE DEFINITIONS & EVALUATION RULES ═══
+1. STANCE DETERMINATION:
+   - SUPPORTS:
+     * The evidence explicitly confirms, affirms, reports, or quotes official sources verifying that the core claim occurred or is factual.
+     * Journalist reporting that covers the event, states facts matching the claim, or provides affirmative details counts as SUPPORTS.
+     * Paraphrases, alternative headlines, or different sentence structures stating the same underlying event MUST be marked SUPPORTS.
+     * DO NOT require 100% word-for-word identity or identical sentence length. If the core factual assertion is corroborated by the article, it is SUPPORTS.
+   - REFUTES:
+     * The evidence explicitly denies, contradicts, fact-checks as false, debunks, or presents mutually exclusive facts (e.g. official denial, different perpetrator, completely contrary outcome).
+     * Direct numerical contradictions or cancelled/rejected outcomes must be classified as REFUTES.
+   - NEUTRAL:
+     * STRICT LIMITATION: Do NOT default to NEUTRAL out of excessive caution.
+     * Use NEUTRAL ONLY when:
+       (a) The source mentions the company/person/topic in general background or historical context without mentioning whether the claimed event occurred.
+       (b) The source explicitly states that reports are unconfirmed, under active dispute, or cannot yet be verified.
+     * If an article confirms the event happened, it is NEVER NEUTRAL — it is SUPPORTS.
+   - IRRELEVANT:
+     * The evidence discusses an entirely different subject or unrelated event.
+
+2. MANDATORY CONCISE DECISION REASON FOR EVERY SOURCE:
+   - For EACH indexed item, provide a clear, informative 1-2 sentence "reason" explicitly justifying why that specific source SUPPORTS, REFUTES, or is NEUTRAL towards this claim.
+
+3. OVERALL CLAIM STANCE REASON:
+   - Provide "claimStanceReason": a 1-2 sentence executive explanation of why the entire claim is corroborated, contradicted, or unverified overall across all sources.
 
 Return ONLY a valid JSON object matching this schema:
 {
@@ -1200,9 +1334,10 @@ Return ONLY a valid JSON object matching this schema:
       "temporalMatch": true,
       "locationMatch": true,
       "relevanceScore": 85,
-      "reason": "Detailed explanation of semantic stance comparison"
+      "reason": "Clear 1-2 sentence rationale for this source's stance"
     }
   ],
+  "claimStanceReason": "Executive summary explaining why the claim is supported, refuted, or unverified",
   "emotionalIntensity": 50,
   "modelConfidence": 80,
   "explanation": "Executive summary of evidence stance evaluation",
@@ -1211,6 +1346,17 @@ Return ONLY a valid JSON object matching this schema:
 }`;
 
     try {
+      const geminiStartTime = Date.now();
+      onDebugEvent?.({
+        agent: 'Agent 3',
+        claimIndex: i,
+        phase: 'WEB_VERIFICATION',
+        action: 'GEMINI_STANCE_PROMPT_SENT',
+        model: modelName,
+        detail: `Agent 3 sent semantic stance evaluation prompt to ${modelName} for Claim #${i + 1} with ${searchResults.length} source(s)`,
+        timestamp: new Date().toISOString()
+      });
+
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Gemini Agent 3 API call timed out after 20000ms')), 20000);
       });
@@ -1226,6 +1372,7 @@ Return ONLY a valid JSON object matching this schema:
       });
 
       const geminiResponse = await Promise.race([apiPromise, timeoutPromise]);
+      const geminiDurationMs = Date.now() - geminiStartTime;
       let rawText = null;
       if (typeof geminiResponse.text === 'string') rawText = geminiResponse.text;
       else if (typeof geminiResponse.text === 'function') rawText = geminiResponse.text();
@@ -1246,10 +1393,52 @@ Return ONLY a valid JSON object matching this schema:
         gptExplanation = gptRawResponse.explanation || '';
         plausibilityFlag = typeof gptRawResponse.plausibilityFlag === 'boolean' ? gptRawResponse.plausibilityFlag : computePlausibilityFlag(claim.text).plausibilityFlag;
         plausibilityReasoning = gptRawResponse.plausibilityReasoning || computePlausibilityFlag(claim.text).plausibilityReasoning;
+
+        claimApiCalls.push({
+          id: `call_gemini_stance_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          service: 'Google Gemini',
+          operation: 'Semantic Stance & Contradiction Evaluation',
+          endpoint: 'models.generateContent',
+          method: 'SDK',
+          model: modelName,
+          requestHeaders: { 'Authorization': 'Bearer ***REDACTED***' },
+          requestPayload: {
+            model: modelName,
+            contents: gptPromptSent,
+            config: { responseMimeType: 'application/json', temperature: 0.0, maxOutputTokens: 4096 }
+          },
+          status: 200,
+          latencyMs: geminiDurationMs,
+          responsePayload: gptRawResponse,
+          timestamp: new Date().toISOString()
+        });
+
+        onDebugEvent?.({
+          agent: 'Agent 3',
+          claimIndex: i,
+          phase: 'WEB_VERIFICATION',
+          action: 'GEMINI_STANCE_RESPONSE',
+          model: modelName,
+          latencyMs: geminiDurationMs,
+          detail: `Gemini completed semantic stance evaluation in ${geminiDurationMs}ms (${evidenceEvaluations.length} sources evaluated)`,
+          timestamp: new Date().toISOString()
+        });
       }
     } catch (err) {
       console.warn('[Agent 3 Gemini Reasoning Exception]:', err.message);
       gptRawResponse = { error: err.message, fallbackActive: true, evaluationMode: 'LLM_FALLBACK' };
+      claimApiCalls.push({
+        id: `call_gemini_err_${Date.now()}`,
+        service: 'Google Gemini',
+        operation: 'Semantic Stance Evaluation',
+        endpoint: 'models.generateContent',
+        method: 'SDK',
+        model: modelName,
+        requestPayload: { model: modelName, contents: gptPromptSent },
+        status: 500,
+        error: err.message,
+        timestamp: new Date().toISOString()
+      });
     }
   }
 
@@ -1316,6 +1505,19 @@ Return ONLY a valid JSON object matching this schema:
       const { evaluateSourceIntelligence } = require('./sourceIntelligence');
       const intel = evaluateSourceIntelligence(src);
 
+      let sourceDecisionReason = '';
+      if (evalObj && evalObj.reason && typeof evalObj.reason === 'string') {
+        sourceDecisionReason = evalObj.reason;
+      } else if (evalObj && evalObj.explanation && typeof evalObj.explanation === 'string') {
+        sourceDecisionReason = evalObj.explanation;
+      } else if (evalStance === 'SUPPORTS') {
+        sourceDecisionReason = `Corroborates core factual propositions of the claim via ${intel.publication || cleanDomain} reporting.`;
+      } else if (evalStance === 'REFUTES') {
+        sourceDecisionReason = `Directly disputes or contradicts factual assertions in the claim.`;
+      } else {
+        sourceDecisionReason = intel.reasoning || `Provides related context without confirming or refuting the claim.`;
+      }
+
       validatedSources.push({
         ...src,
         url: srcUrl,
@@ -1333,7 +1535,7 @@ Return ONLY a valid JSON object matching this schema:
         sourceReasoning: intel.reasoning,
         stance: evalStance,
         relevanceScore: evalRelevance,
-        reason: evalObj ? evalObj.reason : intel.reasoning
+        reason: sourceDecisionReason
       });
     }
   }
@@ -1393,11 +1595,21 @@ Return ONLY a valid JSON object matching this schema:
   const totalHitCount = Math.max(1, evidenceEvaluations.length);
   const sourceIndependence = Math.round((nonDuplicateSupportingCount / totalHitCount) * 100);
 
+  // Apply Global Unified Scoring Formula
+  const { calculateClaimScore, getGlobalScoringWeights } = require('./scoringConfigService');
+  const activeWeights = getGlobalScoringWeights();
+  const sourceAuthorityScore = Math.round((sourceCredibilityEval.averageTrustScore || 0) * 100);
+
   let derivedConfidence = 0;
   if (evidenceState === 'INSUFFICIENT') {
     derivedConfidence = 30;
   } else {
-    derivedConfidence = Math.round(evidenceQuality * 0.4 + sourceAgreement * 0.3 + sourceIndependence * 0.3);
+    derivedConfidence = calculateClaimScore({
+      evidenceQuality,
+      sourceAuthority: sourceAuthorityScore,
+      sourceAgreement,
+      sourceIndependence
+    }, activeWeights);
   }
   derivedConfidence = Math.max(0, Math.min(100, derivedConfidence));
 
@@ -1421,13 +1633,30 @@ Return ONLY a valid JSON object matching this schema:
     canonicalVerdict = 'UNVERIFIED';
   }
 
+  // Synthesize human-readable claim stance reason
+  let claimStanceReason = gptRawResponse?.claimStanceReason || '';
+  if (!claimStanceReason || typeof claimStanceReason !== 'string' || claimStanceReason.trim().length === 0) {
+    if (canonicalVerdict === 'VERIFIED') {
+      claimStanceReason = `Corroborated by ${supportingIndices.length} authoritative source(s) with ${sourceAgreement}% consensus and zero contradictory reporting.`;
+    } else if (canonicalVerdict === 'FALSE') {
+      claimStanceReason = `Contradicted by ${refutingIndices.length} authoritative source(s) with conflicting public facts or explicit debunks.`;
+    } else if (canonicalVerdict === 'PARTIALLY_VERIFIED') {
+      claimStanceReason = `Mixed reporting across sources: ${supportingIndices.length} corroborating vs ${refutingIndices.length} contesting source(s).`;
+    } else {
+      claimStanceReason = `Insufficient or neutral evidence: retrieved sources do not provide definitive confirmation or refutation of this specific assertion.`;
+    }
+  }
+
   const claimVerificationResult = {
     evidenceState,
     verdict: canonicalVerdict,
     confidence: derivedConfidence,
+    claimStanceReason,
     evidenceQuality,
+    sourceAuthority: sourceAuthorityScore,
     sourceAgreement,
-    sourceIndependence
+    sourceIndependence,
+    scoringWeights: activeWeights
   };
 
   let recencyNote = '';
@@ -1486,6 +1715,94 @@ Return ONLY a valid JSON object matching this schema:
     }
   };
 
+  const exactFlow = [
+    {
+      step: 1,
+      name: 'Search Representation & Query Formulation',
+      status: 'COMPLETED',
+      description: 'Decomposed claim propositions into entity, location, and numeric search representations.',
+      inputs: { claimText: claim.text, scope, entities: claim.entities || [] },
+      outputs: {
+        canonicalQuery: retrievalRes.searchQuery || claim.searchQuery || claim.text,
+        multiPerspectiveQueries: (retrievalRes.queries || []).map(q => q.query || q)
+      }
+    },
+    {
+      step: 2,
+      name: 'Candidate Evidence Retrieval (Web & Social)',
+      status: searchResults.length > 0 ? 'COMPLETED' : 'INSUFFICIENT',
+      description: 'Executed real-time web search (Google Serper) and X/Twitter discourse index search.',
+      inputs: {
+        webQuery: retrievalRes.searchQuery || claim.searchQuery || claim.text,
+        xQuery: xSearch?.searchQuery || ''
+      },
+      outputs: {
+        webHitsCount: searchResults.length,
+        xHitsCount: xSearchResults.length,
+        retrievedDomains: Array.from(new Set(searchResults.map(s => s.domain)))
+      }
+    },
+    {
+      step: 3,
+      name: 'Source Credibility & Domain Trust Rating',
+      status: 'COMPLETED',
+      description: 'Evaluated publisher domain trust, anti-syndication groups, and SSRF guardrails.',
+      inputs: { totalSources: searchResults.length },
+      outputs: {
+        averageTrustScore: sourceCredibilityEval.averageTrustScore,
+        credibilityLabel: sourceCredibilityEval.label,
+        domainEvaluations: domainTrustAudits
+      }
+    },
+    {
+      step: 4,
+      name: 'Semantic Stance Evaluation (Gemini LLM)',
+      status: geminiSuccess ? 'COMPLETED' : 'HEURISTIC_FALLBACK',
+      description: 'LLM semantic stance evaluation comparing meaning vs. meaning for each source.',
+      inputs: {
+        model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest',
+        candidateSourcesCount: searchResults.length
+      },
+      outputs: {
+        supportingCount: supportingIndices.length,
+        refutingCount: refutingIndices.length,
+        neutralCount: neutralIndices.length,
+        irrelevantCount: irrelevantIndices.length,
+        modelConfidence,
+        explanation: gptExplanation
+      }
+    },
+    {
+      step: 5,
+      name: '9-Signal Mamdani Fuzzy Verdict Engine',
+      status: 'COMPLETED',
+      description: 'Evaluated 9 linguistic input sets across 17 inference rules with Centroid defuzzification.',
+      inputs: fuzzyEval.fuzzified || {},
+      outputs: {
+        crispScore: fuzzyEval.crispScore,
+        verdict: fuzzyEval.verdict,
+        ruleActivations: fuzzyEval.ruleActivations,
+        defuzzificationMath: fuzzyEval.defuzzificationMath
+      }
+    },
+    {
+      step: 6,
+      name: 'Canonical Confidence & Status Derivation',
+      status: 'COMPLETED',
+      description: 'Calculated deterministic confidence using active global scoring weights.',
+      inputs: { evidenceQuality, sourceAuthority: sourceAuthorityScore, sourceAgreement, sourceIndependence, scoringWeights: activeWeights },
+      outputs: {
+        derivedConfidence,
+        canonicalVerdict,
+        claimStanceReason,
+        status: canonicalVerdict === 'VERIFIED' ? 'TRUSTED' : canonicalVerdict === 'FALSE' ? 'FABRICATED' : 'SUSPICIOUS'
+      }
+    }
+  ];
+
+  auditTrail.apiCalls = claimApiCalls;
+  auditTrail.exactFlow = exactFlow;
+
   let verifiedObj = {
     claimId: claim.id || `claim_${i + 1}`,
     claimText: claim.text,
@@ -1495,19 +1812,24 @@ Return ONLY a valid JSON object matching this schema:
     verdict: canonicalVerdict,
     confidence: derivedConfidence,
     claimVerificationResult,
+    claimStanceReason,
+    explanation: claimStanceReason,
+    technicalExplanation: explanationText,
+    scoringWeights: activeWeights,
     evidenceState,
     evidenceEvaluations: evidenceEvaluations,
     supportingSourceIndices: supportingIndices,
     refutingSourceIndices: refutingIndices,
     neutralSourceIndices: neutralIndices,
     irrelevantSourceIndices: irrelevantIndices,
-    explanation: explanationText,
     sources: validatedSources,
     socialDiscourse,
     claimScope: scope,
     isRecentBreaking: !!claim.isRecentBreaking,
     plausibilityFlag,
     plausibilityReasoning,
+    apiCalls: claimApiCalls,
+    exactFlow,
     auditTrail,
     fuzzySignalBreakdown: {
       corroborationScore: Number(corroborationScore.toFixed(1)),
@@ -1552,6 +1874,20 @@ Return ONLY a valid JSON object matching this schema:
           sourceIndependence: 100
         };
         verifiedObj.explanation = verifiedObj.explanation.replace(/yielding crisp trust score of [\d.]+% \([A-Z]+\)/i, `yielding crisp trust score of ${verifiedObj.confidence}% (${verifiedObj.status})`);
+
+        exactFlow.push({
+          step: 7,
+          name: 'Automatic Deep Research Escalation',
+          status: 'COMPLETED',
+          description: 'Suspicious claim automatically escalated to multi-angle query decomposition and full-page reading.',
+          inputs: { triggerType: deepRes.triggerType || 'SUSPICIOUS_STATUS' },
+          outputs: {
+            decomposedAngles: deepRes.decomposedQueries?.length || 0,
+            fullPagesFetched: deepRes.fullPagesFetchedCount || 0,
+            updatedStatus: verifiedObj.status,
+            updatedConfidence: verifiedObj.confidence
+          }
+        });
       }
     } catch (err) {
       console.warn('[Part B Automatic Deep Research Warning]:', err.message);
@@ -1572,6 +1908,20 @@ Return ONLY a valid JSON object matching this schema:
     verifiedObj.correctionBasis = null;
     verifiedObj.partiallyAccurate = false;
   }
+
+  onDebugEvent?.({
+    agent: 'Agent 3',
+    claimIndex: i,
+    claimId: verifiedObj.claimId,
+    phase: 'WEB_VERIFICATION',
+    action: 'CLAIM_VERIFIED',
+    verdict: verifiedObj.verdict,
+    confidence: verifiedObj.confidence,
+    status: verifiedObj.status,
+    latencyMs: Date.now() - claimStartTime,
+    detail: `Agent 3 finalized Claim #${i + 1}: ${verifiedObj.verdict} (${verifiedObj.confidence}%) in ${Date.now() - claimStartTime}ms`,
+    timestamp: new Date().toISOString()
+  });
 
   return verifiedObj;
 }

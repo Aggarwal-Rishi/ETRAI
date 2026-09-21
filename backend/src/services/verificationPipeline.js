@@ -187,10 +187,50 @@ async function runVerificationPipeline({
         : 'Pasted Text Analysis';
 
   const pipelinePromise = (async () => {
+    const emitDebugEvent = (event) => {
+      logger.log(event.phase || 'pipeline', event.isDelayWarning ? 'WARN' : 'INFO', event.detail, event);
+      const evId = `dbg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      sseManager.emitProgress(jobId, {
+        debugEvent: {
+          id: evId,
+          eventId: evId,
+          timestamp: event.timestamp || new Date().toISOString(),
+          agent: event.agent || 'System',
+          phase: event.phase,
+          action: event.action,
+          eventType: event.action,
+          detail: event.detail,
+          message: event.detail,
+          latencyMs: event.latencyMs,
+          delayMs: event.delayMs,
+          waitMs: event.delayMs,
+          isDelayWarning: Boolean(event.isDelayWarning),
+          error: event.error
+        },
+        activeDelay: event.isDelayWarning ? {
+          agent: event.agent,
+          action: event.action,
+          reason: event.action === 'RATE_LIMIT_BACKOFF' ? 'RATE_LIMIT_BACKOFF' : event.detail,
+          detail: event.detail,
+          message: event.detail,
+          delayMs: event.delayMs,
+          waitMs: event.delayMs,
+          startedAt: Date.now()
+        } : (event.action?.endsWith('_DONE') || event.action?.endsWith('_RECEIVED') || event.action?.endsWith('_COMPLETE') || event.action === 'CLAIMS_READY' || event.action === 'CLAIM_VERIFIED' ? null : undefined)
+      });
+    };
+
     // ----------------------------------------------------
     // Phase 1: Content & Media Reader (Agent 1)
     // ----------------------------------------------------
     logger.startPhase('phase1_contentReader', { inputType, inputSource: inputSourceStr, selectedTypes, providerStatus });
+
+    emitDebugEvent({
+      agent: 'Agent 1',
+      phase: 'CONTENT_READER',
+      action: 'INTAKE_STARTED',
+      detail: `Agent 1 began input intake (type: ${inputType}, target: ${sourceTitle.substring(0, 70)})`
+    });
 
     if (mediaCategory === 'PHOTO') {
       sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 10, step: 'Agent 1: Validating photo binary & file signature...', stage: 'MEDIA_VALIDATION' });
@@ -258,6 +298,13 @@ async function runVerificationPipeline({
       articleSentiment
     });
 
+    emitDebugEvent({
+      agent: 'Agent 1',
+      phase: 'CONTENT_READER',
+      action: 'INTAKE_DONE',
+      detail: `Agent 1 finished content intake (${contentRes.wordCount || 0} words, sentiment: ${articleSentiment.label})`
+    });
+
     logger.endPhase('phase1_contentReader', {
       sourceTitle: contentRes.sourceTitle || sourceTitle,
       wordCount: contentRes.wordCount,
@@ -276,6 +323,13 @@ async function runVerificationPipeline({
       progress: extractionProgress,
       step: `Agent 2: Extracting verifiable claims from ${isMediaJob ? 'media context' : 'document text'}...`,
       stage: 'CLAIM_EXTRACTION'
+    });
+
+    emitDebugEvent({
+      agent: 'Agent 2',
+      phase: 'CLAIM_EXTRACTION',
+      action: 'EXTRACTION_STARTED',
+      detail: `Agent 2 initializing claim decomposition rail (${contentRes.wordCount || 0} words)`
     });
 
     let claims = [];
@@ -310,7 +364,7 @@ async function runVerificationPipeline({
         }];
       }
     } else {
-      claims = await extractClaims(contentRes.extractedText);
+      claims = await extractClaims(contentRes.extractedText, { onDebugEvent: emitDebugEvent });
     }
 
     const scopeCounts = {
@@ -352,6 +406,13 @@ async function runVerificationPipeline({
       stage: 'ARTICLE_DEEP_RESEARCH'
     });
 
+    emitDebugEvent({
+      agent: 'Deep Research',
+      phase: 'ARTICLE_DEEP_RESEARCH',
+      action: 'DEEP_RESEARCH_START',
+      detail: `Performing deep background research across entities: ${mediaTopicStr.slice(0, 80)}...`
+    });
+
     const firstArticleCtx = {
       ...(claims[0]?.articleContext || {}),
       mainTopic: [claims[0]?.articleContext?.mainTopic || mediaTopicBase, ...visualEntityNames].filter(Boolean).join(' ').slice(0, 500)
@@ -359,6 +420,13 @@ async function runVerificationPipeline({
     const articleResearchContext = observationOnlyImage
       ? buildImageSourceResearchContext(mediaAnalysis, mediaTopicStr)
       : await performArticleDeepResearch(firstArticleCtx, claims);
+
+    emitDebugEvent({
+      agent: 'Deep Research',
+      phase: 'ARTICLE_DEEP_RESEARCH',
+      action: 'DEEP_RESEARCH_DONE',
+      detail: `Article-level deep research context synthesized (${articleResearchContext?.articleEvidencePool?.length || 0} candidate evidence items collected)`
+    });
 
     // ----------------------------------------------------
     // Phase 3: Fact Verification Agent (Agent 3) with Parallel Concurrency & Progress Callback
@@ -370,6 +438,13 @@ async function runVerificationPipeline({
       progress: 80,
       step: `Agent 3: Verifying ${claims.length} claims via web search & fuzzy engine...`,
       stage: 'WEB_VERIFICATION'
+    });
+
+    emitDebugEvent({
+      agent: 'Agent 3',
+      phase: 'FACT_VERIFICATION',
+      action: 'VERIFICATION_STARTED',
+      detail: `Agent 3 commencing multi-pass evidentiary verification for ${claims.length} claim(s)`
     });
 
     const progressCallback = (completedCount, total) => {
@@ -388,7 +463,7 @@ async function runVerificationPipeline({
       ? verifyObservationClaimsAgainstImageSource(claims, mediaAnalysis)
       : await verifyClaims(
           claims,
-          { onProgress: progressCallback },
+          { onProgress: progressCallback, onDebugEvent: emitDebugEvent },
           articleResearchContext,
           inputType === 'URL' ? url : null,
           progressCallback
@@ -484,6 +559,13 @@ async function runVerificationPipeline({
       contentRes.metadata?.canonicalUrl || ''
     );
 
+    emitDebugEvent({
+      agent: 'Agent 4',
+      phase: 'REPORT_GENERATION',
+      action: 'SYNTHESIS_STARTED',
+      detail: `Agent 4 synthesizing multi-agent dossier and computing explainable trust score`
+    });
+
     const reportData = await generateReport({
       inputType,
       sourceTitle: contentRes.sourceTitle || sourceTitle,
@@ -566,6 +648,13 @@ async function runVerificationPipeline({
       sealedAt,
       scope: 'Complete report payload before persistence'
     };
+
+    emitDebugEvent({
+      agent: 'System',
+      phase: 'REPORT_GENERATION',
+      action: 'PIPELINE_COMPLETE',
+      detail: `All 4 verification agents complete. Verdict: ${reportData.articleVerdict || reportData.verdict}, Factual Accuracy: ${reportData.factualAccuracyScore}%`
+    });
 
     // ----------------------------------------------------
     // Step 5: Save Full Analysis Record to Database

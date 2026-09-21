@@ -61,12 +61,32 @@ const PENALTY_CATALOG = {
  * Normalizes active factor weights so their sum equals exactly 1.0 (100%)
  */
 function normalizeActiveWeights(activeFactorKeys, customWeights = {}) {
+  let effectiveWeights = { ...(customWeights || {}) };
+  if (Object.keys(effectiveWeights).length === 0) {
+    try {
+      const { getGlobalScoringWeights } = require('./scoringConfigService');
+      const gw = getGlobalScoringWeights();
+      if (gw) {
+        effectiveWeights = {
+          claimEvidenceMatch: gw.evidenceQuality ? gw.evidenceQuality * 0.75 : 0.22,
+          evidenceFreshness: gw.evidenceQuality ? gw.evidenceQuality * 0.25 : 0.08,
+          sourceAuthority: gw.sourceAuthority ? gw.sourceAuthority * 0.72 : 0.18,
+          provenanceQuality: gw.sourceAuthority ? gw.sourceAuthority * 0.28 : 0.07,
+          contradictoryEvidence: gw.sourceAgreement ? gw.sourceAgreement * 0.60 : 0.15,
+          attributionQuality: gw.sourceAgreement ? gw.sourceAgreement * 0.40 : 0.10,
+          independentCorroboration: gw.sourceIndependence ? gw.sourceIndependence * 0.75 : 0.15,
+          contextFramingQuality: gw.sourceIndependence ? gw.sourceIndependence * 0.25 : 0.05
+        };
+      }
+    } catch (_) {}
+  }
+
   const normalized = {};
   let sum = 0;
 
   for (const key of activeFactorKeys) {
-    const raw = customWeights[key] !== undefined 
-      ? parseFloat(customWeights[key]) 
+    const raw = effectiveWeights[key] !== undefined 
+      ? parseFloat(effectiveWeights[key]) 
       : (GLOBAL_SCORING_FACTORS[key]?.defaultWeight ?? DEFAULT_WEIGHTS[key] ?? 0.1);
     normalized[key] = Math.max(0, raw);
     sum += normalized[key];

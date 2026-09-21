@@ -490,12 +490,14 @@ function extractMockClaims(text) {
  * Agent 2 – Claim Extractor Service (Enhanced Dual-Layer Semantic Engine)
  * Provider: Google Gemini (migrated from OpenAI)
  */
-async function extractClaims(extractedText) {
+async function extractClaims(extractedText, options = {}) {
+  const onDebugEvent = typeof options?.onDebugEvent === 'function' ? options.onDebugEvent : null;
   const geminiKey = process.env.GEMINI_API_KEY;
 
   // Guard: if Gemini key is absent/invalid, skip to mock
   if (!isKeyValid(geminiKey)) {
     console.log('[Agent 2 Claim Extractor]: GEMINI_API_KEY absent or invalid. Using deterministic claim extraction.');
+    onDebugEvent?.({ agent: 'Agent 2', phase: 'CLAIM_EXTRACTION', action: 'FALLBACK_TRIGGERED', detail: 'GEMINI_API_KEY absent or invalid. Using heuristic claim extraction.', timestamp: new Date().toISOString() });
     return extractMockClaims(extractedText);
   }
 
@@ -503,6 +505,7 @@ async function extractClaims(extractedText) {
   const providerStatus = getProviderStatus();
   if (providerStatus.mode === 'MOCK') {
     console.log('[Agent 2 Claim Extractor]: MOCK mode active. Using deterministic claim extraction.');
+    onDebugEvent?.({ agent: 'Agent 2', phase: 'CLAIM_EXTRACTION', action: 'MOCK_MODE', detail: 'MOCK mode active. Using deterministic claim extraction.', timestamp: new Date().toISOString() });
     return extractMockClaims(extractedText);
   }
 
@@ -684,13 +687,43 @@ ${extractedText.substring(0, 8000)}
     let attempt = 0;
     while (attempt <= backoffDelays.length) {
       try {
+        const callStartTime = Date.now();
+        onDebugEvent?.({
+          agent: 'Agent 2',
+          phase: 'CLAIM_EXTRACTION',
+          action: 'LLM_PROMPT_SENT',
+          model: modelName,
+          detail: `Agent 2 sent dual-layer semantic prompt to ${modelName} (~${extractedText.length} chars, maxOutputTokens: 8192)`,
+          timestamp: new Date().toISOString()
+        });
+
         geminiRawText = await callGeminiApi();
+        const callDurationMs = Date.now() - callStartTime;
+
+        onDebugEvent?.({
+          agent: 'Agent 2',
+          phase: 'CLAIM_EXTRACTION',
+          action: 'LLM_RESPONSE_RECEIVED',
+          model: modelName,
+          latencyMs: callDurationMs,
+          detail: `Agent 2 received Gemini response in ${callDurationMs}ms (${(geminiRawText || '').length} chars generated)`,
+          timestamp: new Date().toISOString()
+        });
+
         // If parsed cleanly, break immediately
         const testParse = safeParseGeminiJson(geminiRawText);
         if (testParse && (Array.isArray(testParse) || (typeof testParse === 'object' && testParse !== null))) {
           break;
         }
         if (attempt < backoffDelays.length) {
+          onDebugEvent?.({
+            agent: 'Agent 2',
+            phase: 'CLAIM_EXTRACTION',
+            action: 'RETRY_MALFORMED_JSON',
+            isDelayWarning: true,
+            detail: `Agent 2 Gemini returned truncated/malformed JSON. Attempting repair and retry in 1000ms...`,
+            timestamp: new Date().toISOString()
+          });
           await new Promise(resolve => setTimeout(resolve, 1000));
           attempt++;
           continue;
@@ -701,6 +734,15 @@ ${extractedText.substring(0, 8000)}
         if (/429|quota|rate.?limit|RESOURCE_EXHAUSTED|timed.?out|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|fetch failed|socket|hang up|abort|network/i.test(errMsg) && attempt < backoffDelays.length) {
           const delay = backoffDelays[attempt];
           console.log(`[Agent 2 Gemini]: Transient network/rate-limit error (${errMsg.substring(0, 120)}). Retrying in ${delay}ms... (attempt ${attempt + 1}/${backoffDelays.length})`);
+          onDebugEvent?.({
+            agent: 'Agent 2',
+            phase: 'CLAIM_EXTRACTION',
+            action: 'RATE_LIMIT_BACKOFF',
+            isDelayWarning: true,
+            delayMs: delay,
+            detail: `Agent 2 Rate Limit / Network Blocker (${errMsg.substring(0, 80)}). Pausing execution & retrying in ${(delay / 1000).toFixed(1)}s (Attempt ${attempt + 1}/${backoffDelays.length})`,
+            timestamp: new Date().toISOString()
+          });
           await new Promise(resolve => setTimeout(resolve, delay));
           attempt++;
         } else {
@@ -760,6 +802,14 @@ ${extractedText.substring(0, 8000)}
     console.warn('[Agent 2 Gemini Warning]: Gemini returned zero claims. Falling back.');
     return extractMockClaims(extractedText);
   }
+
+  onDebugEvent?.({
+    agent: 'Agent 2',
+    phase: 'CLAIM_EXTRACTION',
+    action: 'POST_PROCESSING',
+    detail: `Agent 2 running coherence filters, pairwise contradictions, and sentiment analysis on ${rawClaims.length} candidate claim(s)...`,
+    timestamp: new Date().toISOString()
+  });
 
   const internalConsistencyIssues = Array.isArray(parsed.internalConsistencyIssues)
     ? parsed.internalConsistencyIssues
@@ -846,6 +896,15 @@ ${extractedText.substring(0, 8000)}
   claims.sourcingTransparency = sourcingTransparency;
   claims.articleContext = topArticleContext;
   claims.extractionMode = 'REAL_LLM';
+
+  onDebugEvent?.({
+    agent: 'Agent 2',
+    phase: 'CLAIM_EXTRACTION',
+    action: 'CLAIMS_READY',
+    detail: `Agent 2 extracted ${claims.length} verifiable claim(s) with dual-layer semantics.`,
+    totalClaims: claims.length,
+    timestamp: new Date().toISOString()
+  });
 
   return claims;
 }

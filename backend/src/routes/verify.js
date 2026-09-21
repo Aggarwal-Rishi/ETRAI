@@ -1,12 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { analyze, streamProgress, getJobStatus, deepResearchClaim, proxyImage } = require('../controllers/verifyController');
+const { analyze, streamProgress, getJobStatus, deepResearchClaim, proxyImage, getScoringWeights, updateScoringWeights } = require('../controllers/verifyController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 const { analyzeLimiter } = require('../middleware/rateLimiter');
 
 // Proxy image endpoint (SSRF guarded for reverse-search images)
 router.get('/proxy-image', proxyImage);
+
+// Global scoring weights configuration
+router.get('/scoring-weights', getScoringWeights);
+router.post('/scoring-weights', protect, updateScoringWeights);
 
 // Initiate analysis job (supports single file upload with rate limiting)
 router.post('/', protect, analyzeLimiter, upload.single('file'), analyze);

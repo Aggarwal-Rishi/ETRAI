@@ -1,20 +1,48 @@
-import React, { useState } from 'react';
-import { X, Search, Cpu, BarChart2, ShieldCheck, AlertTriangle, ExternalLink, Code, Layers, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Search, Cpu, BarChart2, ShieldCheck, AlertTriangle, ExternalLink, Code, Layers, FileText, Terminal, Copy, Check, Clock, FileJson } from 'lucide-react';
+import { generateClaimDiagnosticJson } from '../utils/claimDiagnosticExport';
 
-export default function ClaimAuditModal({ claim, isOpen, onClose }) {
+export default function ClaimAuditModal({ claim, isOpen, onClose, onOpenDebugPanel }) {
   const [activeTab, setActiveTab] = useState('searchApi');
+  const [copiedId, setCopiedId] = useState(null);
 
-  if (!isOpen || !claim) return null;
+  // Lock document body scroll when modal is open
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen || !claim || typeof document === 'undefined') return null;
 
   const audit = claim.auditTrail || {};
   const fuzzy = audit.fuzzyMathTrace || {};
   const gpt = audit.gptCrossVerification || {};
   const rawHits = audit.rawSearchHits || {};
   const searchQueries = audit.searchQueries || {};
+  const apiCalls = claim.apiCalls || audit.apiCalls || [];
+  const exactFlow = claim.exactFlow || audit.exactFlow || [];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-      <div className="bg-white border border-[#CECECE] rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-xs">
+  const copyText = (text, id) => {
+    navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto animate-fadeIn"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', margin: 0 }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white border border-[#CECECE] rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-xs my-auto"
+        onClick={e => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="p-5 border-b border-[#CECECE] flex items-start justify-between gap-4 bg-[#F8F8F6]">
@@ -37,6 +65,33 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
                   Recent News Flag
                 </span>
               )}
+
+              {onOpenDebugPanel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenDebugPanel(claim);
+                  }}
+                  className="px-2.5 py-0.5 rounded bg-[#0B5CD5] text-white text-[11px] font-mono font-bold flex items-center gap-1 hover:bg-[#0033C4] transition shadow-xs cursor-pointer"
+                >
+                  <Terminal className="w-3 h-3" />
+                  Open Agent 3 Flow &amp; APIs
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const diag = generateClaimDiagnosticJson(claim);
+                  copyText(diag, 'modalClaimDiagJson');
+                }}
+                className="px-2.5 py-0.5 rounded bg-[#D97757] text-white text-[11px] font-mono font-bold flex items-center gap-1 hover:bg-[#B0512F] transition shadow-xs cursor-pointer"
+                title="Copy Full Claim Diagnostic JSON to Clipboard"
+              >
+                {copiedId === 'modalClaimDiagJson' ? <Check className="w-3 h-3 text-white" /> : <FileJson className="w-3 h-3 text-white" />}
+                {copiedId === 'modalClaimDiagJson' ? 'Copied JSON!' : 'Copy Diagnostic JSON'}
+              </button>
             </div>
 
             <h3 className="text-base font-semibold text-[#0B5CD5] leading-snug">"{claim.claimText || claim.claim}"</h3>
@@ -108,7 +163,19 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            4. Verdict & Scope Summary
+            4. Verdict &amp; Scope Summary
+          </button>
+
+          <button
+            onClick={() => setActiveTab('apiCallsLedger')}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'apiCallsLedger'
+                ? 'border-[#D97757] text-[#D97757] bg-white shadow-xs font-bold'
+                : 'border-transparent text-[#7386A8] hover:text-[#0B5CD5]'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            5. Raw API Calls &amp; Exact Flow ({apiCalls.length})
           </button>
         </div>
 
@@ -339,9 +406,20 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
           {/* TAB 4: DECISION SUMMARY */}
           {activeTab === 'decisionSummary' && (
             <div className="space-y-4">
-              <div className="bg-[#F8F8F6] p-4 rounded-2xl border border-[#CECECE] space-y-2">
-                <h4 className="font-semibold text-[#0B5CD5] text-sm">Verdict Determination Analysis</h4>
-                <p className="text-[#2C4E86] leading-relaxed text-xs">{claim.explanation}</p>
+              <div className="bg-[#F8F8F6] p-4 rounded-2xl border border-[#CECECE] space-y-2.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h4 className="font-semibold text-[#0B5CD5] text-sm">Verdict Determination Analysis</h4>
+                  <span className="font-mono text-xs font-bold text-[#D97757]">
+                    Stance: {claim.verdict || claim.status}
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-[#CECECE] text-xs font-medium text-[#2C4E86]">
+                  <span className="font-bold text-[#0B5CD5] block font-mono text-[10px] uppercase mb-1">Stance Determination Reason:</span>
+                  {claim.claimStanceReason || claim.claimVerificationResult?.claimStanceReason || claim.explanation}
+                </div>
+                {claim.technicalExplanation && (
+                  <p className="text-[#7386A8] leading-relaxed text-[11px] font-mono">{claim.technicalExplanation}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -365,6 +443,131 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
             </div>
           )}
 
+          {/* TAB 5: RAW API CALLS & EXACT FLOW */}
+          {activeTab === 'apiCallsLedger' && (
+            <div className="space-y-6">
+              {/* Exact Pipeline Flow Stages */}
+              {exactFlow && exactFlow.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-[#0B5CD5] text-sm flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-[#D97757]" />
+                    Exact Step-by-Step Verification Flow ({exactFlow.length} Stages)
+                  </h4>
+                  <div className="space-y-2">
+                    {exactFlow.map((step, sIdx) => (
+                      <div key={sIdx} className="bg-[#F8F8F6] p-3 rounded-xl border border-[#CECECE] flex items-start gap-3">
+                        <span className="w-6 h-6 rounded-lg bg-[#0B5CD5] text-white flex items-center justify-center font-bold text-xs font-mono shrink-0 mt-0.5">
+                          {sIdx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-bold text-[#0B5CD5]">{step.title}</span>
+                            <span className="font-mono text-[10px] text-[#7386A8]">
+                              {step.durationMs ? `${step.durationMs}ms` : ''} · {step.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#2C4E86]">{step.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw API Calls */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-[#0B5CD5] text-sm flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-[#D97757]" />
+                    Raw Outbound API Calls &amp; Payloads ({apiCalls.length})
+                  </h4>
+                  {onOpenDebugPanel && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenDebugPanel(claim);
+                      }}
+                      className="text-xs text-[#0B5CD5] hover:underline font-mono font-bold"
+                    >
+                      Open Full Interactive Inspector →
+                    </button>
+                  )}
+                </div>
+
+                {apiCalls.length === 0 ? (
+                  <div className="p-6 bg-[#F8F8F6] border border-dashed border-[#CECECE] rounded-xl text-center text-[#7386A8]">
+                    No captured API call objects for this claim record.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {apiCalls.map((call, cIdx) => (
+                      <div key={call.id || cIdx} className="bg-[#F8F8F6] p-4 rounded-2xl border border-[#CECECE] space-y-3 font-mono text-[11px]">
+                        <div className="flex items-center justify-between gap-2 flex-wrap border-b border-[#CECECE] pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-[#0B5CD5] text-white rounded font-bold text-[10px]">
+                              {call.method || 'POST'}
+                            </span>
+                            <span className="font-bold text-[#0B5CD5]">{call.service}</span>
+                            <span className="text-[#7386A8] text-[10px] break-all">{call.endpoint}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {call.latencyMs && (
+                              <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded border border-[#CECECE]">
+                                {call.latencyMs}ms
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 bg-[#E4EFE7] text-[#2C5B3E] rounded font-bold border border-[#C5DEC9]">
+                              {call.status || 200}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Request Payload */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[#7386A8]">
+                            <span>Request Payload:</span>
+                            <button
+                              type="button"
+                              onClick={() => copyText(call.requestPayload, `req-${cIdx}`)}
+                              className="text-[#0B5CD5] hover:underline flex items-center gap-1 text-[10px]"
+                            >
+                              {copiedId === `req-${cIdx}` ? <Check className="w-3 h-3 text-[#2C5B3E]" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedId === `req-${cIdx}` ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                          <pre className="p-2.5 bg-white border border-[#CECECE] rounded-xl overflow-x-auto max-h-40 text-[10.5px] text-[#2C4E86]">
+                            {typeof call.requestPayload === 'string' ? call.requestPayload : JSON.stringify(call.requestPayload, null, 2)}
+                          </pre>
+                        </div>
+
+                        {/* Response Payload */}
+                        {call.responsePayload && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[#7386A8]">
+                              <span>Response Payload / Extract:</span>
+                              <button
+                                type="button"
+                                onClick={() => copyText(call.responsePayload, `res-${cIdx}`)}
+                                className="text-[#0B5CD5] hover:underline flex items-center gap-1 text-[10px]"
+                              >
+                                {copiedId === `res-${cIdx}` ? <Check className="w-3 h-3 text-[#2C5B3E]" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedId === `res-${cIdx}` ? 'Copied' : 'Copy'}</span>
+                              </button>
+                            </div>
+                            <pre className="p-2.5 bg-white border border-[#CECECE] rounded-xl overflow-x-auto max-h-40 text-[10.5px] text-[#2C4E86]">
+                              {typeof call.responsePayload === 'string' ? call.responsePayload : JSON.stringify(call.responsePayload, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}
@@ -377,6 +580,7 @@ export default function ClaimAuditModal({ claim, isOpen, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

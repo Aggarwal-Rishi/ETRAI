@@ -406,12 +406,44 @@ const proxyImage = async (req, res) => {
   }
 };
 
+const {
+  getGlobalScoringWeights,
+  updateGlobalScoringWeights,
+  resetGlobalScoringWeights
+} = require('../services/scoringConfigService');
+
+const getScoringWeights = async (req, res) => {
+  try {
+    const weights = getGlobalScoringWeights();
+    return res.json({ success: true, weights });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+const updateScoringWeights = async (req, res) => {
+  try {
+    const { weights, reset } = req.body || {};
+    let updated;
+    if (reset) {
+      updated = resetGlobalScoringWeights();
+    } else {
+      updated = updateGlobalScoringWeights(weights);
+    }
+    return res.json({ success: true, weights: updated });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   analyze,
   streamProgress,
   getJobStatus,
   deepResearchClaim,
   proxyImage,
+  getScoringWeights,
+  updateScoringWeights,
   mapResearchStatusToVerdict,
   mergeSourcesByUrl,
   buildClaimResearchUpdate

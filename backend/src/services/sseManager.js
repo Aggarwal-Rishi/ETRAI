@@ -216,11 +216,25 @@ async function registerStream(jobId, res, req, requestingUserId) {
 function emitProgress(jobId, update) {
   const currentState = activeJobs.get(jobId) || {
     jobId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    debugHistory: []
   };
+
+  const existingHistory = Array.isArray(currentState.debugHistory) ? currentState.debugHistory : [];
+  let nextHistory = existingHistory;
+
+  if (update.debugEvent) {
+    const ev = update.debugEvent;
+    const isDuplicate = existingHistory.some(existing => existing.id && existing.id === ev.id);
+    if (!isDuplicate) {
+      nextHistory = [...existingHistory.slice(-499), ev];
+    }
+  }
+
   const newState = {
     ...currentState,
     ...update,
+    debugHistory: nextHistory,
     updatedAt: new Date().toISOString()
   };
   activeJobs.set(jobId, newState);
