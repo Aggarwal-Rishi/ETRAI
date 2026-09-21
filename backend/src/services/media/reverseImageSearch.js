@@ -52,8 +52,13 @@ async function prepareSerpApiUploadImage(buffer) {
 
 function normalizeSerpApiLensMatches(data = {}) {
   const exactMatches = Array.isArray(data.exact_matches) ? data.exact_matches : [];
+  const visualMatches = Array.isArray(data.visual_matches) ? data.visual_matches : [];
+  const allRaw = [
+    ...exactMatches.map(m => ({ ...m, _isExact: true })),
+    ...visualMatches.map(m => ({ ...m, _isExact: false }))
+  ];
   const seen = new Set();
-  return exactMatches.map(item => {
+  return allRaw.map(item => {
     const sourceUrl = item.link || '';
     const imageUrl = item.image || item.thumbnail || '';
     if (!sourceUrl || !imageUrl || !isSsrfSafeUrl(sourceUrl).safe || !isSsrfSafeUrl(imageUrl).safe) return null;
@@ -63,17 +68,17 @@ function normalizeSerpApiLensMatches(data = {}) {
     let domain = item.source || 'external-source';
     try { domain = new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch (_) {}
     return {
-      title: item.title || 'Google Lens exact-match result',
+      title: item.title || (item._isExact ? 'Google Lens exact-match result' : 'Google Lens visual match result'),
       sourceUrl,
       domain,
       thumbnailUrl: item.thumbnail || imageUrl,
       originalImageUrl: imageUrl,
       publishedDate: item.date || null,
       similarity: null,
-      matchType: 'LENS_EXACT_MATCH_CANDIDATE',
+      matchType: item._isExact ? 'LENS_EXACT_MATCH_CANDIDATE' : 'LENS_VISUAL_MATCH_CANDIDATE',
       isWire: ['pib.gov.in', 'reuters.com', 'apnews.com', 'afp.com', 'gettyimages.com', 'epa.eu', 'bloomberg.com', 'pti.in', 'ani.in'].some(d => domain.includes(d))
     };
-  }).filter(Boolean).slice(0, 16);
+  }).filter(Boolean).slice(0, 24);
 }
 
 async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_KEY) {
@@ -104,7 +109,6 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
 
     const params = new URLSearchParams({
       engine: 'google_lens',
-      type: 'exact_matches',
       image_id: uploadData.image_id,
       country: 'in',
       hl: 'en',
@@ -126,12 +130,12 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
     return {
       status: matches.length ? 'AVAILABLE' : 'NO_MATCH',
       provider: 'SERPAPI_GOOGLE_LENS',
-      query: 'Google Lens exact matches from a transient uploaded image',
+      query: 'Google Lens visual search from uploaded image',
       matches,
       matchCount: matches.length,
       limitations: matches.length
-        ? ['Google Lens results are downloaded and compared locally before any candidate is presented.']
-        : ['Google Lens returned no exact matches for the uploaded image.']
+        ? ['Google Lens candidates are downloaded and compared locally before any candidate is presented as a verified match.']
+        : ['Google Lens returned no visual or exact matches for the uploaded image.']
     };
   } catch (error) {
     console.warn('[SerpApi Google Lens Warning]:', error.message);
@@ -597,23 +601,6 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
     options = arg2 || {};
   }
 
-  // Provider Availability Check
-  const effectiveProviderStatus = options.providerStatus || getProviderStatus();
-  if (effectiveProviderStatus.webSearch === 'UNAVAILABLE' && effectiveProviderStatus.googleVision === 'UNAVAILABLE' && effectiveProviderStatus.googleLens === 'UNAVAILABLE') {
-    return {
-      status: 'UNAVAILABLE',
-      provider: 'UNAVAILABLE',
-      originalImageUrl: null,
-      sourceArticleUrl: null,
-      sourceTitle: null,
-      domain: null,
-      publishedDate: null,
-      matchCount: 0,
-      matches: [],
-      limitations: ['Reverse-image providers are unavailable (SERPAPI_API_KEY, GOOGLE_VISION_API_KEY, and SERPER_API_KEY are missing)']
-    };
-  }
-
   // Option 0: Mock provider for unit tests
   if (options.reverseSearchProvider && typeof options.reverseSearchProvider.search === 'function') {
     try {
@@ -640,6 +627,23 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
     }
   }
 
+  // Provider Availability Check
+  const effectiveProviderStatus = options.providerStatus || getProviderStatus();
+  if (effectiveProviderStatus.webSearch === 'UNAVAILABLE' && effectiveProviderStatus.googleVision === 'UNAVAILABLE' && effectiveProviderStatus.googleLens === 'UNAVAILABLE') {
+    return {
+      status: 'UNAVAILABLE',
+      provider: 'UNAVAILABLE',
+      originalImageUrl: null,
+      sourceArticleUrl: null,
+      sourceTitle: null,
+      domain: null,
+      publishedDate: null,
+      matchCount: 0,
+      matches: [],
+      limitations: ['Reverse-image providers are unavailable (SERPAPI_API_KEY, GOOGLE_VISION_API_KEY, and SERPER_API_KEY are missing)']
+    };
+  }
+
   // 1. Direct image upload to SerpApi Google Lens Exact Matches. The returned
   // candidates still have to pass our local perceptual verification gate.
   if (buffer && Buffer.isBuffer(buffer)) {
@@ -658,6 +662,8 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           domain: verified.domain,
           matches: [verified],
           matchCount: 1,
+          candidateMatches: lensResults.matches,
+          candidateCount: lensResults.matches.length,
           limitations: [
             ...(lensResults.limitations || []),
             `Local perceptual comparison confirmed the Google Lens result with ${Math.round(verified.similarity * 100)}% similarity.`
@@ -674,7 +680,8 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
           ...lensResults,
           status: 'CANDIDATES_ONLY',
           provider: 'SERPAPI_GOOGLE_LENS_LOCAL_VERIFIED',
-          originalImageUrl: candidate.originalImageUrl || candidate.thumbnailUrl || null,
+          originalImageUrl: null,
+          candidateImageUrl: candidate.originalImageUrl || candidate.thumbnailUrl || null,
           sourceArticleUrl: candidate.sourceUrl || null,
           sourceTitle: candidate.title || null,
           domain: candidate.domain || null,
@@ -793,7 +800,8 @@ async function performReverseImageSearch(arg1, arg2 = null, arg3 = null, arg4 = 
         status: hasPresentableCandidate ? 'CANDIDATES_ONLY' : 'NO_MATCH',
         provider: 'SERPER_IMAGES_LOCAL_VERIFIED',
         query: primaryQuery,
-        originalImageUrl: candidate ? (candidate.originalImageUrl || candidate.thumbnailUrl) : null,
+        originalImageUrl: null,
+        candidateImageUrl: candidate ? (candidate.originalImageUrl || candidate.thumbnailUrl) : null,
         sourceArticleUrl: candidate ? candidate.sourceUrl : null,
         sourceTitle: candidate ? candidate.title : null,
         domain: candidate ? candidate.domain : null,

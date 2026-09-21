@@ -4,6 +4,8 @@ const { getProviderStatus, isKeyValid } = require('../providerManager');
 const EMPTY_OBSERVED = Object.freeze({
   visibleText: '',
   entities: [],
+  entityRegions: [],
+  textRegions: [],
   publicFigures: [],
   logos: [],
   signs: [],
@@ -57,12 +59,16 @@ async function analyzeImage(fileInfo, buffer = null, url = null, options = {}) {
 CRITICAL DISTINCTION:
 You MUST strictly separate OBSERVED elements (directly visible in image) from INFERRED elements (speculative context). Do NOT claim a specific location or date unless explicitly visible on a sign, timestamp, or unmistakable landmark.
 
+For all detected people, text blocks, or anomalous regions, provide 2D bounding boxes in normalized coordinates [ymin, xmin, ymax, xmax] on a 0 to 1000 scale (e.g., [100, 200, 500, 600]).
+
 OUTPUT FORMAT (JSON):
 {
   "observed": {
     "visibleText": "all visible text transcribed",
     "entities": ["visible public figures/people"],
-    "publicFigures": [{"name": "name only when visually recognizable with high confidence", "visibleAppearance": "directly visible features", "attire": "directly visible clothing", "confidence": 0, "basis": "visual basis or uncertainty"}],
+    "entityRegions": [{"name": "person or entity name or description", "box_2d": [0, 0, 0, 0]}],
+    "textRegions": [{"text": "text snippet", "box_2d": [0, 0, 0, 0]}],
+    "publicFigures": [{"name": "name only when visually recognizable with high confidence", "visibleAppearance": "directly visible features", "attire": "directly visible clothing", "confidence": 0, "basis": "visual basis or uncertainty", "box_2d": [0, 0, 0, 0]}],
     "logos": ["visible brand/agency logos"],
     "signs": ["street/building signs"],
     "landmarks": ["visible architectural landmarks"],
@@ -88,6 +94,7 @@ OUTPUT FORMAT (JSON):
       "type": "COMPOSITING|LIGHTING|PATTERN|ARTIFACT|GEOMETRY|SOFTWARE",
       "severity": "LOW|MEDIUM|HIGH",
       "confidence": 80,
+      "box_2d": [0, 0, 0, 0],
       "explanation": "Potential manipulation indicator: [explanation]"
     }
   ]
@@ -139,6 +146,7 @@ OUTPUT FORMAT (JSON):
       type: sig.type || 'ARTIFACT',
       severity: sig.severity || 'LOW',
       confidence: typeof sig.confidence === 'number' ? sig.confidence : 50,
+      box_2d: Array.isArray(sig.box_2d) && sig.box_2d.length === 4 ? sig.box_2d : null,
       explanation: sig.explanation?.startsWith('Potential manipulation indicator:') 
         ? sig.explanation 
         : `Potential manipulation indicator: ${sig.explanation || 'Visual anomaly detected'}`

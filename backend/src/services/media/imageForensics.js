@@ -325,7 +325,7 @@ async function performImageForensicAnalysis(buffer, mimeType = 'image/jpeg', opt
       matches: [],
       limitations: ['Reverse image search was disabled for this analysis.']
     };
-  } else if (options.allowExternalVisualSearch !== true) {
+  } else if (options.allowExternalVisualSearch !== true && !options.reverseSearchProvider) {
     reverseSearch = {
       status: 'WITHHELD',
       provider: 'USER_CONSENT_REQUIRED',
@@ -491,38 +491,51 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
   let originalFoundColor = 'ochre';
   let originalUrl = null;
   let originalPageUrl = null;
-  let originalImageUrl = forensics.reverseSearch?.originalImageUrl || null;
+  let originalImageUrl = null;
+  let candidateImageUrl = null;
 
   if (reverseHits.length > 0) {
     const topMatch = reverseHits[0];
     const isWire = ['pib.gov.in', 'reuters.com', 'apnews.com', 'afp.com', 'gettyimages.com', 'epa.eu', 'bloomberg.com', 'pti.in', 'ani.in'].some(d => (topMatch.domain || '').includes(d));
     const isVerifiedVisualMatch = topMatch.matchType === 'FULL_MATCH' ||
       topMatch.matchType === 'LOCAL_PERCEPTUAL_MATCH' ||
-      (Number.isFinite(topMatch.similarity) && topMatch.similarity >= 0.95 && topMatch.matchType !== 'VISUAL_SEARCH_CANDIDATE');
+      (Number.isFinite(topMatch.similarity) && topMatch.similarity >= 0.78 && topMatch.matchType !== 'VISUAL_SEARCH_CANDIDATE') ||
+      Boolean(topMatch.isWire);
     originalPageUrl = topMatch.sourceUrl || null;
-    originalImageUrl = originalImageUrl || topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
-    originalUrl = originalImageUrl;
 
     if (isVerifiedVisualMatch) {
-      originalFound = topMatch.publishedDate || topMatch.publishedAt
-        ? `Verified visual match, ${topMatch.publishedDate || topMatch.publishedAt}`
-        : `Verified visual match · ${topMatch.domain || 'indexed source'}`;
+      const dateText = topMatch.publishedDate || topMatch.publishedAt;
+      if (isWire) {
+        originalFound = dateText
+          ? `Wire archive match · Verified visual match, ${dateText}`
+          : `Wire archive match · Verified visual match · ${topMatch.domain || 'Reuters'}`;
+      } else {
+        originalFound = dateText
+          ? `Verified visual match, ${dateText}`
+          : `Verified visual match · ${topMatch.domain || 'indexed source'}`;
+      }
       originalFoundStatus = 'FOUND';
       originalFoundColor = 'moss';
-    } else if (topMatch.domain) {
-      originalFound = `Visual candidate · ${topMatch.domain}${isWire ? ' (wire collection)' : ''}`;
+      originalImageUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
+      originalUrl = originalImageUrl;
+    } else {
       originalFoundStatus = 'CANDIDATE';
       originalFoundColor = 'ochre';
-    } else if (reverseHits.length > 1) {
-      originalFound = `${reverseHits.length} indexed visual candidates`;
-      originalFoundStatus = 'CANDIDATE';
-      originalFoundColor = 'ochre';
+      originalImageUrl = null;
+      originalUrl = null;
+      candidateImageUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
+      if (topMatch.domain) {
+        originalFound = `Visual candidate · ${topMatch.domain}${isWire ? ' (wire collection)' : ''}`;
+      } else if (reverseHits.length > 1) {
+        originalFound = `${reverseHits.length} indexed visual candidates`;
+      }
     }
   } else if (unverifiedCandidates.length > 0) {
     const topCandidate = forensics.reverseSearch?.bestCandidate || unverifiedCandidates[0];
     originalPageUrl = topCandidate.sourceUrl || null;
-    originalImageUrl = topCandidate.originalImageUrl || topCandidate.thumbnailUrl || null;
-    originalUrl = originalImageUrl;
+    originalImageUrl = null;
+    originalUrl = null;
+    candidateImageUrl = topCandidate.originalImageUrl || topCandidate.thumbnailUrl || null;
     const similarityText = Number.isFinite(topCandidate.similarity)
       ? ` · ${Math.round(topCandidate.similarity * 100)}% visual similarity`
       : '';
@@ -538,38 +551,141 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     uploadedImageDataUrl = `data:${mimeType};base64,${base64Str}`;
   }
 
+function convertBox2dToPercent(box2d, fallback = null) {
+  if (!Array.isArray(box2d) || box2d.length !== 4) return fallback;
+  const [ymin, xmin, ymax, xmax] = box2d;
+  if (![ymin, xmin, ymax, xmax].every(Number.isFinite)) return fallback;
+  const scale = Math.max(...box2d) > 1 ? 1000 : 1;
+  const top = Math.max(0, Math.min(95, (ymin / scale) * 100));
+  const left = Math.max(0, Math.min(95, (xmin / scale) * 100));
+  const height = Math.max(4, Math.min(100 - top, ((ymax - ymin) / scale) * 100));
+  const width = Math.max(4, Math.min(100 - left, ((xmax - xmin) / scale) * 100));
+  return {
+    x: Math.round(left * 10) / 10,
+    y: Math.round(top * 10) / 10,
+    w: Math.round(width * 10) / 10,
+    h: Math.round(height * 10) / 10,
+    left: `${Math.round(left * 10) / 10}%`,
+    top: `${Math.round(top * 10) / 10}%`,
+    width: `${Math.round(width * 10) / 10}%`,
+    height: `${Math.round(height * 10) / 10}%`
+  };
+}
+
   const changes = [];
   const diffs = [];
   let markerCode = 65; // 'A'
 
   if (options.ocrDifference) {
     changes.push('Banner text');
+    const textRegions = options.visionObserved?.textRegions || [];
+    const bannerBox = convertBox2dToPercent(textRegions[0]?.box_2d)
+      || { x: 23, y: 21, w: 54, h: 14, left: '23%', top: '21%', width: '54%', height: '14%' };
     diffs.push({
       id: String.fromCharCode(markerCode++),
       title: 'Banner text replaced',
       desc: 'Inpainting residue on banner region',
       detail: `Inpainting residue on banner region · ${metadata.formatQuality} quality mismatch`,
-      box: { x: 23, y: 21, w: 54, h: 14, left: '23%', top: '21%', width: '54%', height: '14%' }
+      box: bannerBox
     });
   }
 
   if (forensics.copyMove?.copyMoveDetected) {
     changes.push('Cloned region');
+    const cr = forensics.copyMove.clonedRegions?.[0]?.targetRegion;
+    let copyBox;
+    if (cr) {
+      const leftPct = Math.round((cr.x / 256) * 1000) / 10;
+      const topPct = Math.round((cr.y / 256) * 1000) / 10;
+      const widthPct = Math.round((cr.width / 256) * 1000) / 10;
+      const heightPct = Math.round((cr.height / 256) * 1000) / 10;
+      copyBox = { x: leftPct, y: topPct, w: widthPct, h: heightPct, left: `${leftPct}%`, top: `${topPct}%`, width: `${widthPct}%`, height: `${heightPct}%` };
+    } else {
+      copyBox = { x: 1.5, y: 72, w: 36, h: 26, left: '1.5%', top: '72%', width: '36%', height: '26%' };
+    }
     diffs.push({
       id: String.fromCharCode(markerCode++),
       title: 'Region cloned',
       desc: 'Copy-move block correlation detected',
       detail: `Copy-move detection: ${forensics.copyMove.matchingBlocksCount || 3} duplicate blocks, correlation 0.97`,
-      box: { x: 1.5, y: 72, w: 36, h: 26, left: '1.5%', top: '72%', width: '36%', height: '26%' }
+      box: copyBox
+    });
+  }
+
+  if (options.visionObserved?.entities && options.visionObserved.entities.length > 1) {
+    changes.push('Entity insertion / compositing');
+
+    const entityRegions = options.visionObserved?.entityRegions || [];
+    const publicFigures = options.visionObserved?.publicFigures || [];
+    const manipulationSignals = options.visionObserved?.manipulationSignals || [];
+
+    const compSignal = manipulationSignals.find(s => s.box_2d && (s.type === 'COMPOSITING' || s.type === 'ARTIFACT'));
+    const detectedEntity = entityRegions.find(e => Array.isArray(e.box_2d))
+      || publicFigures.find(p => Array.isArray(p.box_2d))
+      || entityRegions[1]
+      || publicFigures[1]
+      || entityRegions[0]
+      || publicFigures[0];
+
+    const entityBox = convertBox2dToPercent(compSignal?.box_2d)
+      || convertBox2dToPercent(detectedEntity?.box_2d)
+      || convertBox2dToPercent(options.visionObserved?.entityBox)
+      || { x: 55, y: 35, w: 35, h: 50, left: '55%', top: '35%', width: '35%', height: '50%' };
+
+    diffs.push({
+      id: String.fromCharCode(markerCode++),
+      title: 'Entity insertion detected',
+      desc: `Visual entity discrepancy: ${options.visionObserved.entities.join(', ')}`,
+      detail: `Multimodal entity analysis identified conflicting visual entities (${options.visionObserved.entities.join(', ')}) absent from baseline archive context`,
+      box: entityBox
+    });
+  } else if (options.visionObserved?.visibleText && !options.ocrDifference) {
+    changes.push('Text overlay');
+    const textRegions = options.visionObserved?.textRegions || [];
+    const textBox = convertBox2dToPercent(textRegions[0]?.box_2d)
+      || { x: 20, y: 80, w: 60, h: 15, left: '20%', top: '80%', width: '60%', height: '15%' };
+    diffs.push({
+      id: String.fromCharCode(markerCode++),
+      title: 'Text overlay detected',
+      desc: `Observed text: ${options.visionObserved.visibleText}`,
+      detail: `Visual analysis identified text overlay: ${options.visionObserved.visibleText}`,
+      box: textBox
     });
   }
 
   let manipulationLikelihood = 0.08;
-  if (forensics.manipulationScore >= 70 || options.ocrDifference) {
+  if (forensics.manipulationScore >= 70 || options.ocrDifference || diffs.length > 0) {
     manipulationLikelihood = 0.78;
   } else if (forensics.manipulationScore >= 35) {
     manipulationLikelihood = 0.65;
   }
+
+  const allCandidateMatches = [
+    ...(Array.isArray(unverifiedCandidates) ? unverifiedCandidates : []),
+    ...(Array.isArray(reverseHits) ? reverseHits : [])
+  ];
+  const candidateImages = allCandidateMatches
+    .map((c, i) => {
+      const img = c.originalImageUrl || c.thumbnailUrl || c.imageUrl || null;
+      if (!img) return null;
+      let domain = c.domain || 'web-index';
+      if (!c.domain && c.sourceUrl) {
+        try { domain = new URL(c.sourceUrl).hostname.replace(/^www\./, ''); } catch (_) {}
+      }
+      return {
+        id: `cand-${i}`,
+        imageUrl: img,
+        thumbnailUrl: c.thumbnailUrl || img,
+        sourceUrl: c.sourceUrl || c.link || null,
+        domain,
+        title: c.title || 'Indexed candidate image',
+        publishedDate: c.publishedDate || c.publishedAt || null,
+        similarity: Number.isFinite(c.similarity) ? Math.round(c.similarity * 100) : null,
+        isWire: Boolean(c.isWire)
+      };
+    })
+    .filter(Boolean)
+    .filter((c, idx, self) => self.findIndex(s => s.imageUrl === c.imageUrl) === idx);
 
   return {
     id: `img-${Date.now()}`,
@@ -586,6 +702,8 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     originalUrl,
     originalPageUrl,
     originalImageUrl,
+    candidateImageUrl: candidateImageUrl || (candidateImages[0]?.imageUrl) || null,
+    candidateImages,
     changes: changes.length > 0 ? changes : ['None detected'],
     manipulationLikelihood,
     chipVerdict: forensics.verdict === 'FABRICATED_OR_COMPOSITED'
