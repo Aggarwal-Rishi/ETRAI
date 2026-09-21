@@ -3,9 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import VerdictBadge from '../components/VerdictBadge';
 import ClaimAuditModal from '../components/ClaimAuditModal';
+import Agent3DebugPanel from '../components/Agent3DebugPanel';
+import ObservabilityPanel from '../components/ObservabilityPanel';
 import ScoreDerivationView from '../components/ScoreDerivationView';
 import ImageForensicsCompare from '../components/ImageForensicsCompare';
 import VideoForensicsViewer from '../components/VideoForensicsViewer';
+import ScoringWeightsModal from '../components/ScoringWeightsModal';
 import { apiUrl } from '../utils/api';
 import {
   ShieldCheck,
@@ -35,7 +38,14 @@ import {
   ChevronUp,
   AlertCircle,
   Lock,
+  Terminal,
+  Activity,
+  Sliders,
+  FileJson,
+  Copy,
 } from 'lucide-react';
+import { generateClaimDiagnosticJson } from '../utils/claimDiagnosticExport';
+import { isDebugEnabled, setDebugEnabled } from '../utils/featureFlags';
 
 export default function ResultsPage() {
   const { id } = useParams();
@@ -43,11 +53,35 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [auditModalClaim, setAuditModalClaim] = useState(null);
+  const [debugPanelClaim, setDebugPanelClaim] = useState(null);
   const [activeReportTab, setActiveReportTab] = useState('full'); // 'full' | 'text' | 'links' | 'images' | 'videos' | 'numbers'
   const [openClaimIdx, setOpenClaimIdx] = useState(0);
   const [toastMsg, setToastMsg] = useState(null);
   const [researchingClaimIdx, setResearchingClaimIdx] = useState(null);
   const [claimSearchErrors, setClaimSearchErrors] = useState({});
+  const [isWeightsModalOpen, setIsWeightsModalOpen] = useState(false);
+  const [copiedClaimJsonIdx, setCopiedClaimJsonIdx] = useState(null);
+  const [isDebug, setIsDebug] = useState(() => isDebugEnabled());
+
+  useEffect(() => {
+    const handleDebugChange = () => setIsDebug(isDebugEnabled());
+    window.addEventListener('etrai_debug_change', handleDebugChange);
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        const next = !isDebugEnabled();
+        setDebugEnabled(next);
+        setIsDebug(next);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('etrai_debug_change', handleDebugChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // SSE progress state for live pipeline jobs
   const [progressState, setProgressState] = useState({
@@ -391,6 +425,22 @@ export default function ResultsPage() {
     }
   };
 
+  const handleCopyClaimJson = (claim, idx, e) => {
+    e?.stopPropagation();
+    try {
+      const diagData = generateClaimDiagnosticJson(claim);
+      navigator.clipboard.writeText(JSON.stringify(diagData, null, 2));
+      setCopiedClaimJsonIdx(idx);
+      setToastMsg(`Claim #${idx + 1} Diagnostic JSON copied to clipboard!`);
+      setTimeout(() => {
+        setCopiedClaimJsonIdx(null);
+        setToastMsg(null);
+      }, 2500);
+    } catch (err) {
+      console.error('Failed to copy claim JSON:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FFF6E3] text-[#0B5CD5] flex flex-col font-sans print:bg-white print:text-black">
       <div className="print:hidden">
@@ -546,7 +596,8 @@ export default function ResultsPage() {
             { key: 'links', label: `Links (${links.length})`, icon: LinkIcon },
             ...(hasImageForensics ? [{ key: 'images', label: 'Image Forensics', icon: Camera }] : []),
             ...(hasVideoForensics ? [{ key: 'videos', label: 'Video Forensics', icon: Film }] : []),
-            { key: 'numbers', label: `Numbers & Quantities (${numericalFacts.length})`, icon: Hash }
+            { key: 'numbers', label: `Numbers & Quantities (${numericalFacts.length})`, icon: Hash },
+            { key: 'telemetry', label: 'Agent Observability & Telemetry', icon: Activity }
           ].map(tab => {
             const Icon = tab.icon;
             return (
@@ -569,6 +620,13 @@ export default function ResultsPage() {
         {/* ========================================================================= */}
         {/* SUB-TAB VIEWS                                                             */}
         {/* ========================================================================= */}
+        
+        {/* AGENT OBSERVABILITY & TELEMETRY TAB */}
+        {activeReportTab === 'telemetry' && (
+          <div className="space-y-6">
+            <ObservabilityPanel observability={report?.observability} reportData={report} />
+          </div>
+        )}
         
         {/* TEXT & LANGUAGE TAB */}
         {activeReportTab === 'text' && (
@@ -726,9 +784,20 @@ export default function ResultsPage() {
 
               {/* 02 · SCORE DERIVATION */}
               <section id="derivation" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-[#D97757]">02 ·</span>
-                  <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Score Derivation & Factors</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-[#D97757]">02 ·</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Score Derivation & Factors</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsWeightsModalOpen(true)}
+                    className="px-3 py-1.5 bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition shadow-2xs"
+                    title="Configure global formula weights"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-[#D97757]" />
+                    Adjust Scoring Weights
+                  </button>
                 </div>
                 <ScoreDerivationView
                   factors={report.explainableScoring?.factorBreakdown || report.explainableScoring?.factors}
@@ -751,9 +820,31 @@ export default function ResultsPage() {
                       Atomic Claim Decomposition ({claims.length})
                     </h3>
                   </div>
-                  <span className="text-[11px] text-[#7386A8] font-mono">
-                    Click any claim to expand full statement & real news summary
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-[#7386A8] font-mono">
+                      Click any claim to expand full statement &amp; real news summary
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsWeightsModalOpen(true)}
+                      className="px-2.5 py-1 bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 transition"
+                      title="Adjust global scoring formula weights"
+                    >
+                      <Sliders className="w-3 h-3 text-[#D97757]" />
+                      Weights
+                    </button>
+                    {isDebug && claims.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setDebugPanelClaim(claims[openClaimIdx >= 0 ? openClaimIdx : 0])}
+                        className="px-2.5 py-1 bg-[#0B5CD5] text-white rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 hover:bg-[#0033C4] transition shadow-xs"
+                        title="Inspect active claim in Agent 3 Debug Panel"
+                      >
+                        <Terminal className="w-3 h-3" />
+                        Agent 3 Live Inspector
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-3.5">
@@ -842,6 +933,44 @@ export default function ResultsPage() {
                                       ? 'Searching this claim...'
                                       : (c.deepResearch?.triggerType === 'MANUAL' ? 'Search this claim again' : 'Search this claim')}
                                   </button>
+
+                                  {isDebug && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDebugPanelClaim(c);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#0B5CD5]/40 bg-[#0B5CD5]/10 px-2.5 py-1 font-sans text-[10px] font-bold text-[#0B5CD5] transition hover:bg-[#0B5CD5] hover:text-white"
+                                      title="Inspect Agent 3 Flow, Serper APIs, Prompts, and Fuzzy Matrix"
+                                    >
+                                      <Terminal className="h-3 w-3" />
+                                      Agent 3 APIs &amp; Flow
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAuditModalClaim(c);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#CECECE] bg-[#EFEEE9] px-2.5 py-1 font-sans text-[10px] font-bold text-[#2C4E86] transition hover:bg-[#CECECE]"
+                                    title="Open Full Evidentiary Audit Trail"
+                                  >
+                                    <ShieldCheck className="h-3 w-3 text-[#3E7A55]" />
+                                    Audit Trail
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleCopyClaimJson(c, idx, e)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97757]/40 bg-[#F6E7DF] px-2.5 py-1 font-sans text-[10px] font-bold text-[#B0512F] transition hover:bg-[#D97757] hover:text-white cursor-pointer"
+                                    title="Copy Complete Diagnostic JSON report for this claim to clipboard"
+                                  >
+                                    {copiedClaimJsonIdx === idx ? <Check className="h-3 w-3 text-[#2C5B3E]" /> : <FileJson className="h-3 w-3 text-[#D97757]" />}
+                                    {copiedClaimJsonIdx === idx ? 'Copied JSON!' : 'Copy Diagnostic JSON'}
+                                  </button>
                                 </div>
                               </div>
                               <p className="text-[#2C4E86] font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
@@ -910,6 +1039,25 @@ export default function ResultsPage() {
                               </p>
                             </div>
 
+                            {/* 2b. REASON FOR CLAIM VERDICT & STANCE */}
+                            <div className="p-3.5 bg-white border border-[#CECECE] rounded-xl space-y-1.5 shadow-2xs">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-[10px] font-mono uppercase text-[#0B5CD5] font-bold flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-[#D97757]" /> Reason for Claim Verdict &amp; Stance
+                                </span>
+                                <span className="font-mono text-[10px] font-bold text-[#7386A8]">
+                                  Stance: <span className={`font-bold ${
+                                    cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED' ? 'text-[#2C5B3E]' :
+                                    cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED' ? 'text-[#B23F35]' : 'text-[#8A6318]'
+                                  }`}>{c.verdict || c.status || 'UNVERIFIED'}</span>
+                                  {c.claimVerificationResult?.sourceAgreement !== undefined && ` · ${c.claimVerificationResult.sourceAgreement}% Agreement`}
+                                </span>
+                              </div>
+                              <p className="text-[#2C4E86] text-xs leading-relaxed font-medium">
+                                {c.claimStanceReason || c.claimVerificationResult?.claimStanceReason || c.explanation || realFindingSummary}
+                              </p>
+                            </div>
+
                             {/* 3. ORIGINAL NEWS PASSAGE / SOURCE CONTEXT (If present in text) */}
                             {originalExcerpt && (
                               <div className="p-3.5 bg-white border border-[#CECECE] rounded-xl space-y-1.5">
@@ -940,7 +1088,7 @@ export default function ResultsPage() {
                                     const sDomain = s.domain || (sUrl ? (() => { try { return new URL(sUrl).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; } })() : 'web source');
                                     
                                     return (
-                                      <div key={sIdx} className="bg-white border border-[#CECECE] hover:border-[#0B5CD5] p-3 rounded-xl transition space-y-1.5 shadow-sm">
+                                      <div key={sIdx} className="bg-white border border-[#CECECE] hover:border-[#0B5CD5] p-3 rounded-xl transition space-y-2 shadow-sm">
                                         <div className="flex items-center justify-between gap-2 flex-wrap">
                                           {sUrl ? (
                                             <a
@@ -969,9 +1117,20 @@ export default function ResultsPage() {
                                           </div>
                                         </div>
 
-                                        {(s.snippet || s.excerpt || s.reason) && (
-                                          <p className="text-[11px] text-[#2C4E86] leading-relaxed pl-2.5 border-l-2 border-[#CECECE]">
-                                            {s.snippet || s.excerpt || s.reason}
+                                        {/* Dedicated Model Decision Reason */}
+                                        {s.reason && (
+                                          <div className="p-2.5 rounded-lg bg-[#0B5CD5]/5 border border-[#0B5CD5]/15 text-[11px] text-[#2C4E86] space-y-0.5">
+                                            <span className="font-bold text-[#0B5CD5] text-[10px] uppercase font-mono block">
+                                              Model Evaluation Reason ({s.stance || 'SUPPORT'}):
+                                            </span>
+                                            <p className="leading-relaxed font-medium">{s.reason}</p>
+                                          </div>
+                                        )}
+
+                                        {/* Source Snippet or Excerpt */}
+                                        {(s.snippet || s.excerpt) && (
+                                          <p className="text-[11px] text-[#7386A8] leading-relaxed pl-2.5 border-l-2 border-[#CECECE]">
+                                            {s.snippet || s.excerpt}
                                           </p>
                                         )}
 
@@ -1316,7 +1475,7 @@ export default function ResultsPage() {
                 <div className="p-5 bg-white border border-[#CECECE] rounded-3xl space-y-3 text-xs shadow-sm">
                   <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">Active Agents</span>
                   <div className="space-y-2 text-[#2C4E86]">
-                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 1: Ingestion & OCR</div>
+                    <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 1: Ingestion &amp; OCR</div>
                     <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 2: Claim Extraction</div>
                     <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 3: Fact Match Engine</div>
                     <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#2C5B3E]" /> Agent 4: Dossier Synthesis</div>
@@ -1326,6 +1485,30 @@ export default function ResultsPage() {
             </div>
           </div>
         )}
+
+        {/* Agent 3 Interactive Inspection Drawer / Modal */}
+        {isDebug && debugPanelClaim && (
+          <Agent3DebugPanel
+            claim={debugPanelClaim}
+            onClose={() => setDebugPanelClaim(null)}
+          />
+        )}
+
+        {/* Evidentiary Claim Audit Modal */}
+        <ClaimAuditModal
+          claim={auditModalClaim}
+          isOpen={Boolean(auditModalClaim)}
+          onClose={() => setAuditModalClaim(null)}
+          onOpenDebugPanel={(c) => setDebugPanelClaim(c)}
+        />
+
+        {/* Global Scoring Weights Configuration Modal */}
+        <ScoringWeightsModal
+          isOpen={isWeightsModalOpen}
+          onClose={() => setIsWeightsModalOpen(false)}
+          currentReport={report}
+          onApplyRecalculatedReport={(updated) => setReport(updated)}
+        />
       </main>
     </div>
   );

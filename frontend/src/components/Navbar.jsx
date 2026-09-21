@@ -24,11 +24,12 @@ import {
   Sparkles,
   Sliders,
   ExternalLink,
-  Clock
+  Clock,
+  Terminal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
-import { FEATURE_FLAGS } from '../utils/featureFlags';
+import { FEATURE_FLAGS, isDebugEnabled, setDebugEnabled } from '../utils/featureFlags';
 import GlobalSearchModal from './GlobalSearchModal';
 
 export default function Navbar() {
@@ -59,6 +60,13 @@ export default function Navbar() {
 
   const userMenuRef = useRef(null);
   const notifMenuRef = useRef(null);
+  const [isDebug, setIsDebug] = useState(() => isDebugEnabled());
+
+  useEffect(() => {
+    const handleDebugChange = () => setIsDebug(isDebugEnabled());
+    window.addEventListener('etrai_debug_change', handleDebugChange);
+    return () => window.removeEventListener('etrai_debug_change', handleDebugChange);
+  }, []);
 
   // Fetch real nav stats on mount
   useEffect(() => {
@@ -239,6 +247,19 @@ export default function Navbar() {
                 <span>New Analysis</span>
               </Link>
 
+              {/* Debug Mode Indicator Badge */}
+              {isDebug && (
+                <button
+                  type="button"
+                  onClick={() => setDebugEnabled(false)}
+                  className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-mono text-[10px] font-bold transition shadow-xs cursor-pointer"
+                  title="Debug mode active (click to disable)"
+                >
+                  <Terminal className="w-3 h-3" />
+                  <span>DEBUG ON</span>
+                </button>
+              )}
+
               {/* Upgrade Plan Jewel Button */}
               <Link
                 to="/billing"
@@ -404,6 +425,22 @@ export default function Navbar() {
                       >
                         <Sliders className="w-3.5 h-3.5 text-[#D97757]" /> Scoring Algorithm
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !isDebugEnabled();
+                          setDebugEnabled(next);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-[#2C4E86] hover:text-[#0B5CD5] hover:bg-[#F8F8F6] flex items-center justify-between cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Terminal className="w-3.5 h-3.5 text-[#0B5CD5]" /> Debug Telemetry
+                        </span>
+                        <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded font-bold ${isDebug ? 'bg-emerald-600 text-white' : 'bg-[#EFEEE9] text-[#7386A8]'}`}>
+                          {isDebug ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
                     </div>
 
                     <div className="pt-1 border-t border-[#CECECE]">

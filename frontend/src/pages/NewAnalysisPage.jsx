@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import VerdictBadge from '../components/VerdictBadge';
 import { apiUrl } from '../utils/api';
+import { isDebugEnabled, setDebugEnabled } from '../utils/featureFlags';
 import {
   Radio,
   FileText,
@@ -26,7 +27,16 @@ import {
   ClipboardPaste,
   Trash2,
   Camera,
-  Link2
+  Link2,
+  Terminal,
+  Activity,
+  Pause,
+  Play,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ShieldAlert,
+  Cpu
 } from 'lucide-react';
 
 const SAMPLE_PRESETS = [
@@ -85,9 +95,38 @@ export default function NewAnalysisPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [errorMessage, setErrorMessage] = useState(null);
 
+  const [debugEvents, setDebugEvents] = useState([]);
+  const [activeDelay, setActiveDelay] = useState(null);
+  const [showDebugConsole, setShowDebugConsole] = useState(true);
+  const [debugFilter, setDebugFilter] = useState('ALL'); // 'ALL' | 'AGENT_1' | 'AGENT_2' | 'AGENT_3' | 'AGENT_4' | 'DEEP_RESEARCH'
+  const [autoScrollDebug, setAutoScrollDebug] = useState(true);
+  const [copiedDebugLogs, setCopiedDebugLogs] = useState(false);
+  const [isDebug, setIsDebug] = useState(() => isDebugEnabled());
+
+  useEffect(() => {
+    const handleDebugChange = () => setIsDebug(isDebugEnabled());
+    window.addEventListener('etrai_debug_change', handleDebugChange);
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        const next = !isDebugEnabled();
+        setDebugEnabled(next);
+        setIsDebug(next);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('etrai_debug_change', handleDebugChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const timerRef = useRef(null);
   const eventSourceRef = useRef(null);
   const pollTimerRef = useRef(null);
+  const debugLogsEndRef = useRef(null);
 
   const stopJobListeners = () => {
     if (eventSourceRef.current) {
@@ -202,6 +241,45 @@ export default function NewAnalysisPage() {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
   }, []);
 
+  // Auto-scroll debug terminal
+  useEffect(() => {
+    if (autoScrollDebug && debugLogsEndRef.current) {
+      debugLogsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [debugEvents, autoScrollDebug]);
+
+  const copyDebugLogs = () => {
+    const text = debugEvents.map(e => `[${new Date(e.timestamp || e.receivedAt).toISOString()}] [${e.agent || 'System'}] [${e.action || e.eventType || 'EVENT'}]: ${e.detail || e.message || ''} ${e.latencyMs ? `(${e.latencyMs}ms)` : ''}`).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedDebugLogs(true);
+      setTimeout(() => setCopiedDebugLogs(false), 2000);
+      showToast('Debug telemetry logs copied to clipboard!');
+    }).catch(() => {
+      showToast('Failed to copy logs to clipboard');
+    });
+  };
+
+  const filterMatches = (e, filter) => {
+    if (filter === 'ALL') return true;
+    const a = (e.agent || '').toUpperCase();
+    if (filter === 'AGENT_1') return a.includes('1') || a.includes('CONTENT') || a.includes('INTAKE');
+    if (filter === 'AGENT_2') return a.includes('2') || a.includes('CLAIM');
+    if (filter === 'AGENT_3') return a.includes('3') || a.includes('FACT') || a.includes('VERIF');
+    if (filter === 'AGENT_4') return a.includes('4') || a.includes('REPORT') || a.includes('SYNTHESIS');
+    if (filter === 'DEEP_RESEARCH') return a.includes('DEEP') || a.includes('RESEARCH');
+    return true;
+  };
+
+  const getAgentPillStyle = (agent = '') => {
+    const a = agent.toUpperCase();
+    if (a.includes('1')) return 'bg-indigo-900/60 text-indigo-300 border border-indigo-700/40';
+    if (a.includes('2')) return 'bg-[#D97757]/30 text-[#E88F6B] border border-[#D97757]/50';
+    if (a.includes('3')) return 'bg-cyan-900/60 text-cyan-300 border border-cyan-700/40';
+    if (a.includes('4')) return 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/40';
+    if (a.includes('DEEP')) return 'bg-purple-900/60 text-purple-300 border border-purple-700/40';
+    return 'bg-white/10 text-white';
+  };
+
   // Handle Form Submission
   const handleLaunchVerification = async (e) => {
     if (e) e.preventDefault();
@@ -234,6 +312,8 @@ export default function NewAnalysisPage() {
     setProgress(10);
     setCurrentStep('Initializing Multi-Agent Verification Rail...');
     setCurrentStage('INTAKE');
+    setDebugEvents([]);
+    setActiveDelay(null);
 
     try {
       const token = localStorage.getItem('etrai_token');
@@ -304,6 +384,43 @@ export default function NewAnalysisPage() {
         if (state.step) setCurrentStep(state.step);
         if (state.stage) setCurrentStage(state.stage);
 
+        // Record live debug telemetry events
+        if (Array.isArray(state.debugHistory) && state.debugHistory.length > 0) {
+          setDebugEvents(state.debugHistory.map(ev => ({
+            ...ev,
+            id: ev.id || ev.eventId,
+            detail: ev.detail || ev.message || ev.action || 'Executing event',
+            message: ev.detail || ev.message || ev.action || 'Executing event',
+            action: ev.action || ev.eventType || 'EVENT',
+            eventType: ev.action || ev.eventType || 'EVENT',
+            agent: ev.agent || 'System',
+            receivedAt: Date.now()
+          })));
+        } else if (state.debugEvent) {
+          setDebugEvents(prev => {
+            const ev = state.debugEvent;
+            const evId = ev.id || ev.eventId;
+            if (evId && prev.some(existing => (existing.id || existing.eventId) === evId)) {
+              return prev;
+            }
+            return [...prev.slice(-300), {
+              ...ev,
+              id: evId,
+              detail: ev.detail || ev.message || ev.action || 'Executing event',
+              message: ev.detail || ev.message || ev.action || 'Executing event',
+              action: ev.action || ev.eventType || 'EVENT',
+              eventType: ev.action || ev.eventType || 'EVENT',
+              agent: ev.agent || 'System',
+              receivedAt: Date.now()
+            }];
+          });
+        }
+
+        // Active delay / bottleneck alert
+        if (state.activeDelay !== undefined) {
+          setActiveDelay(state.activeDelay);
+        }
+
         if (state.status === 'COMPLETED') {
           stopJobListeners();
           navigate(`/results/${activeJobId}`);
@@ -365,25 +482,65 @@ export default function NewAnalysisPage() {
     }
   };
 
-  // Pipeline Stages Definition
+  // Pipeline Stages Definition (Chronological ETRAI 4-Agent Execution)
   const PIPELINE_STAGES = [
-    { id: 'INTAKE', label: 'Intake & Parsing', desc: 'Validates input magic-bytes, extracts OCR/text, cleans payload' },
-    { id: 'PROVENANCE', label: 'Provenance & Source Authority', desc: 'Queries ranked sources, checks registrar WHOIS and wire archives' },
-    { id: 'CLAIMS', label: 'Claim Extraction Engine', desc: 'Decomposes narrative into atomic, verifiable assertions' },
-    { id: 'FACT_MATCH', label: 'Cross-Source Fact Match', desc: 'Queries primary web indices and evaluates corroboration signals' },
-    { id: 'FORENSICS', label: 'Media & Forensics Rails', desc: 'ELA pixel analysis, keyframe splice detection, spectral match' }
+    { 
+      id: 'INTAKE', 
+      label: 'Agent 1: Intake & Content Parsing', 
+      desc: 'Validates input magic-bytes, extracts OCR/audio transcripts, cleans text payload' 
+    },
+    { 
+      id: 'CLAIMS', 
+      label: 'Agent 2: Claim Extraction Engine', 
+      desc: 'Decomposes narrative into atomic, verifiable assertions with semantic context' 
+    },
+    { 
+      id: 'FACT_MATCH', 
+      label: 'Agent 3: Cross-Source Fact Match & Provenance', 
+      desc: 'Queries primary web indices, checks wire archives, and evaluates corroboration signals' 
+    },
+    { 
+      id: 'FORENSICS', 
+      label: 'Agent 4: Multi-Signal Synthesis & Forensics', 
+      desc: 'Computes explainable trust score, runs ELA media forensics, and produces verified dossier' 
+    }
   ];
 
   const getStageStatus = (stageId, index) => {
-    let currentIndex = 0;
-    if (progress < 25) currentIndex = 0;
-    else if (progress < 50) currentIndex = 1;
-    else if (progress < 75) currentIndex = 2;
-    else if (progress < 90) currentIndex = 3;
-    else currentIndex = 4;
+    const stageMap = {
+      'INTAKE': 0,
+      'MEDIA_VALIDATION': 0,
+      'MEDIA_METADATA': 0,
+      'VISUAL_ANALYSIS': 0,
+      'KEYFRAME_EXTRACTION': 0,
+      'READING': 0,
+      'OCR': 0,
+      'VIDEO_CONTEXT': 0,
+      'CLAIM_EXTRACTION': 1,
+      'ARTICLE_DEEP_RESEARCH': 2,
+      'WEB_VERIFICATION': 2,
+      'FACT_CHECKING': 2,
+      'FACT_MATCH': 2,
+      'PROVENANCE': 2,
+      'DEEP_RESEARCH': 2,
+      'SYNTHESIS': 3,
+      'DOSSIER_SYNTHESIS': 3,
+      'FORENSICS': 3
+    };
 
-    if (index < currentIndex) return 'COMPLETED';
-    if (index === currentIndex) return 'ACTIVE';
+    let activeIndex = 0;
+    if (stageMap[currentStage] !== undefined) {
+      activeIndex = stageMap[currentStage];
+    } else {
+      if (progress < 25) activeIndex = 0;
+      else if (progress < 50) activeIndex = 1;
+      else if (progress < 85) activeIndex = 2;
+      else activeIndex = 3;
+    }
+
+    if (progress >= 100) return 'COMPLETED';
+    if (index < activeIndex) return 'COMPLETED';
+    if (index === activeIndex) return 'ACTIVE';
     return 'PENDING';
   };
 
@@ -1128,6 +1285,187 @@ export default function NewAnalysisPage() {
                 })}
               </div>
             </div>
+
+            {/* Active Delay / Bottleneck Alert Banner */}
+            {activeDelay && (
+              <div className="p-5 bg-[#FFF2EE] border-2 border-[#D97757] rounded-3xl space-y-3 shadow-md animate-pulse">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-[#B0512F] font-bold text-xs uppercase font-mono">
+                    <ShieldAlert className="w-4 h-4 text-[#D97757]" />
+                    <span>Active Delay &amp; Bottleneck Inspector</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-[#D97757] text-white rounded-full font-mono text-[10px] font-bold tracking-wider uppercase">
+                    {activeDelay.agent || 'PIPELINE'}
+                  </span>
+                </div>
+                
+                <div className="space-y-1">
+                  <h4 className="text-sm font-extrabold text-[#0B5CD5]">
+                    {activeDelay.action === 'RATE_LIMIT_BACKOFF' || activeDelay.reason === 'RATE_LIMIT_BACKOFF' 
+                      ? 'Gemini Rate-Limit / Token Quota Backoff Active'
+                      : (activeDelay.action === 'EXTRACTION_STARTED' || activeDelay.reason === 'LLM_WAIT' ? 'Decomposing Claims (High Token Density)...' : (activeDelay.action || activeDelay.title || 'Pipeline Latency Window Active'))}
+                  </h4>
+                  <p className="text-xs text-[#2C4E86] leading-relaxed">
+                    {activeDelay.detail || activeDelay.message || activeDelay.reason || 'The verification rail is waiting on upstream AI/Search API responses or running exponential backoff to respect quota limits.'}
+                  </p>
+                </div>
+
+                {(activeDelay.waitMs || activeDelay.delayMs) && (
+                  <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-[#7386A8]">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-[#D97757]" /> Backoff Duration: <strong className="text-[#0B5CD5]">{((activeDelay.waitMs || activeDelay.delayMs) / 1000).toFixed(1)}s</strong>
+                    </span>
+                    {activeDelay.attempt && (
+                      <span>· Attempt {activeDelay.attempt} of {activeDelay.maxAttempts || 5}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Live Multi-Agent Telemetry & Debug Stream Console */}
+            {isDebug && (
+            <div className="bg-[#000D59] border border-[rgba(240,237,233,0.16)] rounded-3xl shadow-xl overflow-hidden text-[#EDE7DC]">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-[rgba(240,237,233,0.1)] flex items-center justify-between gap-4 flex-wrap bg-[#00106A]">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-[#0B5CD5]/30 text-[#E88F6B] border border-[#E88F6B]/30">
+                    <Terminal className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#EDE7DC]">
+                        Live Telemetry &amp; Agent Debug Stream
+                      </h3>
+                      <span className="w-2 h-2 rounded-full bg-[#3E7A55] animate-ping" />
+                      <span className="px-2 py-0.2 rounded-full bg-[#0B5CD5] text-[10px] font-mono font-bold text-white">
+                        {debugEvents.length} events
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#A7B0D4] font-mono">
+                      Real-time Serper calls, Gemini LLM prompts, token latencies &amp; stage transitions
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={copyDebugLogs}
+                    className="px-3 py-1.5 bg-[#0B5CD5]/30 hover:bg-[#0B5CD5]/50 border border-[#0B5CD5]/50 text-[#EDE7DC] rounded-xl text-xs font-mono transition flex items-center gap-1.5"
+                    title="Copy full telemetry log"
+                  >
+                    {copiedDebugLogs ? <Check className="w-3.5 h-3.5 text-[#3E7A55]" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedDebugLogs ? 'Copied' : 'Copy Logs'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setAutoScrollDebug(!autoScrollDebug)}
+                    className={`px-3 py-1.5 border rounded-xl text-xs font-mono transition flex items-center gap-1.5 ${
+                      autoScrollDebug
+                        ? 'bg-[#3E7A55]/20 border-[#3E7A55]/40 text-[#A7F3D0]'
+                        : 'bg-[#EFEEE9]/10 border-white/20 text-[#A7B0D4]'
+                    }`}
+                    title="Toggle auto-scroll to bottom"
+                  >
+                    {autoScrollDebug ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3" />}
+                    <span>Auto-scroll</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowDebugConsole(!showDebugConsole)}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-[#EDE7DC] transition"
+                  >
+                    {showDebugConsole ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {showDebugConsole && (
+                <div className="p-4 sm:p-5 space-y-3">
+                  {/* Filter Tabs */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono">
+                    {[
+                      { id: 'ALL', label: 'All Agents' },
+                      { id: 'AGENT_1', label: 'Agent 1: Ingestion' },
+                      { id: 'AGENT_2', label: 'Agent 2: Claims' },
+                      { id: 'AGENT_3', label: 'Agent 3: Verifier' },
+                      { id: 'AGENT_4', label: 'Agent 4: Synthesis' },
+                      { id: 'DEEP_RESEARCH', label: 'Deep Research' }
+                    ].map(filter => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setDebugFilter(filter.id)}
+                        className={`px-2.5 py-1 rounded-lg transition whitespace-nowrap text-[11px] ${
+                          debugFilter === filter.id
+                            ? 'bg-[#D97757] text-white font-bold shadow-xs'
+                            : 'bg-white/5 hover:bg-white/10 text-[#A7B0D4]'
+                        }`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Terminal logs list */}
+                  <div className="h-72 overflow-y-auto rounded-2xl bg-[#031246] border border-white/10 p-3.5 space-y-2 font-mono text-[11px] select-text">
+                    {debugEvents.filter(e => filterMatches(e, debugFilter)).length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-[#7386A8] text-center space-y-2">
+                        <Activity className="w-6 h-6 text-[#A7B0D4] animate-pulse" />
+                        <p>Waiting for telemetry signals from verification pipeline...</p>
+                        <p className="text-[10px] text-[#A7B0D4]/70">Events will stream here automatically as agents execute</p>
+                      </div>
+                    ) : (
+                      debugEvents
+                        .filter(e => filterMatches(e, debugFilter))
+                        .map((e, idx) => {
+                          const timeStr = new Date(e.timestamp || e.receivedAt).toTimeString().split(' ')[0];
+                          const actionText = e.action || e.eventType || '';
+                          const isDelayOrWarning = actionText.includes('BACKOFF') || actionText.includes('RETRY') || actionText.includes('RATE_LIMIT') || e.isDelayWarning || e.level === 'WARN';
+                          const isError = actionText.includes('FAIL') || e.error || e.level === 'ERROR';
+                          const logDetail = e.detail || e.message || actionText || 'Executing step...';
+
+                          return (
+                            <div
+                              key={e.id || e.eventId || idx}
+                              className={`p-2.5 rounded-xl transition flex flex-col sm:flex-row sm:items-baseline gap-2 leading-relaxed ${
+                                isError ? 'bg-red-950/40 border border-red-500/30 text-red-200' :
+                                isDelayOrWarning ? 'bg-amber-950/40 border border-amber-500/30 text-amber-200' :
+                                'bg-white/5 hover:bg-white/10 text-[#EDE7DC]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-[#7386A8] text-[10px] font-mono">{timeStr}</span>
+                                <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase font-mono ${getAgentPillStyle(e.agent)}`}>
+                                  {e.agent || 'SYSTEM'}
+                                </span>
+                                {actionText && (
+                                  <span className="text-[10px] text-[#A7B0D4] font-semibold font-mono">
+                                    [{actionText}]
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <span className="break-words">{logDetail}</span>
+                                {e.latencyMs && (
+                                  <span className={`ml-2 px-1.5 py-0.2 rounded text-[9px] font-bold font-mono ${
+                                    e.latencyMs < 1000 ? 'bg-emerald-950 text-emerald-300' :
+                                    e.latencyMs < 4000 ? 'bg-amber-950 text-amber-300' : 'bg-orange-950 text-orange-300'
+                                  }`}>
+                                    +{e.latencyMs}ms
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                    )}
+                    <div ref={debugLogsEndRef} />
+                  </div>
+                </div>
+              )}
+            </div>
+            )}
           </div>
         )}
       </main>
