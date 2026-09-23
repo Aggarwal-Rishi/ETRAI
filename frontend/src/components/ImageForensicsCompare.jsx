@@ -20,9 +20,12 @@ import {
   X,
   Check,
   RefreshCw,
-  Search
+  Search,
+  FileJson
 } from 'lucide-react';
 import { apiUrl } from '../utils/api';
+import ReverseSearchAuditModal from './ReverseSearchAuditModal';
+import { generateReverseSearchDiagnosticJson } from '../utils/reverseSearchDiagnosticExport';
 
 export default function ImageForensicsCompare({ images = [], reportData = {}, providedImage, originalImage, differences = [] }) {
   // If reportData has images array or imageForensics, extract the image item
@@ -71,8 +74,25 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
   const [rightError, setRightError] = useState(false);
   const [manualOriginalSrc, setManualOriginalSrc] = useState(null);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [candidateDismissed, setCandidateDismissed] = useState(false);
   const [previewCandidateModal, setPreviewCandidateModal] = useState(null);
   const [showCandidatesTray, setShowCandidatesTray] = useState(true);
+  const [isReverseAuditModalOpen, setIsReverseAuditModalOpen] = useState(false);
+  const [isCopiedReverseJson, setIsCopiedReverseJson] = useState(false);
+
+  const handleCopyReverseJson = (e) => {
+    e?.stopPropagation();
+    try {
+      const diagData = generateReverseSearchDiagnosticJson(selectedAsset, reportData);
+      navigator.clipboard.writeText(JSON.stringify(diagData, null, 2));
+      setIsCopiedReverseJson(true);
+      setTimeout(() => {
+        setIsCopiedReverseJson(false);
+      }, 2500);
+    } catch (err) {
+      console.error('Failed to copy reverse search diagnostic JSON:', err);
+    }
+  };
 
   const containerRef = useRef(null);
   const isDragging = useRef(false);
@@ -86,9 +106,10 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
     }
   }, [imageList]);
 
-  // Reset candidate selection when selected asset changes
+  // Reset candidate selection when selectedAsset changes
   useEffect(() => {
     setSelectedCandidate(null);
+    setCandidateDismissed(false);
     setPreviewCandidateModal(null);
   }, [selectedAsset]);
 
@@ -161,14 +182,18 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
         : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(rawOriginalUrl)}`))
     : null);
 
-  const candidateProxyUrl = selectedCandidate?.imageUrl
-    ? (selectedCandidate.imageUrl.startsWith('data:')
-        ? selectedCandidate.imageUrl
-        : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(selectedCandidate.imageUrl)}`))
+  const activeCandidate = candidateDismissed
+    ? null
+    : (selectedCandidate || (candidateImages.length > 0 ? candidateImages[0] : (selectedAsset.candidateImageUrl ? { imageUrl: selectedAsset.candidateImageUrl, domain: selectedAsset.domain || 'web index' } : null)));
+
+  const candidateProxyUrl = activeCandidate?.imageUrl
+    ? (activeCandidate.imageUrl.startsWith('data:')
+        ? activeCandidate.imageUrl
+        : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(activeCandidate.imageUrl)}`))
     : null;
 
   const effectiveRightSrc = originalSrc || candidateProxyUrl || null;
-  const isComparingCandidate = Boolean(!originalSrc && selectedCandidate && candidateProxyUrl);
+  const isComparingCandidate = Boolean(!originalSrc && activeCandidate && candidateProxyUrl);
 
   const hasOriginal = Boolean(originalSrc) || (isVerifiedOriginal && Boolean(rawOriginalUrl));
 
@@ -333,8 +358,30 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
         <div>
           <div className="rounded-2xl border border-[#CECECE] bg-[#F8F8F6] p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#B98520]">
-              <Search className="w-4 h-4" /> Reverse-image evidence
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#B98520]">
+                <Search className="w-4 h-4" /> Reverse-image evidence
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReverseAuditModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#CECECE] bg-[#EFEEE9] px-2.5 py-1 font-mono text-[10px] font-bold text-[#2C4E86] transition hover:bg-[#CECECE] cursor-pointer"
+                  title="Open Full Reverse Search Evidentiary Telemetry Audit"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#3E7A55]" />
+                  Telemetry Audit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyReverseJson}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97757]/40 bg-[#F6E7DF] px-2.5 py-1 font-mono text-[10px] font-bold text-[#B0512F] transition hover:bg-[#D97757] hover:text-white cursor-pointer"
+                  title="Copy Complete Diagnostic JSON report for reverse-image search to clipboard"
+                >
+                  {isCopiedReverseJson ? <Check className="h-3.5 w-3.5 text-[#2C5B3E]" /> : <FileJson className="h-3.5 w-3.5 text-[#D97757]" />}
+                  {isCopiedReverseJson ? 'Copied JSON!' : 'Copy Diagnostic JSON'}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div><span className="block text-[10px] uppercase text-[#7386A8]">Provider</span><strong className="text-[#0B5CD5]">{primaryItem.reverseSearchProvider || 'Unavailable'}</strong></div>
@@ -493,6 +540,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                       onClick={() => {
                         setSelectedAsset(asset);
                         setSelectedCandidate(null);
+                        setCandidateDismissed(false);
                         setManualOriginalSrc(null);
                         setLeftLoading(true);
                         setRightLoading(true);
@@ -516,6 +564,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                         onClick={() => {
                           setSelectedAsset(asset);
                           setSelectedCandidate(null);
+                          setCandidateDismissed(false);
                           setShowCandidatesTray(true);
                           setLeftLoading(true);
                           setRightLoading(true);
@@ -560,7 +609,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   <p className="text-xs text-[#7386A8] mt-0.5">
                     {effectiveRightSrc
                       ? (isComparingCandidate
-                          ? <>Comparing with unverified candidate from: <strong className="text-amber-700">{selectedCandidate.domain}</strong>{selectedCandidate.similarity ? ` (${selectedCandidate.similarity}% match)` : ''}</>
+                          ? <>Comparing with unverified candidate from: <strong className="text-amber-700">{activeCandidate?.domain || 'web index'}</strong>{activeCandidate?.similarity ? ` (${activeCandidate.similarity}% match)` : ''}</>
                           : <>Original source: <strong className="text-[#0B5CD5]">{manualOriginalSrc ? 'manually supplied file' : (selectedAsset.originalFound || 'verified archive')}</strong></>)
                       : <>No verified original was found in public archives. Add a known original or choose a candidate below.</>}
                   </p>
@@ -640,18 +689,21 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
               </div>
 
               {/* Active candidate comparison notice */}
-              {isComparingCandidate && (
+              {isComparingCandidate && activeCandidate && (
                 <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between text-xs font-mono">
                   <div className="flex items-center gap-2 text-amber-900">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
-                      Comparing with unverified candidate from <strong className="text-[#0B5CD5]">{selectedCandidate.domain}</strong>
-                      {selectedCandidate.similarity ? ` (${selectedCandidate.similarity}% similarity)` : ''}.
+                      Comparing with unverified candidate from <strong className="text-[#0B5CD5]">{activeCandidate?.domain || 'web index'}</strong>
+                      {activeCandidate?.similarity ? ` (${activeCandidate.similarity}% similarity)` : ''}.
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedCandidate(null)}
+                    onClick={() => {
+                      setSelectedCandidate(null);
+                      setCandidateDismissed(true);
+                    }}
                     className="px-2.5 py-1 rounded-lg bg-white border border-[#CECECE] hover:bg-slate-50 text-slate-700 text-[11px] font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
                   >
                     <X className="w-3 h-3" /> Unload candidate
@@ -755,8 +807,18 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                       src={effectiveRightSrc}
                       alt={isComparingCandidate ? 'Unverified visual candidate' : 'Verified original image'}
                       className="w-full h-full object-contain pointer-events-none"
-                      onLoad={() => setRightLoading(false)}
-                      onError={() => {
+                      onLoad={() => {
+                        setRightLoading(false);
+                        setRightError(false);
+                      }}
+                      onError={(e) => {
+                        const rawTarget = isComparingCandidate
+                          ? (activeCandidate?.imageUrl || activeCandidate?.thumbnailUrl)
+                          : (rawOriginalUrl || selectedAsset.originalImageUrl || selectedAsset.candidateImageUrl);
+                        if (rawTarget && e.currentTarget.src !== rawTarget) {
+                          e.currentTarget.src = rawTarget;
+                          return;
+                        }
                         setRightLoading(false);
                         setRightError(true);
                       }}
@@ -811,18 +873,19 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                     : manualOriginalSrc
                     ? 'Original · manually supplied'
                     : isComparingCandidate
-                    ? `Candidate · ${selectedCandidate.domain} (unverified)`
+                    ? `Candidate · ${activeCandidate?.domain || 'web index'} (unverified)`
                     : 'Original · verified match'}
                 </span>
 
                 {/* Change Markers (A, B, C, D) Superimposed */}
                 {showBoxes && diffList.map((d) => {
-                  const isActive = activeDiff === d.id.toLowerCase() || activeDiff === d.id;
+                  const dId = String(d.id || '');
+                  const isActive = activeDiff === dId.toLowerCase() || activeDiff === dId;
                   const b = customBoxPositions[d.id] || d.box || { left: '20%', top: '20%', width: '30%', height: '20%' };
 
                   return (
                     <div
-                      key={d.id}
+                      key={d.id || Math.random()}
                       style={{
                         left: b.left || `${b.x}%`,
                         top: b.top || `${b.y}%`,
@@ -835,7 +898,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                           : 'border-[#D97757] bg-[#D97757]/20 hover:border-white hover:bg-rose-500/30'
                       }`}
                       onMouseDown={(e) => handleBoxMouseDown(e, d.id, b)}
-                      onMouseEnter={() => setActiveDiff(d.id.toLowerCase())}
+                      onMouseEnter={() => setActiveDiff(dId.toLowerCase())}
                       onMouseLeave={() => setActiveDiff(null)}
                       title="Click and drag to reposition this edit region"
                     >
@@ -873,12 +936,13 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
               {diffList.length > 0 && (
                 <div className="divide-y divide-[#CECECE] bg-[#F8F8F6] rounded-2xl border border-[#CECECE] p-4">
                   {diffList.map((d) => {
-                    const isActive = activeDiff === d.id.toLowerCase() || activeDiff === d.id;
+                    const dId = String(d.id || '');
+                    const isActive = activeDiff === dId.toLowerCase() || activeDiff === dId;
 
                     return (
                       <div
-                        key={d.id}
-                        onMouseEnter={() => setActiveDiff(d.id.toLowerCase())}
+                        key={d.id || Math.random()}
+                        onMouseEnter={() => setActiveDiff(dId.toLowerCase())}
                         onMouseLeave={() => setActiveDiff(null)}
                         className={`flex items-start gap-3 py-3 px-2 rounded-xl transition ${
                           isActive ? 'bg-white text-[#0B5CD5] shadow-xs' : 'hover:bg-white/60 text-[#2C4E86]'
@@ -1061,10 +1125,10 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                 <div className="p-4 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl space-y-1 font-mono text-xs">
                   <span className="text-[10px] text-[#7386A8] uppercase tracking-wider block">Manipulation likelihood</span>
                   <div className={`font-bold ${
-                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.70 ? 'text-[#B23F35]' :
-                    parseFloat(selectedAsset.manipulationLikelihood) >= 0.40 ? 'text-[#B98520]' : 'text-[#3E7A55]'
+                    parseFloat(selectedAsset?.manipulationLikelihood || 0) >= 0.70 ? 'text-[#B23F35]' :
+                    parseFloat(selectedAsset?.manipulationLikelihood || 0) >= 0.40 ? 'text-[#B98520]' : 'text-[#3E7A55]'
                   }`}>
-                    {selectedAsset.manipulationLikelihood} · {parseFloat(selectedAsset.manipulationLikelihood) >= 0.40 ? 'edited' : 'unaltered'}
+                    {selectedAsset?.manipulationLikelihood || '0.00'} · {parseFloat(selectedAsset?.manipulationLikelihood || 0) >= 0.40 ? 'edited' : 'unaltered'}
                   </div>
                 </div>
               </div>
@@ -1090,7 +1154,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   Unverified Candidate
                 </span>
                 <h4 className="text-sm font-bold text-[#0B5CD5] font-mono truncate max-w-sm">
-                  {previewCandidateModal.domain}
+                  {previewCandidateModal.domain || 'web index'}
                 </h4>
               </div>
               <button
@@ -1104,10 +1168,10 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
 
             <div className="aspect-[16/10] bg-black rounded-2xl overflow-hidden flex items-center justify-center border border-slate-200">
               <img
-                src={previewCandidateModal.imageUrl.startsWith('data:')
+                src={previewCandidateModal.imageUrl?.startsWith('data:')
                   ? previewCandidateModal.imageUrl
-                  : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(previewCandidateModal.imageUrl)}`)}
-                alt={previewCandidateModal.title}
+                  : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(previewCandidateModal.imageUrl || '')}`)}
+                alt={previewCandidateModal.title || 'Candidate'}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -1157,6 +1221,14 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
         </div>,
         document.body
       )}
+
+      {/* Reverse Search Provenance & Forensics Diagnostic Audit Modal */}
+      <ReverseSearchAuditModal
+        asset={selectedAsset}
+        reportData={reportData}
+        isOpen={isReverseAuditModalOpen}
+        onClose={() => setIsReverseAuditModalOpen(false)}
+      />
     </section>
   );
 }

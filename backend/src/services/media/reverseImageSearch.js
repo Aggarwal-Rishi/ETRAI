@@ -98,7 +98,7 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
       method: 'POST',
       headers: form.getHeaders(),
       body: form,
-      timeout: 8000
+      timeout: 20000
     });
     const uploadData = await uploadResponse.json().catch(() => ({}));
     if (!uploadResponse.ok || !uploadData.image_id) {
@@ -117,7 +117,7 @@ async function searchSerpApiGoogleLens(buffer, apiKey = process.env.SERPAPI_API_
       output: 'json'
     });
     const lensResponse = await fetch(`https://serpapi.com/search.json?${params.toString()}`, {
-      timeout: 10000
+      timeout: 25000
     });
     const lensData = await lensResponse.json().catch(() => ({}));
     if (!lensResponse.ok || lensData.error) {
