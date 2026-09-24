@@ -110,11 +110,20 @@ export function generateClaimDiagnosticJson(claim) {
   // Stance Distribution
   const supportingSources = sourcesList.filter(s => s.stance === 'SUPPORTS');
   const refutingSources = sourcesList.filter(s => s.stance === 'REFUTES');
+  const qualifyingSources = sourcesList.filter(s => s.stance === 'QUALIFIES');
   const neutralSources = sourcesList.filter(s => s.stance === 'NEUTRAL');
   const irrelevantSources = sourcesList.filter(s => s.stance === 'IRRELEVANT');
 
   const maxSupportingAuthority = supportingSources.length > 0 ? Math.max(...supportingSources.map(s => s.authorityScore)) : 0;
   const maxRefutingAuthority = refutingSources.length > 0 ? Math.max(...refutingSources.map(s => s.authorityScore)) : 0;
+
+  // Dual-Axis Formulation
+  const dualAxis = claimVerificationResult.dualAxis || merged.dualAxis || {
+    veracityIndex: typeof merged.veracityIndex === 'number' ? merged.veracityIndex : (verdict === 'VERIFIED' ? 90 : verdict === 'FALSE' ? 10 : 50),
+    evidentiaryCertainty: typeof merged.evidentiaryCertainty === 'number' ? merged.evidentiaryCertainty : confidence,
+    independentCorporateCount: claimVerificationResult.corporateParentCount || 1,
+    qualifyingCount: qualifyingSources.length
+  };
 
   // Override Rule Detection
   const tier0OverrideApplied = Boolean(refutingSources.length > 0 && maxRefutingAuthority >= 95 && maxSupportingAuthority <= 50);
@@ -145,6 +154,8 @@ export function generateClaimDiagnosticJson(claim) {
       canonicalVerdict: verdict,
       statusLabel: status,
       confidenceScore: confidence,
+      veracityIndex: dualAxis.veracityIndex,
+      evidentiaryCertainty: dualAxis.evidentiaryCertainty,
       evidenceState,
       claimStanceReason,
       summaryInterpretation: verdict === 'VERIFIED'
@@ -157,6 +168,12 @@ export function generateClaimDiagnosticJson(claim) {
     },
     scoringFormulaBreakdown: {
       formula: 'Confidence = (EvidenceQuality × w_eq) + (SourceAuthority × w_sa) + (SourceAgreement × w_sag) + (SourceIndependence × w_si)',
+      dualAxisMetrics: {
+        veracityIndex: dualAxis.veracityIndex,
+        evidentiaryCertainty: dualAxis.evidentiaryCertainty,
+        independentCorporateCount: dualAxis.independentCorporateCount,
+        epistemicFormula: 'V = 50 * (1 + NetStance), C = MeanAuth * (1 - e^(-0.4 * N_corp))'
+      },
       activeWeights: {
         evidenceQualityWeight: wEq,
         sourceAuthorityWeight: wSa,
@@ -191,6 +208,7 @@ export function generateClaimDiagnosticJson(claim) {
       totalSourcesEvaluated: sourcesList.length,
       supportingCount: supportingSources.length,
       refutingCount: refutingSources.length,
+      qualifyingCount: qualifyingSources.length,
       neutralCount: neutralSources.length,
       irrelevantCount: irrelevantSources.length,
       maxSupportingAuthority,

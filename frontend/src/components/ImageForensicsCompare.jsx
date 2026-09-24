@@ -21,7 +21,8 @@ import {
   Check,
   RefreshCw,
   Search,
-  FileJson
+  FileJson,
+  Cpu
 } from 'lucide-react';
 import { apiUrl } from '../utils/api';
 import ReverseSearchAuditModal from './ReverseSearchAuditModal';
@@ -530,6 +531,46 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                         </b>
                       </div>
                     )}
+
+                    {/* Sightengine AI Detection / Deepfake Score */}
+                    {Boolean(asset?.aiDetection || reportData?.mediaAnalysis?.aiDetection) && (() => {
+                      const ai = asset?.aiDetection || reportData?.mediaAnalysis?.aiDetection;
+                      if (!ai || ai.status === 'UNCONFIGURED' || ai.status === 'SKIPPED') return null;
+                      const aiPct = Math.round((ai.aiScore || 0) * 100);
+                      const isAi = Boolean(ai.isAiGenerated || aiPct >= 50);
+                      return (
+                        <div className="p-3 my-2.5 rounded-2xl bg-purple-50/80 border border-purple-200/90 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-purple-900 flex items-center gap-1.5 font-mono text-[11px]">
+                              <Cpu className="w-3.5 h-3.5 text-purple-600" />
+                              Sightengine AI &amp; Deepfake Model
+                            </span>
+                            <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border ${
+                              isAi ? 'bg-rose-100 text-rose-700 border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            }`}>
+                              {isAi ? 'SYNTHETIC / AI GENERATED' : 'AUTHENTIC PHOTO'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                            <div className="p-2 bg-white/80 rounded-xl border border-purple-100">
+                              <span className="text-[#7386A8] text-[9.5px] uppercase block">AI Generation</span>
+                              <b className={aiPct >= 50 ? 'text-rose-600 font-bold' : 'text-emerald-700 font-bold'}>{aiPct}% Prob</b>
+                            </div>
+                            <div className="p-2 bg-white/80 rounded-xl border border-purple-100">
+                              <span className="text-[#7386A8] text-[9.5px] uppercase block">Deepfake / Swap</span>
+                              <b className="text-[#0B5CD5] font-bold">{Math.round((ai.deepfakeScore || 0) * 100)}% Prob</b>
+                            </div>
+                          </div>
+
+                          {ai.summary && (
+                            <p className="text-[11px] text-[#2C4E86] leading-relaxed font-sans pt-0.5">
+                              {ai.summary}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* CTA Buttons: Open side-by-side compare & view candidates */}
@@ -719,7 +760,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                       Potential visual candidate indexed, but unverified as the true original
                     </p>
                     <p className="text-[#7386A8] text-[11px]">
-                      Search engines returned candidates from <span className="font-bold text-[#0B5CD5]">{selectedAsset.domain || 'web index'}</span>, but local perceptual comparison did not reach the verified match threshold (&ge;78%). Candidate images are available in the candidate tray below to preview or load into the slider.
+                      Search engines returned candidates from <span className="font-bold text-[#0B5CD5]">{selectedAsset.domain || 'web index'}</span>, but local perceptual comparison did not reach the verified match threshold (&ge;73%). Candidate images are available in the candidate tray below to preview or load into the slider.
                     </p>
                     {selectedAsset.originalPageUrl && (
                       <a
@@ -838,7 +879,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                     <AlertTriangle className="w-8 h-8 text-amber-400 mb-2" />
                     <strong className="text-xs font-mono text-amber-200">No Verified Original Available</strong>
                     <p className="text-[11px] text-slate-300 mt-1 max-w-sm">
-                      Reverse search did not find a verified visual match (&ge;78% similarity). An unverified candidate is never shown as the real original.
+                      Reverse search did not find a verified visual match (&ge;73% similarity). An unverified candidate is never shown as the real original.
                     </p>
                     {candidateImages.length > 0 ? (
                       <div className="mt-3 pointer-events-auto">
@@ -988,7 +1029,7 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   </div>
 
                   <p className="text-[11px] text-[#7386A8] leading-relaxed">
-                    These images were returned by visual and reverse search queries but did not reach the verified match threshold (&ge;78%). You can inspect them or click <strong>Compare in slider</strong> to view how any candidate compares against the circulated photo.
+                    These images were returned by visual and reverse search queries but did not reach the verified match threshold (&ge;73%). You can inspect them or click <strong>Compare in slider</strong> to view how any candidate compares against the circulated photo.
                   </p>
 
                   {showCandidatesTray && (

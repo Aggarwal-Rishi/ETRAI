@@ -84,6 +84,7 @@ export default function NewAnalysisPage() {
   const [optExternalTranscriptSearch, setOptExternalTranscriptSearch] = useState(false);
   const [optTraceProvenance, setOptTraceProvenance] = useState(true);
   const [optDetectEntities, setOptDetectEntities] = useState(true);
+  const [optDetectAi, setOptDetectAi] = useState(true);
   const [optDeepArchive, setOptDeepArchive] = useState(false); // Coming soon
 
   // Pipeline Execution State (Runner)
@@ -339,6 +340,7 @@ export default function NewAnalysisPage() {
         formData.append('allowExternalTranscriptSearch', String(selectedCard === 'VIDEO' && optExternalTranscriptSearch));
         formData.append('traceProvenance', String(optTraceProvenance));
         formData.append('detectEntities', String(optDetectEntities));
+        formData.append('enableAiDetection', String((selectedCard === 'IMAGE' || selectedCard === 'VIDEO') ? optDetectAi : false));
         body = formData;
       } else {
         headers['Content-Type'] = 'application/json';
@@ -351,7 +353,8 @@ export default function NewAnalysisPage() {
           allowExternalVisualSearch: (selectedCard === 'IMAGE' || selectedCard === 'VIDEO') && optExternalVisualSearch,
           allowExternalTranscriptSearch: selectedCard === 'VIDEO' && optExternalTranscriptSearch,
           traceProvenance: optTraceProvenance,
-          detectEntities: optDetectEntities
+          detectEntities: optDetectEntities,
+          enableAiDetection: (selectedCard === 'IMAGE' || selectedCard === 'VIDEO') ? optDetectAi : false
         });
       }
 
@@ -856,6 +859,28 @@ export default function NewAnalysisPage() {
                       />
                     </div>
                   </div>
+
+                  {/* AI Detection Checkbox for Image */}
+                  <div className="pt-1">
+                    <label className="p-3 bg-purple-50/70 border border-purple-200/80 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-purple-400 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={optDetectAi}
+                        onChange={(e) => setOptDetectAi(e.target.checked)}
+                        className="mt-0.5 rounded border-[#AAAAAA] bg-white text-purple-600 focus:ring-0 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Cpu className="w-3.5 h-3.5 text-purple-600" />
+                          <span className="font-semibold text-[#0B5CD5] text-xs">AI-Generated &amp; Deepfake Detection (Sightengine)</span>
+                          <span className="px-1.5 py-0.2 bg-purple-100 text-purple-700 font-mono text-[9px] rounded font-bold uppercase">Vision Model</span>
+                        </div>
+                        <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
+                          Scans pixels for generative AI markers (Midjourney, DALL-E, Sora, Flux, Stable Diffusion) and synthetic face-swapping manipulation.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -1000,6 +1025,28 @@ export default function NewAnalysisPage() {
                       onChange={(e) => setTextInput(e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#F8F8F6] border border-[#CECECE] rounded-2xl text-xs text-[#0B5CD5] focus:outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#F6E7DF] placeholder-[#7386A8]"
                     />
+                  </div>
+
+                  {/* AI Detection Checkbox for Video */}
+                  <div className="pt-1">
+                    <label className="p-3 bg-purple-50/70 border border-purple-200/80 rounded-2xl flex items-start gap-3 cursor-pointer hover:border-purple-400 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={optDetectAi}
+                        onChange={(e) => setOptDetectAi(e.target.checked)}
+                        className="mt-0.5 rounded border-[#AAAAAA] bg-white text-purple-600 focus:ring-0 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Cpu className="w-3.5 h-3.5 text-purple-600" />
+                          <span className="font-semibold text-[#0B5CD5] text-xs">AI-Generated Video &amp; Deepfake Detection (Sightengine)</span>
+                          <span className="px-1.5 py-0.2 bg-purple-100 text-purple-700 font-mono text-[9px] rounded font-bold uppercase">Keyframe AI</span>
+                        </div>
+                        <span className="text-[#2C4E86] text-[11px] leading-relaxed block mt-0.5">
+                          Inspects extracted representative keyframes against Sightengine deepfake and AI synthetic video detectors to detect face-swapping, lip-sync manipulation, and Sora/Runway video generation.
+                        </span>
+                      </div>
+                    </label>
                   </div>
                 </div>
               )}

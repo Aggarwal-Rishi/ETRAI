@@ -46,7 +46,8 @@ const analyze = async (req, res) => {
       allowExternalVisualSearch: parseOptionalBoolean(req.body.allowExternalVisualSearch, true),
       allowExternalTranscriptSearch: parseOptionalBoolean(req.body.allowExternalTranscriptSearch, false),
       traceProvenance: parseOptionalBoolean(req.body.traceProvenance),
-      detectEntities: parseOptionalBoolean(req.body.detectEntities)
+      detectEntities: parseOptionalBoolean(req.body.detectEntities),
+      enableAiDetection: parseOptionalBoolean(req.body.enableAiDetection, true)
     };
     const file = req.file;
 

@@ -167,7 +167,7 @@ function normalizeClaimProposition(claim) {
     ? claimMeaning.quantities
     : extractFullQuantities(claimText);
 
-  const hasNegation = /\b(not|never|no|denied|refuted|debunked|false|fake|untrue|fabricated|contradicted|failed to|ruled out|did not|didn't|wasn't|was not|remained completely unchanged)\b/i.test(claimText);
+  const hasNegation = /\b(not|never|no|denied|refuted|debunked|false|fake|untrue|fabricated|contradicted|failed to|ruled out|did not|didn't|wasn't|was not|remained completely unchanged|declined|declining|refused|refusing|withheld|withholding|withholds|rejected|rejecting|skips|skipped|turned down)\b/i.test(claimText);
 
   let direction = 'NEUTRAL';
   if (/\b(increase|increased|grew|grew by|rose|climbed|surge|higher)\b/i.test(claimText)) {
@@ -296,7 +296,7 @@ function normalizeEvidenceProposition(evidenceItem, fetchedPassage = null) {
   const { textWithoutFrame, reportingSource, reportingVerb } = extractReportingFrame(text);
 
   const quantities = extractFullQuantities(text);
-  const hasNegation = /\b(not|never|no|denied|refuted|debunked|false|fake|untrue|fabricated|contradicted|failed to|ruled out|did not|didn't|wasn't|was not|remained completely unchanged)\b/i.test(text);
+  const hasNegation = /\b(not|never|no|denied|refuted|debunked|false|fake|untrue|fabricated|contradicted|failed to|ruled out|did not|didn't|wasn't|was not|remained completely unchanged|declined|declining|refused|refusing|withheld|withholding|withholds|rejected|rejecting|skips|skipped|turned down)\b/i.test(text);
 
   let direction = 'NEUTRAL';
   if (/\b(increase|increased|grew|grew by|rose|climbed|surge|higher)\b/i.test(textLower)) {
@@ -653,7 +653,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   // Past/Former Role vs Current Claim Contradiction
   const isPastRoleEvidence = /\b(served as|former|ex-|stepped down|resigned|was the|previously served|replaced by)\b/i.test(textEv);
   const isPresentRoleClaim = /\b(is the|is ceo|is president|currently|in 2026|in 2025)\b/i.test(textClaim);
-  if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && isPastRoleEvidence && (isPresentRoleClaim || dimensions.time === 'MISMATCH' || /\b(stepped down|resigned|former)\b/i.test(textEv))) {
+  if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && isPastRoleEvidence && isPresentRoleClaim && (dimensions.time === 'MISMATCH' || /\b(stepped down|resigned|former)\b/i.test(textEv))) {
     return { stance: 'REFUTES', reason: 'Temporal role contradiction: Evidence establishes the subject previously held or stepped down from the role, contradicting the claim that they currently hold it.' };
   }
 
@@ -669,13 +669,17 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
     return { stance: 'REFUTES', reason: 'Numerical direction contradiction: Evidence reports opposite direction of change.' };
   }
 
+  // Location Evaluation: If action/event matches, location difference is a QUALIFICATION, not a full refutation
   if (dimensions.location === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN')) {
-    return { stance: 'REFUTES', reason: 'Location mismatch: Evidence places the event in a different location.' };
+    if (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') {
+      return { stance: 'QUALIFIES', reason: 'Location qualification: Core proposition is corroborated, but reported geographic setting or jurisdiction differs.' };
+    }
+    return { stance: 'NEUTRAL', reason: 'Location discrepancy: Evidence references an event in a different location.' };
   }
 
   // Direct Action Rejection / Refutation (e.g. Tribunal rejected request vs claim asserted approved/cleared)
-  const isDirectDebunk = /\b(debunked|false|fabricated|incorrect|refuted|fake|hoax|denied|denies|rejected|opposed|declined|turned down|refused|dismissed|capping|capped)\b/i.test(textEv);
-  const isClaimAffirmative = claimProp.canonicalEvent !== 'REJECTION' && !/\b(rejected|denied|opposed|refused|declined)\b/i.test(textClaim);
+  const isDirectDebunk = /\b(debunked|false|fabricated|incorrect|refuted|fake|hoax|denied|denies|rejected|opposed|turned down|dismissed|capping|capped)\b/i.test(textEv);
+  const isClaimAffirmative = claimProp.canonicalEvent !== 'REJECTION' && !/\b(rejected|denied|opposed|refused|declined|withheld)\b/i.test(textClaim);
   if (isDirectDebunk && isClaimAffirmative && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN')) {
     return { stance: 'REFUTES', reason: 'Action contradiction: Evidence confirms the action or permission was rejected, denied, or debunked.' };
   }
@@ -705,11 +709,17 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
 
   // Temporal Mismatch Trigger (Except for ongoing ownership / acquisition states):
   if (dimensions.time === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && claimProp.canonicalEvent !== 'ACQUISITION') {
+    if (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') {
+      return { stance: 'QUALIFIES', reason: 'Temporal qualification: Core proposition is corroborated, but reports cite differing dates or milestones.' };
+    }
     return { stance: 'NEUTRAL', reason: 'Temporal discrepancy: Evidence specifies a different date for the event.' };
   }
 
   // Quantity Mismatch Trigger:
   if (dimensions.quantity === 'MISMATCH') {
+    if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && (dimensions.action === 'MATCH' || dimensions.event === 'MATCH')) {
+      return { stance: 'QUALIFIES', reason: 'Numerical qualification: Evidence corroborates the core event but cites differing figures or metrics.' };
+    }
     return { stance: 'NEUTRAL', reason: 'Numerical discrepancy: Evidence cites a different numerical figure for the event.' };
   }
 

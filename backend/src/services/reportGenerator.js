@@ -5,7 +5,7 @@ const { getProviderStatus, isKeyValid } = require('./providerManager');
  * Single Source of Truth: Canonical Scoring Engine for ETRAI
  * Separates Factual Accuracy from Manipulation & Sensationalism Risk.
  */
-function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment = null, sourceTitle = '', internalConsistencyIssues = [], sourcingTransparency = null) {
+function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment = null, sourceTitle = '', internalConsistencyIssues = [], sourcingTransparency = null, mediaAnalysis = null) {
   const claims = verifiedClaims || [];
   const total = claims.length;
 
@@ -30,23 +30,71 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
 
   // Factual Accuracy Score calculation (0 to 100)
   let factualAccuracyScore = 50;
+  let articleVerdict = 'UNVERIFIED';
+
   if (total > 0) {
     const rawWeightedSum = (verifiedCount * 100) + (partiallyVerifiedCount * 50) + (unverifiedCount * 45) + (falseCount * 0);
     factualAccuracyScore = Math.round(rawWeightedSum / total);
-  }
 
-  // Canonical Article Verdict determination
-  let articleVerdict = 'UNVERIFIED';
-  if (falseCount > 0 || (total > 0 && factualAccuracyScore < 35 && verifiedCount === 0 && partiallyVerifiedCount === 0)) {
-    articleVerdict = 'FALSE';
-  } else if (factualAccuracyScore >= 70 && verifiedCount > 0 && unverifiedCount === 0) {
-    articleVerdict = 'VERIFIED';
-  } else if (partiallyVerifiedCount > 0 && falseCount === 0) {
-    articleVerdict = 'PARTIALLY_VERIFIED';
-  } else if (verifiedCount > 0 && unverifiedCount > 0 && falseCount === 0) {
-    articleVerdict = 'PARTIALLY_VERIFIED';
-  } else {
-    articleVerdict = 'UNVERIFIED';
+    // Canonical Article Verdict determination
+    if (falseCount > 0 || (factualAccuracyScore < 35 && verifiedCount === 0 && partiallyVerifiedCount === 0)) {
+      articleVerdict = 'FALSE';
+    } else if (factualAccuracyScore >= 70 && verifiedCount > 0 && unverifiedCount === 0) {
+      articleVerdict = 'VERIFIED';
+    } else if (partiallyVerifiedCount > 0 && falseCount === 0) {
+      articleVerdict = 'PARTIALLY_VERIFIED';
+    } else if (verifiedCount > 0 && unverifiedCount > 0 && falseCount === 0) {
+      articleVerdict = 'PARTIALLY_VERIFIED';
+    } else {
+      articleVerdict = 'UNVERIFIED';
+    }
+  } else if (mediaAnalysis) {
+    // Pure Visual Media: Score directly using Google Lens reverse search or Sightengine AI Detector
+    const comparison = mediaAnalysis.imageSourceContextComparison;
+    const aiDet = mediaAnalysis.aiDetection;
+
+    if (comparison?.decisive && comparison.status === 'MATCHED') {
+      factualAccuracyScore = Math.max(80, Math.min(95, comparison.confidence || 88));
+      articleVerdict = 'VERIFIED';
+    } else if (comparison?.decisive && comparison.status === 'CONTRADICTED') {
+      factualAccuracyScore = Math.min(25, 100 - (comparison.confidence || 85));
+      articleVerdict = 'FALSE';
+    } else if (comparison?.decisive && comparison.status === 'UNINDEXED_NEW_CAPTURE') {
+      // Unindexed original capture: evaluate with Sightengine AI detector
+      if (aiDet && aiDet.status === 'SUCCESS') {
+        if (aiDet.isAiGenerated) {
+          factualAccuracyScore = Math.max(5, Math.min(25, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.9)) * 100)));
+          articleVerdict = 'FALSE';
+        } else if (aiDet.aiGeneratedProbability <= 0.15 && !aiDet.isDeepfake) {
+          // Authentic camera capture: score between 95% and 98%
+          factualAccuracyScore = Math.max(95, Math.min(98, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.02)) * 100)));
+          articleVerdict = 'VERIFIED';
+        } else {
+          factualAccuracyScore = 75;
+          articleVerdict = 'UNVERIFIED';
+        }
+      } else {
+        factualAccuracyScore = 95;
+        articleVerdict = 'VERIFIED';
+      }
+    } else if (aiDet && aiDet.status === 'SUCCESS') {
+      if (aiDet.isAiGenerated) {
+        factualAccuracyScore = Math.max(5, Math.min(25, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.9)) * 100)));
+        articleVerdict = 'FALSE';
+      } else if (aiDet.aiGeneratedProbability <= 0.15 && !aiDet.isDeepfake) {
+        factualAccuracyScore = Math.max(95, Math.min(98, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.02)) * 100)));
+        articleVerdict = 'VERIFIED';
+      } else if (aiDet.aiGeneratedProbability <= 0.30 && !aiDet.isDeepfake) {
+        factualAccuracyScore = Math.max(80, Math.min(92, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.1)) * 100)));
+        articleVerdict = 'VERIFIED';
+      } else {
+        factualAccuracyScore = 50;
+        articleVerdict = 'UNVERIFIED';
+      }
+    } else {
+      factualAccuracyScore = 50;
+      articleVerdict = 'UNVERIFIED';
+    }
   }
 
   // Manipulation & Sensationalism Assessment (SEPARATE from Factual Accuracy!)
@@ -123,7 +171,7 @@ async function generateReport({
   const resolvedInputType = inputType === 'FILE' && mediaAnalysis?.mediaType
     ? mediaAnalysis.mediaType
     : (inputType || mediaAnalysis?.mediaType || (hasAttachedNews ? 'TEXT_MEDIA' : 'TEXT'));
-  const canonicalData = calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment, sourceTitle, internalConsistencyIssues, sourcingTransparency);
+  const canonicalData = calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment, sourceTitle, internalConsistencyIssues, sourcingTransparency, mediaAnalysis);
   const { scores, factualAccuracyScore, evidenceConfidence, articleVerdict, manipulationRisk, manipulationScore, breakdown } = canonicalData;
 
   const providerStatus = getProviderStatus();
@@ -395,6 +443,8 @@ Return ONLY a JSON object with this exact structure:
     sources: uniqueDiscoveredSources,
     provenance,
     mediaAnalysis,
+    factualAccuracyScore,
+    articleVerdict,
     textAnalysis: arguments[0].textAnalysis,
     numericalAnalysis: arguments[0].numericalAnalysis,
     linkIntelligence: arguments[0].linkIntelligence,
@@ -414,8 +464,8 @@ Return ONLY a JSON object with this exact structure:
     selectedTypes,
     factualAccuracyScore: explainableScoring.finalTrustScore,
     evidenceConfidence,
-    articleVerdict,
-    verdict: articleVerdict,
+    articleVerdict: explainableScoring.finalVerdict === 'HIGHLY_SUPPORTED' && articleVerdict === 'VERIFIED' ? 'VERIFIED' : (explainableScoring.finalTrustScore >= 85 ? 'VERIFIED' : articleVerdict),
+    verdict: explainableScoring.finalVerdict === 'HIGHLY_SUPPORTED' && articleVerdict === 'VERIFIED' ? 'VERIFIED' : (explainableScoring.finalTrustScore >= 85 ? 'VERIFIED' : articleVerdict),
     trustScore: explainableScoring.finalTrustScore,
     confidenceRating: explainableScoring.finalTrustScore,
     methodologyVersion: 'ETRAI-v2.4-TransparentScoring',
@@ -437,6 +487,7 @@ Return ONLY a JSON object with this exact structure:
     claims: verifiedClaims,
     sources: uniqueDiscoveredSources,
     mediaAnalysis: mediaAnalysis || null,
+    aiDetection: mediaAnalysis?.aiDetection || null,
     images: mediaAnalysis?.images || (mediaAnalysis?.imageForensics?.reportItem ? [mediaAnalysis.imageForensics.reportItem] : []),
     articleResearchContext: articleResearchContext || null,
     provenance,

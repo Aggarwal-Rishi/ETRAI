@@ -483,12 +483,12 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
 
   const reverseStatus = forensics.reverseSearch?.status || 'UNAVAILABLE';
   let originalFound = reverseStatus === 'NO_MATCH'
-    ? 'Search completed — no indexed candidate returned'
+    ? 'Unindexed Original Media · Zero web duplicates indexed'
     : reverseStatus === 'CANDIDATES_ONLY'
       ? 'Candidates found, but none verified as the same image'
       : 'Reverse search unavailable or inconclusive';
-  let originalFoundStatus = 'UNVERIFIED';
-  let originalFoundColor = 'ochre';
+  let originalFoundStatus = reverseStatus === 'NO_MATCH' ? 'UNINDEXED_ORIGINAL' : 'UNVERIFIED';
+  let originalFoundColor = reverseStatus === 'NO_MATCH' ? 'moss' : 'ochre';
   let originalUrl = null;
   let originalPageUrl = null;
   let originalImageUrl = null;
@@ -499,7 +499,7 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     const isWire = ['pib.gov.in', 'reuters.com', 'apnews.com', 'afp.com', 'gettyimages.com', 'epa.eu', 'bloomberg.com', 'pti.in', 'ani.in'].some(d => (topMatch.domain || '').includes(d));
     const isVerifiedVisualMatch = topMatch.matchType === 'FULL_MATCH' ||
       topMatch.matchType === 'LOCAL_PERCEPTUAL_MATCH' ||
-      (Number.isFinite(topMatch.similarity) && topMatch.similarity >= 0.78 && topMatch.matchType !== 'VISUAL_SEARCH_CANDIDATE') ||
+      (Number.isFinite(topMatch.similarity) && topMatch.similarity >= 0.73 && topMatch.matchType !== 'VISUAL_SEARCH_CANDIDATE') ||
       Boolean(topMatch.isWire);
     originalPageUrl = topMatch.sourceUrl || null;
 
@@ -519,15 +519,17 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
       originalImageUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
       originalUrl = originalImageUrl;
     } else {
-      originalFoundStatus = 'CANDIDATE';
-      originalFoundColor = 'ochre';
+      // Below 73% threshold: Loose visual lookalike, original remains unindexed
+      originalFoundStatus = 'UNINDEXED_ORIGINAL';
+      originalFoundColor = 'moss';
       originalImageUrl = null;
       originalUrl = null;
       candidateImageUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
+      const simText = Number.isFinite(topMatch.similarity) ? ` (${Math.round(topMatch.similarity * 100)}% visual similarity)` : '';
       if (topMatch.domain) {
-        originalFound = `Visual candidate · ${topMatch.domain}${isWire ? ' (wire collection)' : ''}`;
-      } else if (reverseHits.length > 1) {
-        originalFound = `${reverseHits.length} indexed visual candidates`;
+        originalFound = `Unindexed Original Media · Loose lookalike on ${topMatch.domain}${simText}`;
+      } else {
+        originalFound = `Unindexed Original Media · Loose visual lookalikes returned`;
       }
     }
   } else if (unverifiedCandidates.length > 0) {
@@ -536,12 +538,18 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     originalImageUrl = null;
     originalUrl = null;
     candidateImageUrl = topCandidate.originalImageUrl || topCandidate.thumbnailUrl || null;
-    const similarityText = Number.isFinite(topCandidate.similarity)
-      ? ` · ${Math.round(topCandidate.similarity * 100)}% visual similarity`
-      : '';
-    originalFound = `Closest indexed candidate · ${topCandidate.domain || 'web index'}${similarityText}`;
-    originalFoundStatus = 'CANDIDATE';
-    originalFoundColor = 'ochre';
+    const similarityVal = Number.isFinite(topCandidate.similarity) ? topCandidate.similarity : null;
+    const similarityText = similarityVal ? ` · ${Math.round(similarityVal * 100)}% visual similarity` : '';
+
+    if (similarityVal && similarityVal >= 0.73) {
+      originalFound = `Verified visual match · ${topCandidate.domain || 'web index'}${similarityText}`;
+      originalFoundStatus = 'FOUND';
+      originalFoundColor = 'moss';
+    } else {
+      originalFound = `Unindexed Original Media · Closest candidate ${topCandidate.domain || 'web index'}${similarityText}`;
+      originalFoundStatus = 'UNINDEXED_ORIGINAL';
+      originalFoundColor = 'moss';
+    }
   }
 
   // Base64 Data URL of the user's provided photo

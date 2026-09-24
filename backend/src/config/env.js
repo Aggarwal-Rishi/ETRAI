@@ -47,6 +47,10 @@ const config = {
   serpApi: {
     apiKey: process.env.SERPAPI_API_KEY || ''
   },
+  sightengine: {
+    apiUser: process.env.SIGHTENGINE_API_USER || '',
+    apiSecret: process.env.SIGHTENGINE_API_SECRET || ''
+  },
   limits: {
     maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '10', 10),
     maxSearchQueriesPerClaim: parseInt(process.env.MAX_SEARCH_QUERIES_PER_CLAIM || '4', 10),

@@ -205,6 +205,15 @@ export default function VideoForensicsViewer({ mediaAnalysis = {}, reportData = 
     ['Synthetic voice signal', voice.status === 'COMPLETED' ? `${Number(voice.syntheticLikelihood || 0)}% likelihood` : 'Not available', voice.isSyntheticSuspected ? 'danger' : voice.status === 'COMPLETED' ? 'safe' : 'warn']
   ];
 
+  const aiDetection = reportData?.mediaAnalysis?.aiDetection || mediaAnalysis?.aiDetection;
+  if (aiDetection && aiDetection.status === 'COMPLETED') {
+    checks.push([
+      'Sightengine Deepfake / Face-Swap',
+      `${Math.round((aiDetection.aiScore || 0) * 100)}% AI · ${Math.round((aiDetection.deepfakeScore || 0) * 100)}% swap`,
+      aiDetection.isAiGenerated || (aiDetection.aiScore >= 0.5) || (aiDetection.deepfakeScore >= 0.5) ? 'danger' : 'safe'
+    ]);
+  }
+
   const tone = (status) => status === 'danger'
     ? 'text-rose-300 border-rose-500/30 bg-rose-500/10'
     : status === 'warn'

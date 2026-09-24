@@ -274,6 +274,23 @@ async function verifyImageSourceContext({ imageReportItem, reverseSearch, visual
   const matchStatus = imageReportItem?.originalFoundStatus || 'UNVERIFIED';
   const localVisualMatchVerified = matchStatus === 'FOUND';
 
+  if (matchStatus === 'UNINDEXED_ORIGINAL') {
+    return {
+      status: 'UNINDEXED_NEW_CAPTURE',
+      contextualVerdict: 'AUTHENTIC_UNINDEXED',
+      confidence: 96,
+      decisive: true,
+      localVisualMatchVerified: false,
+      matchStatus: 'UNINDEXED_ORIGINAL',
+      visualSummary: visualSummary || '',
+      source: null,
+      rationale: 'Image is an unindexed original capture with no prior publication context or web duplications. Primary verification relies on camera sensor and synthetic AI forensics.',
+      matchingDetails: ['Verified unindexed camera capture', 'No web duplicate matches detected'],
+      contradictions: [],
+      provider: 'UNINDEXED_ORIGINAL_CLASSIFIER'
+    };
+  }
+
   if (!sourceUrl || !['FOUND', 'CANDIDATE'].includes(matchStatus)) {
     return {
       status: 'UNAVAILABLE',

@@ -93,6 +93,38 @@ function verifyObservationClaimsAgainstImageSource(claims = [], mediaAnalysis = 
     }));
   }
 
+  const aiDet = mediaAnalysis?.aiDetection;
+  if (aiDet && aiDet.status === 'SUCCESS') {
+    if (aiDet.isAiGenerated) {
+      const aiConf = Math.round((aiDet.aiGeneratedProbability || 0.9) * 100);
+      return claims.map(claim => ({
+        ...claim,
+        status: 'FABRICATED',
+        verdict: 'FALSE',
+        confidence: aiConf,
+        sources,
+        evidenceState: 'REFUTED',
+        evidenceEvaluations: [],
+        explanation: `Sightengine AI Detection confirmed synthetic AI generation (${aiConf}% probability). ${aiDet.assessmentSummary}`,
+        verificationMode: 'AI_DETECTION_SIGHTENGINE'
+      }));
+    }
+    if (aiDet.aiGeneratedProbability <= 0.20 && !aiDet.isDeepfake) {
+      const realConf = Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.1)) * 100);
+      return claims.map(claim => ({
+        ...claim,
+        status: 'TRUSTED',
+        verdict: 'VERIFIED',
+        confidence: realConf,
+        sources,
+        evidenceState: 'SUPPORTED',
+        evidenceEvaluations: [],
+        explanation: `Sightengine AI Detection verified authentic photographic capture (camera lens confidence: ${realConf}%). ${aiDet.assessmentSummary}`,
+        verificationMode: 'AI_DETECTION_SIGHTENGINE'
+      }));
+    }
+  }
+
   return claims.map(claim => ({
     ...claim,
     status: 'SUSPICIOUS',
@@ -159,7 +191,8 @@ async function runVerificationPipeline({
   allowExternalVisualSearch = false,
   allowExternalTranscriptSearch = false,
   traceProvenance = true,
-  detectEntities = true
+  detectEntities = true,
+  enableAiDetection = true
 }) {
   const logger = new PipelineLogger(jobId);
   const providerStatus = getProviderStatus();
@@ -284,6 +317,37 @@ async function runVerificationPipeline({
       }
     }
 
+    if (enableAiDetection && isMediaJob) {
+      const { detectImageAi, detectVideoKeyframesAi } = require('./media/sightengineDetector');
+      if (mediaCategory === 'PHOTO') {
+        sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 52, step: 'Agent 1: Scanning image for synthetic AI generation & deepfakes (Sightengine)...', stage: 'AI_DETECTION' });
+        const imgBuffer = file?.buffer || (mediaAnalysis?.imageForensics?.rawBuffer) || null;
+        if (imgBuffer) {
+          const aiRes = await detectImageAi(imgBuffer);
+          if (mediaAnalysis) mediaAnalysis.aiDetection = aiRes;
+          emitDebugEvent({
+            agent: 'Sightengine',
+            phase: 'AI_DETECTION',
+            action: 'IMAGE_AI_DETECTION_COMPLETE',
+            detail: `Sightengine evaluated image (ai_generated: ${aiRes.aiGeneratedProbability !== null ? Math.round(aiRes.aiGeneratedProbability * 100) + '%' : 'unconfigured'}, verdict: ${aiRes.verdictLabel || 'N/A'})`
+          });
+        }
+      } else if (mediaCategory === 'VIDEO') {
+        sseManager.emitProgress(jobId, { status: 'PROCESSING', progress: 52, step: 'Agent 1: Inspecting video keyframes for generative AI signatures (Sightengine)...', stage: 'AI_DETECTION' });
+        const frames = (mediaAnalysis?.extractedFrames || []).map(f => f.buffer).filter(Boolean);
+        if (frames.length > 0) {
+          const aiRes = await detectVideoKeyframesAi(frames);
+          if (mediaAnalysis) mediaAnalysis.aiDetection = aiRes;
+          emitDebugEvent({
+            agent: 'Sightengine',
+            phase: 'AI_DETECTION',
+            action: 'VIDEO_AI_DETECTION_COMPLETE',
+            detail: `Sightengine evaluated video keyframes (max AI: ${aiRes.maxAiGeneratedProbability !== null ? Math.round(aiRes.maxAiGeneratedProbability * 100) + '%' : 'unconfigured'}, verdict: ${aiRes.verdictLabel || 'N/A'})`
+          });
+        }
+      }
+    }
+
     const { analyzeSentiment } = require('./sentimentService');
     const articleSentiment = analyzeSentiment(contentRes.extractedText || mediaAnalysis?.transcript || '');
 
@@ -343,18 +407,19 @@ async function runVerificationPipeline({
           ocrText: mediaAnalysis.ocrText || '',
           visualDescription: mediaAnalysis.visualDescription || '',
           entities: mediaAnalysis.entities || [],
-          isVideo: mediaCategory === 'VIDEO'
+          isVideo: mediaCategory === 'VIDEO',
+          observed: mediaAnalysis.observed || {}
         });
         claims = claimRes.claims || [];
       }
 
-      // Guarantee fallback verifiable claim if empty
-      if (claims.length === 0) {
+      // Only guarantee fallback verifiable claim for videos or if user explicitly attached news text
+      if (claims.length === 0 && (mediaCategory === 'VIDEO' || hasAttachedNews)) {
         const fallbackTopic = mediaAnalysis.visualDescription || `Visual content verification for ${contentRes.sourceTitle}`;
         claims = [{
           id: 'media_claim_visual_primary',
-          claimText: `The submitted ${mediaCategory === 'VIDEO' ? 'video' : 'image'} depicts: ${fallbackTopic}`,
-          text: `The submitted ${mediaCategory === 'VIDEO' ? 'video' : 'image'} depicts: ${fallbackTopic}`,
+          claimText: `The submitted video depicts: ${fallbackTopic}`,
+          text: `The submitted video depicts: ${fallbackTopic}`,
           entities: mediaAnalysis.entities || [],
           searchQuery: fallbackTopic.substring(0, 120),
           scope: 'National',

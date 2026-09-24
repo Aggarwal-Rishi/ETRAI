@@ -9,6 +9,7 @@ import ScoreDerivationView from '../components/ScoreDerivationView';
 import ImageForensicsCompare from '../components/ImageForensicsCompare';
 import VideoForensicsViewer from '../components/VideoForensicsViewer';
 import ScoringWeightsModal from '../components/ScoringWeightsModal';
+import SightengineReportCard from '../components/SightengineReportCard';
 import { apiUrl } from '../utils/api';
 import {
   ShieldCheck,
@@ -120,12 +121,39 @@ export default function ResultsPage() {
       }
     };
 
-    const acceptReport = (reportPayload) => {
+    const acceptReport = (rawPayload) => {
+      let reportPayload = rawPayload;
+      if (typeof reportPayload === 'string') {
+        try { reportPayload = JSON.parse(reportPayload); } catch (_) {}
+      }
+      if (reportPayload && typeof reportPayload.reportData === 'string') {
+        try {
+          const parsed = JSON.parse(reportPayload.reportData);
+          reportPayload = { ...parsed, ...reportPayload };
+        } catch (_) {}
+      } else if (reportPayload && typeof reportPayload.reportData === 'object' && reportPayload.reportData !== null) {
+        reportPayload = { ...reportPayload.reportData, ...reportPayload };
+      }
+
+      if (reportPayload && typeof reportPayload.mediaAnalysis === 'string') {
+        try {
+          reportPayload.mediaAnalysis = JSON.parse(reportPayload.mediaAnalysis);
+        } catch (_) {}
+      }
+
+      if (reportPayload && typeof reportPayload.aiDetection === 'string') {
+        try {
+          reportPayload.aiDetection = JSON.parse(reportPayload.aiDetection);
+        } catch (_) {}
+      }
+
       const isUsableReport = reportPayload && typeof reportPayload === 'object' && (
         Array.isArray(reportPayload.claims) ||
         Boolean(reportPayload.scores) ||
         Boolean(reportPayload.mediaAnalysis) ||
-        Boolean(reportPayload.summary)
+        Boolean(reportPayload.summary) ||
+        Boolean(reportPayload.images) ||
+        Boolean(reportPayload.aiDetection)
       );
       if (!isUsableReport || disposed) return false;
       recoveryFinished = true;
@@ -349,17 +377,40 @@ export default function ResultsPage() {
     DETECTED: 'bg-[#EAF1FC] text-[#2C4E86] border-[#C7D5EB]',
     TEXT_ONLY: 'bg-[#EFEEE9] text-[#52627D] border-[#CECECE]'
   };
+  const parseJsonField = (val) => {
+    if (!val) return null;
+    if (typeof val === 'object') return val;
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch (_) { return null; }
+    }
+    return null;
+  };
+
   const numericalFacts = report.numericalFacts || [];
   const links = report.discoveredAssets?.links || [];
-  const mediaType = (report.inputType || report.mediaAnalysis?.mediaType || 'TEXT').toUpperCase();
+  const parsedMediaAnalysis = parseJsonField(report.mediaAnalysis) || {};
+  const mediaType = (report.inputType || parsedMediaAnalysis.mediaType || 'TEXT').toUpperCase();
+
+  // Sightengine AI Detection / Deepfake Audit parsing
+  const aiDetection = parseJsonField(report.aiDetection) ||
+    parseJsonField(parsedMediaAnalysis.aiDetection) ||
+    parseJsonField(report.images?.[0]?.aiDetection) ||
+    parseJsonField(parsedMediaAnalysis.images?.[0]?.aiDetection) ||
+    null;
+
+  const hasSightengineAi = Boolean(aiDetection && (aiDetection.status === 'SUCCESS' || aiDetection.configured));
   const hasImageForensics = (report?.images && report.images.length > 0) ||
-    (report?.mediaAnalysis?.images && report.mediaAnalysis.images.length > 0) ||
-    Boolean(report?.mediaAnalysis?.imageForensics) ||
+    (parsedMediaAnalysis.images && parsedMediaAnalysis.images.length > 0) ||
+    Boolean(parsedMediaAnalysis.imageForensics) ||
+    Boolean(aiDetection && !aiDetection.evaluatedFramesCount) ||
     Boolean(report?.sourceTitle && /photo|image|jpg|jpeg|png|webp/i.test(report.sourceTitle));
   const hasVideoForensics = mediaType.includes('VIDEO') || mediaType.includes('AUDIO') ||
-    Boolean(report?.mediaAnalysis?.videoAudioForensics &&
-      Object.keys(report.mediaAnalysis.videoAudioForensics).length > 0) ||
+    Boolean(parsedMediaAnalysis.videoAudioForensics &&
+      Object.keys(parsedMediaAnalysis.videoAudioForensics).length > 0) ||
+    Boolean(aiDetection?.evaluatedFramesCount) ||
     Boolean(report?.sourceTitle && /\b(?:video|clip|mp4|mov|webm|avi)\b/i.test(report.sourceTitle));
+
+  const detectedForensicMediaType = hasVideoForensics || mediaType.includes('VIDEO') ? 'VIDEO' : 'IMAGE';
 
   // Confidence derivation — exact same canonical metric as trust score
   const confidencePct = trustScore;
@@ -743,14 +794,30 @@ export default function ResultsPage() {
 
         {/* MEDIA FORENSICS TABS */}
         {activeReportTab === 'images' && hasImageForensics && (
-          <ImageForensicsCompare
-            images={report?.images || report?.mediaAnalysis?.images}
-            reportData={report}
-          />
+          <div className="space-y-8">
+            <ImageForensicsCompare
+              images={report?.images || report?.mediaAnalysis?.images}
+              reportData={report}
+            />
+            {hasSightengineAi && (
+              <SightengineReportCard
+                aiDetection={aiDetection}
+                mediaType="IMAGE"
+              />
+            )}
+          </div>
         )}
 
         {activeReportTab === 'videos' && hasVideoForensics && (
-          <VideoForensicsViewer mediaAnalysis={report?.mediaAnalysis} reportData={report} />
+          <div className="space-y-8">
+            <VideoForensicsViewer mediaAnalysis={report?.mediaAnalysis} reportData={report} />
+            {hasSightengineAi && (
+              <SightengineReportCard
+                aiDetection={aiDetection}
+                mediaType="VIDEO"
+              />
+            )}
+          </div>
         )}
 
         {/* ========================================================================= */}
@@ -1169,6 +1236,14 @@ export default function ResultsPage() {
                 />
               )}
 
+              {/* SIGHTENGINE AI & DEEPFAKE REPORT CARD */}
+              {hasSightengineAi && (
+                <SightengineReportCard
+                  aiDetection={aiDetection}
+                  mediaType={detectedForensicMediaType}
+                />
+              )}
+
               {/* 05 · VIDEO: REAL FOOTAGE / DECEPTIVE CUT (actual measured signals only) */}
               {hasVideoForensics && (
                 <VideoForensicsViewer mediaAnalysis={report?.mediaAnalysis} reportData={report} />
@@ -1436,6 +1511,15 @@ export default function ResultsPage() {
                         className="block text-[#D97757] hover:text-[#B0512F] transition cursor-pointer font-semibold"
                       >
                         04 · Image Forensics
+                      </a>
+                    )}
+                    {hasSightengineAi && (
+                      <a
+                        href="#sightengine-audit"
+                        onClick={(e) => { e.preventDefault(); document.getElementById('sightengine-audit')?.scrollIntoView({ behavior: 'smooth' }); }}
+                        className="block text-[#0B5CD5] hover:text-[#0033C4] transition cursor-pointer font-semibold"
+                      >
+                        04B · AI &amp; Deepfake Audit
                       </a>
                     )}
                     {hasVideoForensics && (

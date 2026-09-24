@@ -183,13 +183,18 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   }
 
   // ── Factor Scores Derivations ─────────────────────────────────────────────
-  
+  const aiDet = analysisData.mediaAnalysis?.aiDetection;
+  const isAuthenticAiVerified = aiDet?.status === 'SUCCESS' && (aiDet.aiGeneratedProbability || 0) <= 0.15 && !aiDet.isDeepfake;
+  const isMediaAuthentic = isAuthenticAiVerified || (analysisData.factualAccuracyScore !== undefined && analysisData.factualAccuracyScore >= 80);
+
   // 1. Claim Truthfulness / Evidence Match
   let claimTruthfulness = 50;
   if (totalClaims > 0) {
     claimTruthfulness = Math.round(claimScoreSum / totalClaims);
   } else if (analysisData.factualAccuracyScore !== undefined) {
     claimTruthfulness = Math.round(analysisData.factualAccuracyScore);
+  } else if (isAuthenticAiVerified) {
+    claimTruthfulness = 96;
   }
 
   // 2. Evidence Grounding / Freshness
@@ -197,6 +202,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   let evidenceGrounding = Math.min(100, Math.max(30, Math.round(avgEvidencePerClaim * 30 + 10)));
   if (totalEvidenceCount === 0 && totalClaims > 0 && verifiedCount === 0) evidenceGrounding = 0;
   if (verifiedCount > 0 && totalEvidenceCount >= 2) evidenceGrounding = Math.max(85, evidenceGrounding);
+  if (totalClaims === 0 && hasMedia && isMediaAuthentic) evidenceGrounding = 95;
 
   // 3. Source Authority
   let sourceAuthority = 75; // Baseline high-tier publisher expectation
@@ -204,6 +210,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     sourceAuthority = Math.round(authoritySum / authorityCount);
   } else if (verifiedCount > 0) {
     sourceAuthority = 85;
+  } else if (totalClaims === 0 && hasMedia && isMediaAuthentic) {
+    sourceAuthority = 95;
   }
 
   // 4. Stance Alignment / Contradictory Evidence
@@ -215,6 +223,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     stanceAlignment = 95;
   } else if (falseCount > 0) {
     stanceAlignment = 20;
+  } else if (totalClaims === 0 && hasMedia && isMediaAuthentic) {
+    stanceAlignment = 98;
   }
 
   // 5. Source Independence / Corroboration
@@ -222,7 +232,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   if (uniqueDomains.size >= 3) sourceIndependence = 95;
   else if (uniqueDomains.size === 2) sourceIndependence = 85;
   else if (uniqueDomains.size === 1) sourceIndependence = 70;
-  else if (totalEvidenceCount === 0 && verifiedCount === 0) sourceIndependence = 40;
+  else if (totalEvidenceCount === 0 && verifiedCount === 0 && !(totalClaims === 0 && hasMedia && isMediaAuthentic)) sourceIndependence = 40;
+  else if (totalClaims === 0 && hasMedia && isMediaAuthentic) sourceIndependence = 95;
 
   // 6. Provenance Quality
   const originConf = analysisData.provenance?.originConfidence || 'UNKNOWN';
@@ -231,6 +242,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   else if (originConf === 'PROBABLE') provenanceConfidence = 85;
   else if (originConf === 'EARLIEST_DISCOVERED') provenanceConfidence = 75;
   else if (verifiedCount > 0) provenanceConfidence = 80;
+  else if (totalClaims === 0 && hasMedia && isMediaAuthentic) provenanceConfidence = 95;
   else provenanceConfidence = 50;
 
   // 7. Language & Framing / Attribution Quality
@@ -250,11 +262,12 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   const forensicVerdict = mediaFindings?.forensicVerdict || mediaFindings?.verdict || analysisData.mediaAnalysis?.forensicVerdict;
   if (mediaFindings) {
     if (mediaFindings.c2pa?.hasC2paManifest) mediaIntegrity = 100;
-    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED') mediaIntegrity = 25;
+    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED' || aiDet?.isAiGenerated || aiDet?.isDeepfake) mediaIntegrity = 25;
     else if (videoContextVerdict === 'Manipulated') mediaIntegrity = 45;
     else if (videoContextVerdict === 'Deceptive Context') mediaIntegrity = 60;
     else if (forensicVerdict === 'INCONCLUSIVE_LIMITED_ANALYSIS') mediaIntegrity = 50;
     else if (mediaFindings.integrity && !mediaFindings.integrity.isIntegrityIntact) mediaIntegrity = 40;
+    else if (isAuthenticAiVerified) mediaIntegrity = 98;
     else mediaIntegrity = 90;
   }
 
@@ -464,10 +477,11 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   if (falseCount > 0 && finalTrustScore < 40) finalVerdict = 'FALSE';
   else if (falseCount > 0) finalVerdict = 'MISLEADING';
   else if (disputedCount > 0 || (supportingCount > 0 && refutingCount > 0)) finalVerdict = 'MIXED';
-  else if (finalTrustScore >= 85 && unverifiedCount === 0) finalVerdict = 'HIGHLY_SUPPORTED';
+  else if (finalTrustScore >= 85 && (unverifiedCount === 0 || (totalClaims === 0 && hasMedia))) finalVerdict = 'HIGHLY_SUPPORTED';
   else if (finalTrustScore >= 70) finalVerdict = 'SUPPORTED';
   else if (finalTrustScore >= 50) finalVerdict = 'MIXED';
-  else if (totalEvidenceCount === 0) finalVerdict = 'UNCERTAIN';
+  else if (totalEvidenceCount === 0 && !hasMedia) finalVerdict = 'UNCERTAIN';
+  else if (hasMedia && finalTrustScore >= 80) finalVerdict = 'HIGHLY_SUPPORTED';
   else finalVerdict = 'FALSE';
 
   // ── Drivers ───────────────────────────────────────────────────────────────
@@ -475,6 +489,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   const negativeDrivers = [];
 
   if (verifiedCount > 0) positiveDrivers.push(`Corroborated ${verifiedCount} factual proposition(s) against official sources.`);
+  if (isAuthenticAiVerified) positiveDrivers.push(`Sightengine neural detector confirmed authentic optical camera capture (${Math.round((1.0 - (aiDet.aiGeneratedProbability || 0)) * 100)}% natural capture certainty).`);
   if (sourceAuthority >= 80) positiveDrivers.push(`High average source authority score (${sourceAuthority}/100).`);
   if (uniqueDomains.size >= 2) positiveDrivers.push(`Corroborated across ${uniqueDomains.size} independent domains.`);
   if (originConf === 'CONFIRMED') positiveDrivers.push('Primary content provenance origin is cryptographically or archival confirmed.');

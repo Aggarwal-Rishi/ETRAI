@@ -508,30 +508,63 @@ function evaluateEvidenceStanceHeuristic(claim, searchResults = []) {
   });
 }
 
+let corporateOwnershipMap = {};
+try {
+  corporateOwnershipMap = require('../config/corporateOwnershipMap.json').domains || {};
+} catch (_) {}
+
+function getCorporateParent(domain) {
+  if (!domain) return 'Independent / Unmapped';
+  const clean = domain.replace(/^www\./i, '').toLowerCase();
+  return corporateOwnershipMap[clean] || clean;
+}
+
 /**
- * Deduplicates search hits that are republished/syndicated wire copies of a single original source.
+ * Deduplicates search hits that are republished/syndicated wire copies of a single original source,
+ * incorporating corporate parent conglomerate mapping.
  */
-function deduplicateWireSources(evaluations, searchResults) {
+function deduplicateWireSources(evaluations = [], searchResults = null) {
+  const resultsList = Array.isArray(searchResults) ? searchResults : evaluations;
   const seenSignatures = new Map();
+  const seenParentsByStance = new Map();
 
   return evaluations.map((e, idx) => {
-    const src = searchResults.find(s => (s.index !== undefined ? s.index : idx) === e.sourceIndex) || searchResults[idx] || {};
+    const sIndex = e.sourceIndex !== undefined ? e.sourceIndex : idx;
+    const src = resultsList.find((s, sIdx) => (s.index !== undefined ? s.index : sIdx) === sIndex) || resultsList[idx] || e || {};
+    const domain = src.domain || (src.url ? (() => { try { return new URL(src.url).hostname.replace(/^www\./, ''); } catch(_) { return ''; } })() : (e.domain || ''));
+    const corporateParent = getCorporateParent(domain);
+
     const titleSig = (src.title || '').toLowerCase().replace(/[^\w]/g, '').slice(0, 40);
     const snippetSig = (src.snippet || '').toLowerCase().replace(/[^\w]/g, '').slice(0, 60);
     const signature = `${titleSig}_${snippetSig}`;
 
+    const parentKey = `${corporateParent}_${e.stance || 'DEFAULT'}`;
+    const isParentDuplicate = Boolean(corporateParent !== 'Independent / Unmapped' && seenParentsByStance.has(parentKey));
+
     if (signature.length > 10 && seenSignatures.has(signature)) {
       return {
         ...e,
+        corporateParent,
         isSyndicatedDuplicate: true,
         primarySourceIndex: seenSignatures.get(signature)
       };
+    } else if (isParentDuplicate) {
+      return {
+        ...e,
+        corporateParent,
+        isSyndicatedDuplicate: true,
+        primarySourceIndex: seenParentsByStance.get(parentKey)
+      };
     } else {
       if (signature.length > 10) {
-        seenSignatures.set(signature, e.sourceIndex);
+        seenSignatures.set(signature, sIndex);
+      }
+      if (corporateParent !== 'Independent / Unmapped') {
+        seenParentsByStance.set(parentKey, sIndex);
       }
       return {
         ...e,
+        corporateParent,
         isSyndicatedDuplicate: false
       };
     }
@@ -1462,6 +1495,10 @@ Return ONLY a valid JSON object matching this schema:
     .filter(e => e.stance === 'REFUTES' && !e.isSyndicatedDuplicate)
     .map(e => e.sourceIndex);
 
+  const qualifyingIndices = evidenceEvaluations
+    .filter(e => e.stance === 'QUALIFIES' && !e.isSyndicatedDuplicate)
+    .map(e => e.sourceIndex);
+
   const neutralIndices = evidenceEvaluations
     .filter(e => e.stance === 'NEUTRAL')
     .map(e => e.sourceIndex);
@@ -1474,8 +1511,8 @@ Return ONLY a valid JSON object matching this schema:
     gptExplanation = `Zero relevant web search evidence items matched. No corroborating evidence could be retrieved for this claim.`;
     modelConfidence = 30;
   } else if (!gptExplanation) {
-    gptExplanation = `Evaluated ${evidenceEvaluations.length} search evidence item(s): ${supportingIndices.length} SUPPORTS, ${refutingIndices.length} REFUTES, ${neutralIndices.length} NEUTRAL, ${irrelevantIndices.length} IRRELEVANT.`;
-    modelConfidence = supportingIndices.length > 0 || refutingIndices.length > 0 ? 80 : 35;
+    gptExplanation = `Evaluated ${evidenceEvaluations.length} search evidence item(s): ${supportingIndices.length} SUPPORTS, ${refutingIndices.length} REFUTES, ${qualifyingIndices.length} QUALIFIES, ${neutralIndices.length} NEUTRAL, ${irrelevantIndices.length} IRRELEVANT.`;
+    modelConfidence = supportingIndices.length > 0 || refutingIndices.length > 0 || qualifyingIndices.length > 0 ? 80 : 35;
   }
 
   const validatedSources = [];
@@ -1592,17 +1629,48 @@ Return ONLY a valid JSON object matching this schema:
   }
 
   const nonDuplicateSupportingCount = evidenceEvaluations.filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate).length;
-  const totalHitCount = Math.max(1, evidenceEvaluations.length);
-  const sourceIndependence = Math.round((nonDuplicateSupportingCount / totalHitCount) * 100);
+  const nonDuplicateRefutingCount = evidenceEvaluations.filter(e => e.stance === 'REFUTES' && !e.isSyndicatedDuplicate).length;
+  const nonDuplicateQualifyingCount = evidenceEvaluations.filter(e => e.stance === 'QUALIFIES' && !e.isSyndicatedDuplicate).length;
 
-  // Apply Global Unified Scoring Formula
-  const { calculateClaimScore, getGlobalScoringWeights } = require('./scoringConfigService');
+  const distinctCorporateParents = new Set(
+    evidenceEvaluations
+      .filter(e => !e.isSyndicatedDuplicate && e.stance !== 'NEUTRAL' && e.stance !== 'IRRELEVANT')
+      .map(e => e.corporateParent || e.sourceIndex)
+  ).size;
+
+  const totalHitCount = Math.max(1, evidenceEvaluations.length);
+  const sourceIndependence = Math.round((Math.max(nonDuplicateSupportingCount, nonDuplicateRefutingCount, distinctCorporateParents) / totalHitCount) * 100);
+
+  // Apply Global Unified Scoring Formula + Dual-Axis Calculation
+  const { calculateClaimScore, calculateDualAxisScore, getGlobalScoringWeights } = require('./scoringConfigService');
   const activeWeights = getGlobalScoringWeights();
   const sourceAuthorityScore = Math.round((sourceCredibilityEval.averageTrustScore || 0) * 100);
 
+  const maxRefutingAuthority = Math.max(0, ...refutingIndices.map(idx => {
+    const src = searchResults.find(s => s.index === idx) || searchResults[idx];
+    return src ? getDomainTrustScore(src.domain || src.url) * 100 : 0;
+  }));
+  const maxSupportingAuthority = Math.max(0, ...supportingIndices.map(idx => {
+    const src = searchResults.find(s => s.index === idx) || searchResults[idx];
+    return src ? getDomainTrustScore(src.domain || src.url) * 100 : 0;
+  }));
+
+  const dualAxis = calculateDualAxisScore({
+    supportingSources: evidenceEvaluations.filter(e => e.stance === 'SUPPORTS'),
+    refutingSources: evidenceEvaluations.filter(e => e.stance === 'REFUTES'),
+    qualifyingSources: evidenceEvaluations.filter(e => e.stance === 'QUALIFIES'),
+    neutralSources: evidenceEvaluations.filter(e => e.stance === 'NEUTRAL'),
+    allSources: evidenceEvaluations,
+    distinctCorporateParents,
+    maxRefutingAuthority
+  });
+
+  const veracityIndex = dualAxis.veracityIndex;
+  const evidentiaryCertainty = dualAxis.evidentiaryCertainty;
+
   let derivedConfidence = 0;
-  if (evidenceState === 'INSUFFICIENT') {
-    derivedConfidence = 30;
+  if (evidenceState === 'INSUFFICIENT' || dualAxis.canonicalVerdict === 'UNVERIFIED') {
+    derivedConfidence = Math.min(35, Math.round(evidentiaryCertainty) || 30);
   } else {
     derivedConfidence = calculateClaimScore({
       evidenceQuality,
@@ -1613,24 +1681,24 @@ Return ONLY a valid JSON object matching this schema:
   }
   derivedConfidence = Math.max(0, Math.min(100, derivedConfidence));
 
-  let canonicalVerdict = 'UNVERIFIED';
-  const maxRefutingAuthority = Math.max(0, ...refutingIndices.map(idx => {
-    const src = searchResults.find(s => s.index === idx) || searchResults[idx];
-    return src ? getDomainTrustScore(src.domain || src.url) * 100 : 0;
-  }));
-  const maxSupportingAuthority = Math.max(0, ...supportingIndices.map(idx => {
-    const src = searchResults.find(s => s.index === idx) || searchResults[idx];
-    return src ? getDomainTrustScore(src.domain || src.url) * 100 : 0;
-  }));
-
+  // Canonical Verdict & Epistemic Guardrail:
+  // Cannot be marked FALSE unless refuting sources exist with authoritative support
+  let canonicalVerdict = dualAxis.canonicalVerdict;
   if (evidenceState === 'REFUTED' || (maxRefutingAuthority >= 95 && maxSupportingAuthority <= 50 && refutingIndices.length > 0)) {
     canonicalVerdict = 'FALSE';
-  } else if (evidenceState === 'MIXED') {
+  } else if (evidenceState === 'MIXED' || nonDuplicateQualifyingCount > 0) {
     canonicalVerdict = 'PARTIALLY_VERIFIED';
   } else if (evidenceState === 'SUPPORTED' && derivedConfidence >= 55) {
     canonicalVerdict = 'VERIFIED';
   } else {
     canonicalVerdict = 'UNVERIFIED';
+  }
+
+  // Hard Epistemic Lock: Zero evidence CANNOT be FALSE or FABRICATED
+  if (evidenceEvaluations.length === 0 || distinctCorporateParents === 0 || evidentiaryCertainty < 25) {
+    if (canonicalVerdict === 'FALSE' && refutingIndices.length === 0) {
+      canonicalVerdict = 'UNVERIFIED';
+    }
   }
 
   // Synthesize human-readable claim stance reason
@@ -1641,7 +1709,9 @@ Return ONLY a valid JSON object matching this schema:
     } else if (canonicalVerdict === 'FALSE') {
       claimStanceReason = `Contradicted by ${refutingIndices.length} authoritative source(s) with conflicting public facts or explicit debunks.`;
     } else if (canonicalVerdict === 'PARTIALLY_VERIFIED') {
-      claimStanceReason = `Mixed reporting across sources: ${supportingIndices.length} corroborating vs ${refutingIndices.length} contesting source(s).`;
+      claimStanceReason = nonDuplicateQualifyingCount > 0
+        ? `Qualifying reporting across sources: core event acknowledged with differing contextual details or numbers.`
+        : `Mixed reporting across sources: ${supportingIndices.length} corroborating vs ${refutingIndices.length} contesting source(s).`;
     } else {
       claimStanceReason = `Insufficient or neutral evidence: retrieved sources do not provide definitive confirmation or refutation of this specific assertion.`;
     }
@@ -1651,11 +1721,15 @@ Return ONLY a valid JSON object matching this schema:
     evidenceState,
     verdict: canonicalVerdict,
     confidence: derivedConfidence,
+    veracityIndex,
+    evidentiaryCertainty,
+    dualAxis,
     claimStanceReason,
     evidenceQuality,
     sourceAuthority: sourceAuthorityScore,
     sourceAgreement,
     sourceIndependence,
+    distinctCorporateParents,
     scoringWeights: activeWeights
   };
 
@@ -2026,5 +2100,6 @@ module.exports = {
   generateMultiPerspectiveQueries,
   deduplicateAndRankCandidates,
   executeSemanticCandidateRetrieval,
-  evaluateEvidenceStanceHeuristic
+  evaluateEvidenceStanceHeuristic,
+  deduplicateWireSources
 };

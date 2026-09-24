@@ -125,11 +125,94 @@ function calculateClaimScore(factors = {}, customWeights = null) {
   return Math.max(0, Math.min(100, Math.round(weightedSum)));
 }
 
+/**
+ * Dual-Axis Scoring Engine & Epistemic Guardrail Synthesizer
+ * Separates truth value (Veracity Index V) from proof certainty (Evidentiary Certainty C).
+ * 
+ * Veracity Index V = 50 * (1 + S_net), where S_net = (W_sup - W_ref) / W_total
+ * Evidentiary Certainty C = Mean(Authority) * (1 - e^(-0.4 * N_indep))
+ */
+function calculateDualAxisScore({
+  supportingSources = [],
+  refutingSources = [],
+  qualifyingSources = [],
+  neutralSources = [],
+  allSources = [],
+  distinctCorporateParents = 0,
+  maxRefutingAuthority = 0
+} = {}) {
+  const getAuth = (s) => typeof s.authorityScore === 'number' ? s.authorityScore : (typeof s.trustScore === 'number' ? Math.round(s.trustScore * 100) : 50);
+
+  const wSup = supportingSources.reduce((sum, s) => sum + getAuth(s), 0);
+  const wRef = refutingSources.reduce((sum, s) => sum + getAuth(s), 0);
+  const wQual = qualifyingSources.reduce((sum, s) => sum + (getAuth(s) * 0.5), 0);
+  const wTotal = allSources.reduce((sum, s) => sum + getAuth(s), 0);
+
+  // 1. Veracity Index (0 to 100)
+  let sNet = 0;
+  let veracityIndex = 50.0;
+  if (wTotal > 0) {
+    sNet = ((wSup + wQual) - wRef) / wTotal;
+    veracityIndex = Number(Math.max(0, Math.min(100, 50.0 * (1.0 + sNet))).toFixed(1));
+  }
+
+  // 2. Evidentiary Certainty (0 to 100)
+  const nIndep = Math.max(0, distinctCorporateParents || allSources.length);
+  const totalCount = allSources.length;
+  const meanAuthority = totalCount > 0 ? (wTotal / totalCount) : 0;
+  const certaintyFactor = 1.0 - Math.exp(-0.4 * nIndep);
+  const evidentiaryCertainty = Number(Math.max(0, Math.min(100, meanAuthority * certaintyFactor)).toFixed(1));
+
+  // 3. Epistemic Guardrail Execution
+  let canonicalVerdict = 'UNVERIFIED';
+  let evidenceState = 'INSUFFICIENT';
+  let statusLabel = 'UNVERIFIED';
+
+  if (totalCount === 0 || nIndep === 0 || evidentiaryCertainty < 30.0) {
+    canonicalVerdict = 'UNVERIFIED';
+    evidenceState = 'INSUFFICIENT';
+    statusLabel = 'UNVERIFIED';
+  } else if (veracityIndex >= 80.0 && supportingSources.length > 0) {
+    canonicalVerdict = 'VERIFIED';
+    evidenceState = 'SUPPORTED';
+    statusLabel = 'TRUSTED';
+  } else if (veracityIndex <= 25.0 && refutingSources.length > 0 && maxRefutingAuthority >= 85) {
+    canonicalVerdict = 'FALSE';
+    evidenceState = 'REFUTED';
+    statusLabel = 'FABRICATED';
+  } else if (qualifyingSources.length > 0 || (supportingSources.length > 0 && refutingSources.length > 0)) {
+    canonicalVerdict = 'PARTIALLY_VERIFIED';
+    evidenceState = 'MIXED';
+    statusLabel = 'SUSPICIOUS';
+  } else {
+    canonicalVerdict = 'UNVERIFIED';
+    evidenceState = 'INSUFFICIENT';
+    statusLabel = 'SUSPICIOUS';
+  }
+
+  return {
+    veracityIndex,
+    evidentiaryCertainty,
+    canonicalVerdict,
+    evidenceState,
+    statusLabel,
+    netBalance: Number(sNet.toFixed(3)),
+    distinctCorporateParents: nIndep,
+    weightsSummary: {
+      wSup,
+      wRef,
+      wQual,
+      wTotal
+    }
+  };
+}
+
 module.exports = {
   DEFAULT_GLOBAL_WEIGHTS,
   getGlobalScoringWeights,
   updateGlobalScoringWeights,
   resetGlobalScoringWeights,
   calculateClaimScore,
+  calculateDualAxisScore,
   normalizeWeights
 };

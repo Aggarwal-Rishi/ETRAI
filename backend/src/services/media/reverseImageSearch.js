@@ -9,7 +9,7 @@ const { fetchRemoteMediaBuffer } = require('./remoteMediaFetcher');
 // perceptual lookalikes out of the report entirely; otherwise images with a
 // similar colour palette or broad scene layout can be misrepresented as the
 // uploaded image's source.
-const VERIFIED_VISUAL_MATCH_THRESHOLD = 0.78;
+const VERIFIED_VISUAL_MATCH_THRESHOLD = 0.73;
 const PRESENTABLE_VISUAL_CANDIDATE_THRESHOLD = 0.60;
 const SERPAPI_IMAGE_UPLOAD_LIMIT_BYTES = 500 * 1024;
 const SERPAPI_IMAGE_UPLOAD_TARGET_BYTES = 480 * 1024;
