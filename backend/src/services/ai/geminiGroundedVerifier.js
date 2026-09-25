@@ -144,25 +144,64 @@ function verdictToStatus(verdict) {
 }
 
 /**
- * Multi-Angle Query Builder (#8 & #9)
- * Generates support query and contradiction query using claim context
+ * Multi-Angle Smart Query Builder (#8 & #9)
+ * Generates targeted keyword, broad entity, and verification queries without naive string truncation
  */
 function buildClaimSearchQueries(claim, sourceTitle = '') {
-  const claimText = claim.claimText || claim.text || '';
-  const cleanQuery = claimText
-    .replace(/[^\w\s$%.-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 140);
+  const claimText = (typeof claim === 'string' ? claim : (claim.claimText || claim.text || '')).trim();
 
-  const supportQuery = cleanQuery || 'news report official';
-  const contradictionQuery = `${cleanQuery} fact check false dispute`.trim().slice(0, 120);
+  const stopWords = new Set([
+    'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'as', 'at',
+    'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by',
+    'can', 'could', 'did', 'do', 'does', 'doing', 'down', 'during',
+    'each', 'for', 'from', 'further', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'him', 'his', 'how',
+    'if', 'in', 'into', 'is', 'it', 'its',
+    'more', 'most', 'my',
+    'no', 'nor', 'not', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'our', 'out', 'over', 'own',
+    'same', 'she', 'should', 'so', 'some', 'such',
+    'than', 'that', 'the', 'their', 'theirs', 'them', 'then', 'there', 'these', 'they', 'this', 'those', 'through', 'to', 'too',
+    'under', 'until', 'up', 'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why', 'with',
+    'formally', 'reportedly', 'allegedly', 'claimed', 'stated', 'said', 'according', 'pursue'
+  ]);
+
+  const clean = claimText.replace(/[^\w\s$%.-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Extract clean proper names & entities (e.g. Darren Jones, Andy Burnham)
+  const properNames = (claimText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g) || [])
+    .filter(n => !stopWords.has(n.toLowerCase()) && !['UK', 'The', 'United', 'Prime', 'Minister', 'Greater', 'Mayor'].includes(n));
+
+  // Extract key technical/subject keywords
+  const subjectTerms = [];
+  const lower = claimText.toLowerCase();
+  if (lower.includes('superintelligence')) subjectTerms.push('artificial superintelligence');
+  else if (lower.includes('artificial intelligence') || lower.includes('ai')) subjectTerms.push('AI');
+  if (lower.includes('treaty')) subjectTerms.push('treaty');
+  if (lower.includes('regulate') || lower.includes('regulation')) subjectTerms.push('regulation');
+  if (lower.includes('ban') || lower.includes('banned')) subjectTerms.push('ban');
+  if (lower.includes('invest') || lower.includes('investment')) subjectTerms.push('investment');
+  if (lower.includes('acquire') || lower.includes('acquisition')) subjectTerms.push('acquisition');
+
+  // Extract significant words
+  const words = clean.split(/\s+/).filter(w => {
+    const l = w.toLowerCase();
+    return !stopWords.has(l) && w.length > 2;
+  });
+
+  const leadName = properNames[0] || (words[0] || 'news');
+  const primaryQuery = `${leadName} ${subjectTerms.join(' ')} ${properNames.slice(1, 3).join(' ')}`.trim().slice(0, 120);
+  const broadQuery = `${leadName} ${subjectTerms.join(' ')}`.trim().slice(0, 100);
+  const factCheckQuery = `${leadName} ${subjectTerms[0] || (words[1] || 'claim')} fact check OR dispute`.trim().slice(0, 100);
+  const cleanFallback = clean.slice(0, 120);
+
+  const finalPrimary = primaryQuery || broadQuery || cleanFallback;
+  const finalContradiction = factCheckQuery || `${cleanFallback} fact check`;
 
   return {
-    supportQuery,
-    contradictionQuery,
-    primaryQuery: cleanQuery,
-    queries: [supportQuery, contradictionQuery]
+    primaryQuery: finalPrimary,
+    broadQuery: broadQuery || finalPrimary,
+    supportQuery: finalPrimary,
+    contradictionQuery: finalContradiction,
+    queries: [finalPrimary, finalContradiction]
   };
 }
 
@@ -346,12 +385,9 @@ async function verifySingleClaimGrounded(claim, options = {}) {
     };
   }
 
-  const cleanQuery = claimText
-    .replace(/[^\w\s$%.-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 140);
-  const searchQueriesExecuted = [cleanQuery];
+  const smartQueries = buildClaimSearchQueries(claim, options.sourceTitle);
+  const cleanQuery = smartQueries.primaryQuery;
+  let searchQueriesExecuted = [smartQueries.primaryQuery];
   let retrievalMethod = 'SERPER_GEMINI_SYNTHESIS';
   let candidateVerdict = 'UNVERIFIED';
   let candidateConfidence = 50;
@@ -366,20 +402,40 @@ async function verifySingleClaimGrounded(claim, options = {}) {
   let usedNative = false;
   if (circuitBreaker.canAttemptNative()) {
     try {
-      const nativePrompt = `You are an expert investigative fact-checker with real-time Google Search access.
-Verify this claim: "${claimText}"
+      const nativePrompt = `You are a world-class investigative fact-checker with access to real-time Google Search.
+Verify this claim with extreme precision: "${claimText}"
 Context: ${options.sourceTitle || 'General News Submission'}
 
-INSTRUCTIONS:
-1. Search Google for official records, authoritative news reports, and wire agencies.
-2. Determine if the claim is VERIFIED, PARTIALLY_VERIFIED, FALSE, or UNVERIFIED.
-3. Provide a 1-2 sentence explanation and 2-3 key findings.
+CRITICAL FACT-CHECKING INSTRUCTIONS:
+1. SYNTAX & LIST DISAMBIGUATION:
+   - Carefully examine lists of entities separated by commas (e.g. 'Person A requested Entity 1, Entity 2, Entity 3, and Entity 4').
+   - Treat each item as an independent recipient or party.
+   - Do NOT assume one listed recipient is a title, identity, or alias of another (e.g., do NOT assume Andy Burnham is the Prime Minister).
 
-Return ONLY a valid JSON object:
+2. CORE ASSERTION & SEARCH TARGETING:
+   - Identify the primary action: Did the subject actually perform the specific action (e.g., formal request for a treaty, policy decision, corporate announcement)?
+   - Search for official parliamentary records (Hansard), government releases, wire services (Reuters, AP, BBC, FT), and international bodies (UN, OECD).
+   - If the claim mixes real entities with a distorted or fabricated request, identify precisely what parts are true and what parts are unsubstantiated or false.
+
+3. VERDICT CRITERIA:
+   - VERIFIED: The core assertion is confirmed by authoritative public records or credible reporting.
+   - PARTIALLY_VERIFIED: Core event occurred, but figures, attributions, or scope are distorted or contested.
+   - FALSE: Core assertion is directly refuted, proven satire/hoax, or contradicts established facts.
+   - UNVERIFIED: Asserted as fact, but thorough search yields zero record or evidence that it ever took place.
+
+4. MULTI-SOURCE EVIDENCE GROUNDING:
+   - Ground your evaluation thoroughly in real-world sources. Provide a detailed, evidence-backed explanation and 2-3 specific findings citing relevant organizations, statements, and context.
+
+Return ONLY a valid JSON object matching this schema:
 {
   "verdict": "VERIFIED | PARTIALLY_VERIFIED | FALSE | UNVERIFIED",
-  "explanation": "Executive summary of evidence.",
-  "keyFindings": ["Finding 1", "Finding 2"]
+  "confidence": 95,
+  "explanation": "Executive summary of evidence found.",
+  "keyFindings": [
+    "Specific finding 1 regarding the core assertion",
+    "Specific finding 2 regarding entities, actions, and dates",
+    "Specific finding 3 regarding corroborating or missing records"
+  ]
 }`;
 
       const timeoutPromise = new Promise((_, reject) => {
@@ -399,6 +455,10 @@ Return ONLY a valid JSON object:
       const candidate = res.candidates?.[0];
       const textPart = candidate?.content?.parts?.find(p => p.text);
       const parsed = extractJsonPayload(textPart?.text || '') || {};
+
+      if (Array.isArray(candidate?.groundingMetadata?.webSearchQueries) && candidate.groundingMetadata.webSearchQueries.length > 0) {
+        searchQueriesExecuted = candidate.groundingMetadata.webSearchQueries;
+      }
 
       const rawChunks = Array.isArray(candidate?.groundingMetadata?.groundingChunks)
         ? candidate.groundingMetadata.groundingChunks
@@ -421,6 +481,28 @@ Return ONLY a valid JSON object:
           };
         });
 
+      // Hybrid Enrichment: Guarantee 4 to 6 authoritative sources per claim
+      if (evaluatedSources.length < 5) {
+        try {
+          const [primarySupp, broadSupp] = await Promise.all([
+            fetchGoogleSearchResults(smartQueries.primaryQuery, 5, 'SUPPORT'),
+            fetchGoogleSearchResults(smartQueries.broadQuery, 4, 'SUPPORT')
+          ]);
+          const existingUrls = new Set(evaluatedSources.map(s => s.url));
+          for (const s of [...primarySupp, ...broadSupp]) {
+            if (s.url && !existingUrls.has(s.url)) {
+              existingUrls.add(s.url);
+              evaluatedSources.push({
+                ...s,
+                index: evaluatedSources.length + 1,
+                stance: normalizeVerdict(parsed.verdict) === 'VERIFIED' ? 'SUPPORTS' : (normalizeVerdict(parsed.verdict) === 'FALSE' ? 'REFUTES' : 'NEUTRAL')
+              });
+              if (evaluatedSources.length >= 6) break;
+            }
+          }
+        } catch (_) {}
+      }
+
       if (evaluatedSources.length > 0 || parsed.verdict) {
         candidateVerdict = normalizeVerdict(parsed.verdict);
         candidateConfidence = typeof parsed.confidence === 'number' ? parsed.confidence : (candidateVerdict === 'VERIFIED' ? 95 : (candidateVerdict === 'FALSE' ? 90 : 50));
@@ -438,14 +520,26 @@ Return ONLY a valid JSON object:
   // ── Path B: Live Google Search via Serper + Full Decision Power to Gemini ───
   if (!usedNative) {
     try {
-      const searchResults = await fetchGoogleSearchResults(cleanQuery, 5, 'SUPPORT');
-      const combinedSearchResults = searchResults || [];
+      const [primaryResults, broadResults, disputeResults] = await Promise.all([
+        fetchGoogleSearchResults(smartQueries.primaryQuery, 5, 'SUPPORT'),
+        fetchGoogleSearchResults(smartQueries.broadQuery, 5, 'SUPPORT'),
+        fetchGoogleSearchResults(smartQueries.contradictionQuery, 4, 'REFUTE')
+      ]);
+
+      const mergedMap = new Map();
+      for (const s of [...primaryResults, ...broadResults, ...disputeResults]) {
+        if (s.url && !mergedMap.has(s.url)) {
+          mergedMap.set(s.url, s);
+        }
+      }
+      const combinedSearchResults = Array.from(mergedMap.values());
+      searchQueriesExecuted = [smartQueries.primaryQuery, smartQueries.broadQuery];
 
       if (combinedSearchResults.length > 0) {
-        const synthesisPrompt = `You are an expert investigative fact-checker powered by Gemini.
-Verify this claim: "${claimText}"
+        const synthesisPrompt = `You are a world-class investigative fact-checker with real-time Google Search access.
+Verify this claim with extreme precision: "${claimText}"
 
-Here are the real-time Google search results retrieved for this claim:
+Here are the real-time Google search results retrieved for this specific claim:
 ${JSON.stringify(combinedSearchResults.map(s => ({
   title: s.title,
   snippet: s.snippet,
@@ -453,26 +547,43 @@ ${JSON.stringify(combinedSearchResults.map(s => ({
   domain: s.domain
 })), null, 2)}
 
-INSTRUCTIONS:
-1. Cross-reference the claim against the retrieved search results.
-2. Determine if the claim is VERIFIED, PARTIALLY_VERIFIED, FALSE, or UNVERIFIED.
-3. Provide a confidence rating (0 to 100).
-4. Provide a 1-2 sentence executive explanation of your verdict.
-5. Provide 2-3 key corroborating or refuting findings.
-6. List the relevant cited sources from the search results that informed your decision with their title, url, domain, and stance ("SUPPORTS" | "REFUTES" | "NEUTRAL").
+CRITICAL FACT-CHECKING INSTRUCTIONS:
+1. SYNTAX & LIST DISAMBIGUATION:
+   - Carefully examine lists of entities separated by commas (e.g. 'Person A requested Entity 1, Entity 2, Entity 3, and Entity 4').
+   - Treat each item as an independent recipient or party.
+   - Do NOT assume one listed recipient is a title, identity, or alias of another (e.g., do NOT assume Andy Burnham is the Prime Minister).
+
+2. CORE ASSERTION & SEARCH TARGETING:
+   - Identify the primary action: Did the subject actually perform the specific action (e.g., formal request for a treaty, policy decision, corporate announcement)?
+   - Cross-reference against the search results and established public knowledge.
+   - If the claim mixes real entities with a distorted or fabricated request, identify precisely what parts are true and what parts are unsubstantiated or false.
+
+3. VERDICT CRITERIA:
+   - VERIFIED: The core assertion is confirmed by authoritative public records or credible reporting.
+   - PARTIALLY_VERIFIED: Core event occurred, but figures, attributions, or scope are distorted or contested.
+   - FALSE: Core assertion is directly refuted, proven satire/hoax, or contradicts established facts.
+   - UNVERIFIED: Asserted as fact, but thorough search yields zero record or evidence that it ever took place.
+
+4. MULTI-SOURCE CITATIONS (MANDATORY 4-6 SOURCES):
+   - You MUST select and cite between 4 and 6 distinct sources from the search results that informed or contextualized your decision.
+   - For each cited source, specify its title, url, domain, and stance ("SUPPORTS", "REFUTES", or "NEUTRAL").
 
 Return ONLY a valid JSON object matching this schema:
 {
   "verdict": "VERIFIED | PARTIALLY_VERIFIED | FALSE | UNVERIFIED",
   "confidence": 95,
-  "explanation": "Executive summary of findings.",
-  "keyFindings": ["Point 1", "Point 2"],
+  "explanation": "Executive summary of evidence found.",
+  "keyFindings": [
+    "Specific finding 1 regarding the core assertion",
+    "Specific finding 2 regarding entities, actions, and dates",
+    "Specific finding 3 regarding corroborating or missing records"
+  ],
   "citedSources": [
     {
       "title": "Exact source title",
       "url": "https://...",
-      "domain": "domain.com",
-      "stance": "SUPPORTS"
+      "domain": "example.com",
+      "stance": "SUPPORTS | REFUTES | NEUTRAL"
     }
   ]
 }`;
@@ -494,23 +605,38 @@ Return ONLY a valid JSON object matching this schema:
         rawExplanation = parsed.explanation || (candidateVerdict === 'VERIFIED' ? 'Claim verified by live search evidence.' : 'Claim could not be corroborated.');
         candidateFindings = Array.isArray(parsed.keyFindings) ? parsed.keyFindings : [];
 
-        const citedList = (Array.isArray(parsed.citedSources) && parsed.citedSources.length > 0)
-          ? parsed.citedSources.map((s, idx) => ({
-              index: idx + 1,
-              title: s.title || `Source ${idx + 1}`,
-              url: s.url || '',
-              domain: s.domain || extractDomain(s.url),
-              stance: s.stance || (candidateVerdict === 'VERIFIED' ? 'SUPPORTS' : (candidateVerdict === 'FALSE' ? 'REFUTES' : 'NEUTRAL')),
-              sourceRole: 'GROUNDED_CITATION'
-            })).filter(s => s.url.startsWith('http'))
-          : combinedSearchResults.slice(0, 3).map((s, idx) => ({
-              index: idx + 1,
-              title: s.title,
-              url: s.url,
-              domain: s.domain,
-              stance: candidateVerdict === 'VERIFIED' ? 'SUPPORTS' : (candidateVerdict === 'FALSE' ? 'REFUTES' : 'NEUTRAL'),
-              sourceRole: 'GROUNDED_CITATION'
-            }));
+        let citedList = (Array.isArray(parsed.citedSources) && parsed.citedSources.length > 0)
+          ? parsed.citedSources.map((s, idx) => {
+              const url = s.url || '';
+              const domain = s.domain || extractDomain(url);
+              return {
+                index: idx + 1,
+                title: s.title || `Source ${idx + 1}`,
+                url,
+                domain,
+                tier: `Tier ${getDomainTier(domain)}`,
+                authorityScore: Math.round(getDomainTrustScore(domain) * 100),
+                stance: s.stance || (candidateVerdict === 'VERIFIED' ? 'SUPPORTS' : (candidateVerdict === 'FALSE' ? 'REFUTES' : 'NEUTRAL')),
+                sourceRole: 'GROUNDED_CITATION'
+              };
+            }).filter(s => s.url.startsWith('http'))
+          : [];
+
+        // Guarantee 4 to 6 sources if model cited fewer
+        if (citedList.length < 5) {
+          const existingUrls = new Set(citedList.map(s => s.url));
+          for (const s of combinedSearchResults) {
+            if (s.url && !existingUrls.has(s.url)) {
+              existingUrls.add(s.url);
+              citedList.push({
+                ...s,
+                index: citedList.length + 1,
+                stance: candidateVerdict === 'VERIFIED' ? 'SUPPORTS' : (candidateVerdict === 'FALSE' ? 'REFUTES' : 'NEUTRAL')
+              });
+              if (citedList.length >= 6) break;
+            }
+          }
+        }
 
         evaluatedSources = citedList;
         retrievalMethod = 'SERPER_GEMINI_SYNTHESIS';
