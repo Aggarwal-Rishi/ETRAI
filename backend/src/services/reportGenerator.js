@@ -120,6 +120,17 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
           factualAccuracyScore = 90;
           articleVerdict = 'VERIFIED';
         }
+
+        // Proportional 3% to 10% deduction for detected mobile photo edits (stickers, erasers, text)
+        const mobileEdits = mediaAnalysis.mobileEdits || imageForensics.mobileEdits || imageForensics.reportItem?.mobileEdits;
+        if (mobileEdits?.hasEdits) {
+          const editCount = mobileEdits.editCount || mobileEdits.items?.length || 1;
+          const penalty = Math.min(10, Math.max(3, mobileEdits.estimatedEditPercentage || (editCount * 3)));
+          factualAccuracyScore = Math.max(70, factualAccuracyScore - penalty);
+          if (factualAccuracyScore >= 75) {
+            articleVerdict = 'VERIFIED';
+          }
+        }
       }
     }
   }

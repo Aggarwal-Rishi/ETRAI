@@ -127,6 +127,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     inferred = imgRes.inferred || inferred;
     visualInconsistencies = imgRes.visualInconsistencies || [];
     manipulationSignals = imgRes.manipulationSignals || [];
+    const mobileEdits = imgRes.mobileEdits || { hasEdits: false, editCount: 0, estimatedEditPercentage: 0, items: [] };
     allLimitations.push(...(imgRes.limitations || []));
 
     // B. Structured OCR
@@ -145,6 +146,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
       visualDescription,
       entities: observed.entities || [],
       ocrText: ocrRes.ocrText || observed.visibleText || '',
+      mobileEdits,
       // Visible text alone is not evidence that text was replaced. Only an
       // explicit comparison result may set this signal.
       ocrDifference: Boolean(options.ocrDifference)
@@ -152,6 +154,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     
     imageForensics = {
       ...imageReportItem.forensics,
+      mobileEdits,
       reportItem: imageReportItem
     };
     
@@ -292,6 +295,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     imageSourceContextComparison,
     forensics: imageForensics || docForensics || videoAudioForensics,
     imageForensics,
+    mobileEdits: imageForensics?.mobileEdits || null,
     images: imageForensics?.reportItem ? [imageForensics.reportItem] : [],
     docForensics,
     videoAudioForensics,

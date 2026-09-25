@@ -928,6 +928,21 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                   const isActive = activeDiff === dId.toLowerCase() || activeDiff === dId;
                   const b = customBoxPositions[d.id] || d.box || { left: '20%', top: '20%', width: '30%', height: '20%' };
 
+                  const actionType = (d.action || '').toUpperCase();
+                  const isAdded = actionType === 'ADDED';
+                  const isErased = actionType === 'ERASED';
+                  const isModified = actionType === 'MODIFIED';
+
+                  const colorClasses = isAdded
+                    ? (isActive ? 'border-white bg-blue-600/40 shadow-[0_0_15px_rgba(59,130,246,0.8)] scale-[1.01]' : 'border-blue-500 bg-blue-500/20 hover:border-white hover:bg-blue-600/30')
+                    : isErased
+                      ? (isActive ? 'border-white bg-orange-600/40 shadow-[0_0_15px_rgba(249,115,22,0.8)] scale-[1.01]' : 'border-orange-500 bg-orange-500/20 hover:border-white hover:bg-orange-600/30')
+                      : isModified
+                        ? (isActive ? 'border-white bg-purple-600/40 shadow-[0_0_15px_rgba(168,85,247,0.8)] scale-[1.01]' : 'border-purple-500 bg-purple-500/20 hover:border-white hover:bg-purple-600/30')
+                        : (isActive ? 'border-white bg-rose-500/35 shadow-[0_0_15px_rgba(232,143,107,0.8)] scale-[1.01]' : 'border-[#D97757] bg-[#D97757]/20 hover:border-white hover:bg-rose-500/30');
+
+                  const badgeBg = isAdded ? 'bg-blue-600' : isErased ? 'bg-orange-600' : isModified ? 'bg-purple-600' : 'bg-[#D97757]';
+
                   return (
                     <div
                       key={d.id || Math.random()}
@@ -937,19 +952,20 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                         width: b.width || `${b.w}%`,
                         height: b.height || `${b.h}%`
                       }}
-                      className={`absolute rounded border-2 transition-shadow cursor-move z-20 flex flex-col items-start justify-start p-1 select-none ${
-                        isActive
-                          ? 'border-white bg-rose-500/35 shadow-[0_0_15px_rgba(232,143,107,0.8)] scale-[1.01]'
-                          : 'border-[#D97757] bg-[#D97757]/20 hover:border-white hover:bg-rose-500/30'
-                      }`}
+                      className={`absolute rounded border-2 transition-shadow cursor-move z-20 flex flex-col items-start justify-start p-1 select-none ${colorClasses}`}
                       onMouseDown={(e) => handleBoxMouseDown(e, d.id, b)}
                       onMouseEnter={() => setActiveDiff(dId.toLowerCase())}
                       onMouseLeave={() => setActiveDiff(null)}
                       title="Click and drag to reposition this edit region"
                     >
                       <div className="flex items-center gap-1.5 -translate-y-3 -translate-x-1 shadow pointer-events-none">
-                        <b className="px-1.5 py-0.5 rounded bg-[#D97757] text-white font-mono text-[9px] font-bold">
-                          {d.id} · {d.title}
+                        <b className={`px-1.5 py-0.5 rounded ${badgeBg} text-white font-mono text-[9px] font-bold flex items-center gap-1`}>
+                          {d.action && (
+                            <span className="opacity-90">
+                              {d.action === 'ADDED' ? '+' : d.action === 'ERASED' ? '-' : '~'}
+                            </span>
+                          )}
+                          <span>{d.id} · {d.title}</span>
                         </b>
                         <span className="px-1 py-0.5 rounded bg-black/75 text-slate-200 text-[8px] font-mono hidden sm:inline">
                           ⠿ drag
@@ -977,12 +993,35 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                 </div>
               </div>
 
+              {/* Mobile Edits Audit Notice */}
+              {(selectedAsset?.mobileEdits?.hasEdits || primaryItem?.mobileEdits?.hasEdits) && (() => {
+                const me = selectedAsset?.mobileEdits || primaryItem?.mobileEdits;
+                return (
+                  <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-4 space-y-1.5 font-mono text-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 font-bold text-amber-900">
+                        <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Gemini Mobile &amp; Inpainting Edit Audit</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">
+                        -{me.estimatedEditPercentage || (me.editCount * 3)}% Trust Score Adjustment
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      {me.summary || `${me.editCount} mobile photo edits (added stickers, text overlays, or erased regions) were detected and mapped onto the image above.`}
+                    </p>
+                  </div>
+                );
+              })()}
+
               {/* Diffs List (.diffs) */}
               {diffList.length > 0 && (
                 <div className="divide-y divide-[#CECECE] bg-[#F8F8F6] rounded-2xl border border-[#CECECE] p-4">
                   {diffList.map((d) => {
                     const dId = String(d.id || '');
                     const isActive = activeDiff === dId.toLowerCase() || activeDiff === dId;
+                    const actionType = (d.action || '').toUpperCase();
+                    const badgeBg = actionType === 'ADDED' ? 'bg-blue-600' : actionType === 'ERASED' ? 'bg-orange-600' : actionType === 'MODIFIED' ? 'bg-purple-600' : 'bg-[#D97757]';
 
                     return (
                       <div
@@ -993,13 +1032,26 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
                           isActive ? 'bg-white text-[#0B5CD5] shadow-xs' : 'hover:bg-white/60 text-[#2C4E86]'
                         }`}
                       >
-                        <span className="w-5 h-5 rounded bg-[#D97757] text-white font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className={`w-5 h-5 rounded ${badgeBg} text-white font-mono text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5`}>
                           {d.id}
                         </span>
-                        <div className="space-y-1 text-xs">
-                          <p className="text-[#0B5CD5] leading-relaxed font-bold">
-                            {d.desc || d.title}
-                          </p>
+                        <div className="space-y-1 text-xs min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-[#0B5CD5] leading-relaxed font-bold">
+                              {d.desc || d.title}
+                            </p>
+                            {d.action && (
+                              <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase tracking-wider ${
+                                actionType === 'ADDED'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : actionType === 'ERASED'
+                                    ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                                    : 'bg-purple-100 text-purple-800 border border-purple-200'
+                              }`}>
+                                {actionType === 'ADDED' ? '+ Added' : actionType === 'ERASED' ? '- Erased' : '~ Mod'}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] text-[#7386A8] font-mono block">
                             {d.detail || d.meta}
                           </span>

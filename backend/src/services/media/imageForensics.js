@@ -493,6 +493,7 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
   let originalPageUrl = null;
   let originalImageUrl = null;
   let candidateImageUrl = null;
+  let visualComparison = null;
   const changes = [];
   const diffs = [];
   let markerCode = 65; // 'A'
@@ -666,34 +667,49 @@ function convertBox2dToPercent(box2d, fallback = null) {
     });
   }
 
-  if (options.visionObserved?.entities && options.visionObserved.entities.length > 1) {
-    changes.push('Entity insertion / compositing');
+  // ── Gemini Mobile Photo & Inpainting Edit Detection ──
+  const mobileEdits = options.mobileEdits || { hasEdits: false, editCount: 0, estimatedEditPercentage: 0, items: [] };
+  if (mobileEdits.hasEdits && Array.isArray(mobileEdits.items) && mobileEdits.items.length > 0) {
+    for (const editItem of mobileEdits.items) {
+      const actionTag = (editItem.action || 'MODIFIED').toUpperCase();
+      const title = editItem.title || (actionTag === 'ADDED' ? 'Added Element' : actionTag === 'ERASED' ? 'Erased Region' : 'Modified Area');
+      changes.push(`[${actionTag}] ${title}`);
+      
+      const editBox = convertBox2dToPercent(editItem.box_2d) || {
+        x: 25, y: 25, w: 50, h: 50, left: '25%', top: '25%', width: '50%', height: '50%'
+      };
+      diffs.push({
+        id: editItem.id || String.fromCharCode(markerCode++),
+        title: `[${actionTag}] ${title}`,
+        desc: editItem.explanation || editItem.title,
+        detail: editItem.explanation || `${title} identified during multimodal forensic inspection.`,
+        action: actionTag,
+        category: editItem.category || 'MOBILE_EDIT',
+        confidence: editItem.confidence || 80,
+        box: editBox,
+        box_2d: editItem.box_2d || null
+      });
+    }
+  }
 
-    const entityRegions = options.visionObserved?.entityRegions || [];
-    const publicFigures = options.visionObserved?.publicFigures || [];
+  if (options.visionObserved?.entities && options.visionObserved.entities.length > 1 && !mobileEdits.hasEdits) {
     const manipulationSignals = options.visionObserved?.manipulationSignals || [];
-
     const compSignal = manipulationSignals.find(s => s.box_2d && (s.type === 'COMPOSITING' || s.type === 'ARTIFACT'));
-    const detectedEntity = entityRegions.find(e => Array.isArray(e.box_2d))
-      || publicFigures.find(p => Array.isArray(p.box_2d))
-      || entityRegions[1]
-      || publicFigures[1]
-      || entityRegions[0]
-      || publicFigures[0];
+    
+    if (compSignal) {
+      changes.push('Entity insertion / compositing');
+      const entityBox = convertBox2dToPercent(compSignal.box_2d)
+        || { x: 55, y: 35, w: 35, h: 50, left: '55%', top: '35%', width: '35%', height: '50%' };
 
-    const entityBox = convertBox2dToPercent(compSignal?.box_2d)
-      || convertBox2dToPercent(detectedEntity?.box_2d)
-      || convertBox2dToPercent(options.visionObserved?.entityBox)
-      || { x: 55, y: 35, w: 35, h: 50, left: '55%', top: '35%', width: '35%', height: '50%' };
-
-    diffs.push({
-      id: String.fromCharCode(markerCode++),
-      title: 'Entity insertion detected',
-      desc: `Visual entity discrepancy: ${options.visionObserved.entities.join(', ')}`,
-      detail: `Multimodal entity analysis identified conflicting visual entities (${options.visionObserved.entities.join(', ')}) absent from baseline archive context`,
-      box: entityBox
-    });
-  } else if (options.visionObserved?.visibleText && !options.ocrDifference) {
+      diffs.push({
+        id: String.fromCharCode(markerCode++),
+        title: 'Entity insertion detected',
+        desc: `Visual entity discrepancy: ${options.visionObserved.entities.join(', ')}`,
+        detail: `Multimodal entity analysis identified conflicting visual entities (${options.visionObserved.entities.join(', ')}) absent from baseline archive context`,
+        box: entityBox
+      });
+    }
+  } else if (options.visionObserved?.visibleText && !options.ocrDifference && !mobileEdits.hasEdits) {
     changes.push('Text overlay');
     const textRegions = options.visionObserved?.textRegions || [];
     const textBox = convertBox2dToPercent(textRegions[0]?.box_2d)
@@ -759,6 +775,7 @@ function convertBox2dToPercent(box2d, fallback = null) {
     candidateImageUrl: candidateImageUrl || (candidateImages[0]?.imageUrl) || null,
     candidateImages,
     visualComparison,
+    mobileEdits,
     changes: changes.length > 0 ? changes : ['None detected'],
     manipulationLikelihood,
     chipVerdict: forensics.verdict === 'FABRICATED_OR_COMPOSITED'
@@ -780,6 +797,7 @@ function convertBox2dToPercent(box2d, fallback = null) {
     forensics: {
       ...forensics,
       visualComparison,
+      mobileEdits,
       integrity: {
         ...forensics.integrity,
         status: forensics.integrity?.isValid ? 'INTEGRITY_VERIFIED' : 'INTEGRITY_FAILED'

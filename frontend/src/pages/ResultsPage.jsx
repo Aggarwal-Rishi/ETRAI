@@ -863,6 +863,11 @@ export default function ResultsPage() {
                     imageForensics.visualComparison ||
                     report.mediaAnalysis?.visualComparison ||
                     null;
+                  const mobileEdits = parsedMediaAnalysis.mobileEdits ||
+                    imageForensics.mobileEdits ||
+                    imageForensics.reportItem?.mobileEdits ||
+                    report.mediaAnalysis?.mobileEdits ||
+                    null;
 
                   const isTampered = Boolean(
                     visualComparison?.isModified === true ||
@@ -917,24 +922,58 @@ export default function ResultsPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#7386A8]">02 · Media Integrity</span>
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                              isTampered ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]' : 'bg-[#EAF5EC] text-[#2C5B3E] border-[#C3E4C9]'
+                              visualComparison?.isModified || isTampered
+                                ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]'
+                                : mobileEdits?.hasEdits
+                                  ? 'bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]'
+                                  : 'bg-[#EAF5EC] text-[#2C5B3E] border-[#C3E4C9]'
                             }`}>
-                              {visualComparison?.isModified ? 'ELEMENT / PERSON REPLACED' : isTampered ? 'TAMPERING DETECTED' : 'UNALTERED'}
+                              {visualComparison?.isModified
+                                ? 'ELEMENT / PERSON REPLACED'
+                                : isTampered
+                                  ? 'TAMPERING DETECTED'
+                                  : mobileEdits?.hasEdits
+                                    ? `MOBILE EDITS (${mobileEdits.editCount})`
+                                    : 'UNALTERED'}
                             </span>
                           </div>
                           <div>
                             <h4 className="text-xs font-bold text-[#0B5CD5]">
                               {visualComparison?.isModified 
                                 ? (visualComparison.modificationType === 'PERSON_SWAPPED' || visualComparison.modificationType === 'FACE_SWAPPED' ? 'Person / Face Swapped' : 'Digital Tampering Detected')
-                                : isTampered ? 'Digital Manipulation / Splicing' : 'Uniform Pixel Integrity'}
+                                : isTampered 
+                                  ? 'Digital Manipulation / Splicing'
+                                  : mobileEdits?.hasEdits
+                                    ? `Mobile Alterations (-${mobileEdits.estimatedEditPercentage || (mobileEdits.editCount * 3)}% adjustment)`
+                                    : 'Uniform Pixel Integrity'}
                             </h4>
                             <p className="text-[11px] text-[#2C4E86] mt-1 leading-relaxed">
                               {visualComparison?.isModified
                                 ? (visualComparison.summary || 'Direct comparison with verified original photo confirms element replacement or face swap.')
                                 : isTampered 
                                   ? 'Error level analysis anomalies or cloning signals detected in high-frequency regions.' 
-                                  : 'No copy-move cloning or inpainting artifacts detected; quantization is uniform.'}
+                                  : mobileEdits?.hasEdits
+                                    ? (mobileEdits.summary || `${mobileEdits.editCount} mobile photo edits (stickers, erasures, or filters) identified.`)
+                                    : 'No copy-move cloning or inpainting artifacts detected; quantization is uniform.'}
                             </p>
+                            {mobileEdits?.hasEdits && Array.isArray(mobileEdits.items) && mobileEdits.items.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {mobileEdits.items.map((item, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border ${
+                                      item.action === 'ADDED'
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : item.action === 'ERASED'
+                                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                          : 'bg-purple-50 text-purple-700 border-purple-200'
+                                    }`}
+                                  >
+                                    {item.action === 'ADDED' ? '+ Added' : item.action === 'ERASED' ? '- Erased' : '~ Mod'}: {item.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 

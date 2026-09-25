@@ -577,6 +577,13 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
         provenanceReason = 'Reverse search contradicts submitted caption or indicates decontextualized reuse.';
       }
 
+      const mobileEdits = analysisData.mediaAnalysis?.mobileEdits || imageForensics.mobileEdits || imageForensics.reportItem?.mobileEdits;
+      let mobileEditPenalty = 0;
+      if (mobileEdits?.hasEdits && !isAi && !isTampered) {
+        const editCount = mobileEdits.editCount || mobileEdits.items?.length || 1;
+        mobileEditPenalty = Math.min(10, Math.max(3, mobileEdits.estimatedEditPercentage || (editCount * 3)));
+      }
+
       if (isAi) {
         finalTrustScore = 0;
         finalVerdict = 'FALSE';
@@ -584,7 +591,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
         finalTrustScore = 25;
         finalVerdict = 'FALSE';
       } else {
-        finalTrustScore = provenanceScore;
+        finalTrustScore = Math.max(70, provenanceScore - mobileEditPenalty);
         finalVerdict = finalTrustScore >= 80 ? 'HIGHLY_SUPPORTED' : 'SUPPORTED';
       }
 
@@ -616,15 +623,17 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
           shortName: 'Tampering',
           d: 'Error Level Analysis (ELA), copy-move forgery detection, and quantization uniformity',
           description: 'Error Level Analysis (ELA), copy-move forgery detection, and quantization uniformity',
-          raw: isTampered ? 25 : Math.max(0, 100 - manipulationScore),
-          rawScore: isTampered ? 25 : Math.max(0, 100 - manipulationScore),
+          raw: isTampered ? 25 : (mobileEditPenalty > 0 ? Math.max(70, 100 - (manipulationScore + (mobileEditPenalty * 3))) : Math.max(0, 100 - manipulationScore)),
+          rawScore: isTampered ? 25 : (mobileEditPenalty > 0 ? Math.max(70, 100 - (manipulationScore + (mobileEditPenalty * 3))) : Math.max(0, 100 - manipulationScore)),
           w: 35,
           weight: 35,
-          weightedContribution: Number(((isTampered ? 25 : Math.max(0, 100 - manipulationScore)) * 0.35).toFixed(1)),
-          contribution: Number(((isTampered ? 25 : Math.max(0, 100 - manipulationScore)) * 0.35).toFixed(1)),
+          weightedContribution: Number(((isTampered ? 25 : (mobileEditPenalty > 0 ? Math.max(70, 100 - (manipulationScore + (mobileEditPenalty * 3))) : Math.max(0, 100 - manipulationScore))) * 0.35).toFixed(1)),
+          contribution: Number(((isTampered ? 25 : (mobileEditPenalty > 0 ? Math.max(70, 100 - (manipulationScore + (mobileEditPenalty * 3))) : Math.max(0, 100 - manipulationScore))) * 0.35).toFixed(1)),
           reason: visualComparison?.isModified
             ? (visualComparison.summary || 'Direct comparison with verified original photo confirms element replacement or face swap.')
-            : (isTampered ? 'Splicing, inpainting, or composite manipulation detected.' : 'Uniform quantization and compression characteristics across image edges.')
+            : (mobileEdits?.hasEdits
+                ? `Local/mobile editing identified (${mobileEdits.editCount} region${mobileEdits.editCount > 1 ? 's' : ''}: ${mobileEdits.summary || 'retouching, inpainting, or stickers'}). Proportional score adjustment of -${mobileEditPenalty}%.`
+                : (isTampered ? 'Splicing, inpainting, or composite manipulation detected.' : 'Uniform quantization and compression characteristics across image edges.'))
         },
         {
           k: 'provenanceMatch',
