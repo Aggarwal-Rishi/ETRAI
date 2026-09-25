@@ -661,7 +661,7 @@ function buildReproducibilityMetadata({ fileInfo = {}, durationSeconds = 0, temp
       transcript_matched_sources: Number(options.provenanceEvidence?.transcriptSearch?.matchedSourceCount || 0)
     },
     configured_models: {
-      report_synthesis: options.disableAi === true ? null : ((process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim()),
+      report_synthesis: options.disableAi === true ? null : ((process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_MEDIA_MODEL || 'gemini-3.5-flash').trim()),
       face_manipulation: forensics.faceManipulation?.modelExecuted ? (forensics.faceManipulation.modelName || 'configured detector') : null,
       voice_clone: forensics.voiceClone?.modelExecuted ? (forensics.voiceClone.modelName || 'configured detector') : null,
       audiovisual_lip_sync: forensics.lipSync?.modelExecuted ? (forensics.lipSync.modelName || 'configured detector') : null
@@ -676,7 +676,7 @@ async function synthesizeVideoReport(segments, forensics, options = {}) {
   if (!ai) return fallback;
   try {
     const response = await ai.models.generateContent({
-      model: (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim(),
+      model: (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_MEDIA_MODEL || 'gemini-3.5-flash').trim(),
       contents: `Produce a source-grounded, segment-level video verification report using only this evidence.
 
 Rules: ordinary cuts prove editing, not deception; set is_truncated=true only when supplied source text contains the omitted adjacent words; never invent omitted speech, original intent, event, date, location, identity, or source; unknown fields must be null; use Inconclusive when evidence is insufficient; Deceptive Context requires source-grounded truncation or exact-media evidence proving that different events were presented as one; transcript similarity is only a possible audio-reuse clue, not acoustic proof; preserve supplied translations faithfully.

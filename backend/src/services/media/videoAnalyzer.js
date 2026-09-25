@@ -348,21 +348,30 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
     const mock = typeof options.mockTranscript === 'string'
       ? { text: options.mockTranscript }
       : options.mockTranscript;
+    const isSong = Boolean(mock.isSongOrMusic || options.isSongOrMusic || mock.audioType === 'SONG_VOCALS' || mock.audioType === 'MUSIC' || mock.audioType === 'MUSIC_BGM');
     const defaultSegment = {
       start: 0.0,
       end: 5.0,
-      text: mock.text || '',
-      translatedText: mock.translatedText || '',
+      text: isSong ? '' : (mock.text || ''),
+      translatedText: isSong ? '' : (mock.translatedText || ''),
       language: mock.language || null,
-      audioType: 'UNKNOWN',
-      backgroundAudio: []
+      audioType: isSong ? 'SONG_VOCALS' : (mock.audioType || 'SPEECH'),
+      backgroundAudio: isSong ? ['music'] : []
     };
     return {
-      status: 'AVAILABLE',
-      text: mock.text || '',
-      translatedText: mock.translatedText || '',
+      status: isSong ? 'SONG_OR_MUSIC_ONLY' : (mock.text ? 'AVAILABLE' : 'NO_SPEECH_DETECTED'),
+      text: isSong ? '' : (mock.text || ''),
+      translatedText: isSong ? '' : (mock.translatedText || ''),
       language: mock.language || null,
       segments: Array.isArray(mock.segments) ? mock.segments.map(segment => ({ ...defaultSegment, ...segment })) : [defaultSegment],
+      audioBreakdown: {
+        hasSpokenSpeech: !isSong && Boolean(mock.text),
+        isSongOrMusic: isSong,
+        speechPercentage: isSong ? 0 : (mock.speechPercentage !== undefined ? mock.speechPercentage : 100),
+        musicPercentage: isSong ? 100 : (mock.musicPercentage !== undefined ? mock.musicPercentage : 0),
+        songSegmentsCount: isSong ? 1 : 0,
+        speechSegmentsCount: isSong ? 0 : 1
+      },
       provider: 'INJECTED_TEST_TRANSCRIPT',
       limitations: []
     };
@@ -395,12 +404,36 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
 
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+    const modelName = (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_MEDIA_MODEL || 'gemini-3.5-flash').trim();
 
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [
-        `Transcribe this audio accurately. Preserve speech in its original language and provide an English translation when it is not English. Timestamp speech and significant audio components. Classify audioType only from acoustic evidence as SPEECH, VOICEOVER, MUSIC, SOUND_EFFECT, AMBIENT, MIXED, or UNKNOWN. Do not label sound diegetic or non-diegetic because no video is supplied. Output ONLY JSON matching: { "text": "full original-language transcript", "translatedText": "English translation or empty when already English", "language": "BCP-47 or plain language name", "segments": [ { "start": 0.0, "end": 5.0, "text": "original speech", "translatedText": "English translation", "language": "language", "audioType": "SPEECH", "backgroundAudio": ["music", "crowd"] } ] }`,
+        `Transcribe spoken dialogue in this audio accurately.
+CRITICAL RULES:
+1. DO NOT transcribe singing, song lyrics, or background music as spoken speech.
+2. Classify audio components into audioType: "SPEECH", "VOICEOVER", "SONG_VOCALS", "MUSIC_BGM", "SOUND_EFFECT", "AMBIENT", or "UNKNOWN".
+3. The root "text" field MUST ONLY contain human spoken speech / dialogue / news reporting. If the audio contains ONLY songs or background music and NO spoken dialogue, set "text" to "".
+Output ONLY JSON matching:
+{
+  "text": "spoken human dialogue only (empty string if song/music only)",
+  "translatedText": "English translation of spoken dialogue or empty",
+  "language": "BCP-47 or plain language name",
+  "isSongOrMusic": false,
+  "speechPercentage": 85,
+  "musicPercentage": 15,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 5.0,
+      "text": "spoken dialogue or lyrics",
+      "translatedText": "translation",
+      "language": "en",
+      "audioType": "SPEECH",
+      "backgroundAudio": ["music", "crowd"]
+    }
+  ]
+}`,
         {
           inlineData: {
             mimeType: 'audio/mp3',
@@ -423,30 +456,52 @@ async function transcribeAudio(audioBuffer = null, options = {}) {
 
     const parsed = JSON.parse((rawText || '{}').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
 
-    const fullText = (parsed.text || '').trim();
-    const translatedText = (parsed.translatedText || '').trim();
-    const language = parsed.language ? String(parsed.language).trim() : null;
-    const allowedAudioTypes = new Set(['SPEECH', 'VOICEOVER', 'MUSIC', 'SOUND_EFFECT', 'AMBIENT', 'MIXED', 'UNKNOWN']);
+    const allowedAudioTypes = new Set(['SPEECH', 'VOICEOVER', 'SONG_VOCALS', 'MUSIC_BGM', 'MUSIC', 'SOUND_EFFECT', 'AMBIENT', 'MIXED', 'UNKNOWN']);
     const rawSegments = Array.isArray(parsed.segments) ? parsed.segments : [];
-    const segments = rawSegments.map(s => ({
-      start: Number(Number(s.start || 0).toFixed(1)),
-      end: Number(Number(s.end || 0).toFixed(1)),
-      text: (s.text || '').trim(),
-      translatedText: (s.translatedText || '').trim(),
-      language: s.language ? String(s.language).trim() : language,
-      audioType: allowedAudioTypes.has(String(s.audioType || '').toUpperCase()) ? String(s.audioType).toUpperCase() : 'UNKNOWN',
-      backgroundAudio: Array.isArray(s.backgroundAudio) ? s.backgroundAudio.map(String).slice(0, 8) : []
-    }));
+    const segments = rawSegments.map(s => {
+      const type = allowedAudioTypes.has(String(s.audioType || '').toUpperCase()) ? String(s.audioType).toUpperCase() : 'UNKNOWN';
+      return {
+        start: Number(Number(s.start || 0).toFixed(1)),
+        end: Number(Number(s.end || 0).toFixed(1)),
+        text: (s.text || '').trim(),
+        translatedText: (s.translatedText || '').trim(),
+        language: s.language ? String(s.language).trim() : (parsed.language ? String(parsed.language).trim() : null),
+        audioType: type,
+        backgroundAudio: Array.isArray(s.backgroundAudio) ? s.backgroundAudio.map(String).slice(0, 8) : []
+      };
+    });
+
+    const spokenSegments = segments.filter(s => s.audioType === 'SPEECH' || s.audioType === 'VOICEOVER');
+    const songSegments = segments.filter(s => s.audioType === 'SONG_VOCALS' || s.audioType === 'MUSIC_BGM' || s.audioType === 'MUSIC');
+    const isPureSongOrMusic = spokenSegments.length === 0 && (songSegments.length > 0 || parsed.isSongOrMusic === true || (parsed.musicPercentage || 0) >= 80);
+
+    let cleanFullText = isPureSongOrMusic ? '' : (parsed.text || '').trim();
+    if (isPureSongOrMusic) {
+      cleanFullText = '';
+    }
+
+    const translatedText = isPureSongOrMusic ? '' : (parsed.translatedText || '').trim();
+    const language = parsed.language ? String(parsed.language).trim() : null;
+
+    const audioBreakdown = {
+      hasSpokenSpeech: cleanFullText.length > 0,
+      isSongOrMusic: Boolean(isPureSongOrMusic),
+      speechPercentage: isPureSongOrMusic ? 0 : Number(parsed.speechPercentage || (spokenSegments.length > 0 ? (songSegments.length > 0 ? 60 : 100) : 0)),
+      musicPercentage: isPureSongOrMusic ? 100 : Number(parsed.musicPercentage || (songSegments.length > 0 ? (spokenSegments.length > 0 ? 40 : 100) : 0)),
+      songSegmentsCount: songSegments.length,
+      speechSegmentsCount: spokenSegments.length
+    };
 
     return {
-      status: fullText ? 'AVAILABLE' : 'NO_SPEECH_DETECTED',
-      text: fullText,
+      status: cleanFullText ? 'AVAILABLE' : (isPureSongOrMusic ? 'SONG_OR_MUSIC_ONLY' : 'NO_SPEECH_DETECTED'),
+      text: cleanFullText,
       translatedText,
       language,
-      segments: segments.length > 0 ? segments : (fullText ? [{ start: 0.0, end: 5.0, text: fullText, translatedText, language, audioType: 'SPEECH', backgroundAudio: [] }] : []),
+      segments: segments.length > 0 ? segments : (cleanFullText ? [{ start: 0.0, end: 5.0, text: cleanFullText, translatedText, language, audioType: 'SPEECH', backgroundAudio: [] }] : []),
+      audioBreakdown,
       provider: 'GEMINI_AUDIO_TRANSCRIPTION',
       model: modelName,
-      limitations: fullText ? [] : ['Speech-to-text transcription detected zero spoken audio words']
+      limitations: cleanFullText ? [] : (isPureSongOrMusic ? ['Audio identified as song or background music; musical lyrics excluded from spoken claims'] : ['Speech-to-text transcription detected zero spoken audio words'])
     };
   } catch (e) {
     return {
@@ -508,9 +563,11 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   } else {
     allLimitations.push('Video container indicates no audio track present');
   }
-  emitProgress(43, transcriptRes.text
-    ? 'Agent 1: Speech transcript extracted for source and context matching...'
-    : 'Agent 1: Audio inspection completed; no usable speech transcript was recovered...', 'AUDIO_TRANSCRIPTION');
+  emitProgress(43, transcriptRes.audioBreakdown?.isSongOrMusic
+    ? 'Agent 1: Background song / music track detected; lyrics excluded from factual claims...'
+    : (transcriptRes.text
+      ? 'Agent 1: Speech transcript extracted for source and context matching...'
+      : 'Agent 1: Audio inspection completed; no usable speech transcript was recovered...'), 'AUDIO_TRANSCRIPTION');
 
   // 4. Frame Visual Analysis & Separate Frame OCR (Executed in parallel for performance)
   const allObservedEntities = [];
@@ -731,8 +788,49 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
   const combinedOcrText = ocrTexts.join('\n');
   const primaryDescription = frameAnalyses.map(f => `[${f.timestamp}s]: ${f.description}`).join(' ');
   const uniqueFrameValues = key => Array.from(new Set(frameAnalyses.flatMap(frame => frame[key] || []).filter(Boolean)));
-
   const uniqueLimitations = Array.from(new Set(allLimitations));
+
+  // 7. Dedicated On-Screen Headline Rail
+  const { isSubstantiveNewsHeadline } = require('./mediaClaimExtractor');
+  const onScreenHeadlines = [];
+  for (const frame of frameAnalyses) {
+    const rawOcr = frame.visibleText || '';
+    if (rawOcr && isSubstantiveNewsHeadline(rawOcr, { logos: frame.logos, signs: frame.signs })) {
+      const cleanHeadline = rawOcr.trim().replace(/\s+/g, ' ');
+      if (!onScreenHeadlines.some(h => h.text.toLowerCase() === cleanHeadline.toLowerCase())) {
+        onScreenHeadlines.push({
+          text: cleanHeadline,
+          timestamp: frame.timestamp,
+          frameIndex: frame.frameIndex
+        });
+      }
+    }
+  }
+
+  // 8. Speaker Identification & Online Transcript Verifier
+  const { verifyOnlineTranscript } = require('./videoTranscriptVerifier');
+  let transcriptVerification = null;
+  if (transcriptRes.text && transcriptRes.text.length >= 15 && !transcriptRes.audioBreakdown?.isSongOrMusic) {
+    try {
+      transcriptVerification = await verifyOnlineTranscript({
+        transcript: transcriptRes.text,
+        entities: combinedEntities,
+        publicFigures: videoProvenanceEvidence?.recognizedFigures || frameAnalyses.flatMap(f => f.publicFigures || []),
+        visualDescription: primaryDescription
+      }, options);
+    } catch (err) {
+      console.warn('[Video Transcript Verification Error]:', err.message);
+    }
+  }
+
+  const audioBreakdown = transcriptRes.audioBreakdown || {
+    hasSpokenSpeech: Boolean(transcriptRes.text),
+    isSongOrMusic: false,
+    speechPercentage: transcriptRes.text ? 100 : 0,
+    musicPercentage: 0,
+    songSegmentsCount: 0,
+    speechSegmentsCount: transcriptRes.text ? 1 : 0
+  };
 
   return {
     status: (keyframes.length > 0 || transcriptRes.text) ? 'AVAILABLE' : 'UNAVAILABLE',
@@ -741,6 +839,9 @@ async function analyzeVideo(fileInfo, buffer = null, url = null, options = {}) {
     translatedTranscript: transcriptRes.translatedText || '',
     transcriptLanguage: transcriptRes.language || null,
     transcriptSegments: transcriptRes.segments || [],
+    audioBreakdown,
+    onScreenHeadlines,
+    transcriptVerification,
     frameCount: keyframes.length,
     extractedFrames: frameAnalyses,
     temporalBoundaries: boundaryRes.boundaries || [],

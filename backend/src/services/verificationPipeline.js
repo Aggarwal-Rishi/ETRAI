@@ -494,57 +494,159 @@ async function runVerificationPipeline({
     });
 
     // ----------------------------------------------------
-    // Phase 3: Fact Verification Agent (Agent 3) with Parallel Concurrency & Progress Callback
+    // Phase 3: Fact Verification Agent (Agent 3) - Gemini Grounded Verification
     // ----------------------------------------------------
     logger.startPhase('phase3_factVerifier', { claimCount: claims.length });
 
-    sseManager.emitProgress(jobId, {
-      status: 'PROCESSING',
-      progress: 80,
-      step: `Agent 3: Verifying ${claims.length} claims via web search & fuzzy engine...`,
-      stage: 'WEB_VERIFICATION'
-    });
+    const agent3Engine = (process.env.AGENT3_ENGINE || 'grounded').toLowerCase();
+    const isShadowMode = process.env.AGENT3_SHADOW_MODE === 'true';
+    const isLegacyEngine = agent3Engine === 'legacy';
 
-    emitDebugEvent({
-      agent: 'Agent 3',
-      phase: 'FACT_VERIFICATION',
-      action: 'VERIFICATION_STARTED',
-      detail: `Agent 3 commencing multi-pass evidentiary verification for ${claims.length} claim(s)`
-    });
+    let verifiedClaims = [];
+    let verifiedCount = 0;
+    let suspiciousCount = 0;
+    let falseCount = 0;
+    let geminiGroundedVerification = null;
 
-    const progressCallback = (completedCount, total) => {
-      const startPct = 40;
-      const endPct = 85;
-      const pct = Math.min(85, Math.round(startPct + (completedCount / Math.max(1, total)) * (endPct - startPct)));
+    if (isLegacyEngine) {
+      // Legacy Engine Fallback (if AGENT3_ENGINE=legacy explicitly set)
+      logger.log('phase3_factVerifier', 'INFO', `Executing Agent 3 via Legacy Fuzzy Verification Engine.`);
       sseManager.emitProgress(jobId, {
         status: 'PROCESSING',
-        progress: pct,
-        step: `Agent 3: Verifying claim ${completedCount} of ${total} via web search & fuzzy engine...`,
+        progress: 80,
+        step: `Agent 3: Verifying ${claims.length} claims via legacy engine...`,
         stage: 'WEB_VERIFICATION'
       });
-    };
 
-    const verifiedClaims = observationOnlyImage
-      ? verifyObservationClaimsAgainstImageSource(claims, mediaAnalysis)
-      : await verifyClaims(
-          claims,
-          { onProgress: progressCallback, onDebugEvent: emitDebugEvent },
-          articleResearchContext,
-          inputType === 'URL' ? url : null,
-          progressCallback
-        );
+      const progressCallback = (completedCount, total) => {
+        const startPct = 40;
+        const endPct = 85;
+        const pct = Math.min(85, Math.round(startPct + (completedCount / Math.max(1, total)) * (endPct - startPct)));
+        sseManager.emitProgress(jobId, {
+          status: 'PROCESSING',
+          progress: pct,
+          step: `Agent 3: Verifying claim ${completedCount} of ${total} via legacy web search...`,
+          stage: 'WEB_VERIFICATION'
+        });
+      };
 
-    const verifiedCount = verifiedClaims.filter(c => c.status === 'TRUSTED' || c.status === 'Verified').length;
-    const suspiciousCount = verifiedClaims.filter(c => c.status === 'SUSPICIOUS' || c.status === 'Suspicious').length;
-    const falseCount = verifiedClaims.filter(c => c.status === 'FABRICATED' || c.status === 'False').length;
+      verifiedClaims = observationOnlyImage
+        ? verifyObservationClaimsAgainstImageSource(claims, mediaAnalysis)
+        : await verifyClaims(
+            claims,
+            { onProgress: progressCallback, onDebugEvent: emitDebugEvent },
+            articleResearchContext,
+            inputType === 'URL' ? url : null,
+            progressCallback
+          );
 
-    logger.log('phase3_factVerifier', 'INFO', `Verified ${claims.length} claims: ${verifiedCount} TRUSTED, ${suspiciousCount} SUSPICIOUS, ${falseCount} FABRICATED`, {
-      verifiedCount,
-      suspiciousCount,
-      falseCount
-    });
+      verifiedCount = verifiedClaims.filter(c => c.status === 'TRUSTED' || c.status === 'Verified').length;
+      suspiciousCount = verifiedClaims.filter(c => c.status === 'SUSPICIOUS' || c.status === 'Suspicious').length;
+      falseCount = verifiedClaims.filter(c => c.status === 'FABRICATED' || c.status === 'False').length;
 
-    logger.endPhase('phase3_factVerifier', { verifiedClaims }, { verifiedCount, suspiciousCount, falseCount });
+      logger.endPhase('phase3_factVerifier', { verifiedClaims }, { verifiedCount, suspiciousCount, falseCount });
+    } else {
+      // Primary Agent 3: Gemini Grounded Verification Engine with Concurrency & Evidence Guard
+      logger.log('phase3_factVerifier', 'INFO', `Executing Agent 3: Gemini Live Search Grounding with Evidence Guard for ${claims.length} claims.`);
+      sseManager.emitProgress(jobId, {
+        status: 'PROCESSING',
+        progress: 55,
+        step: `Agent 3: Verifying ${claims.length} claims via Gemini Live Search Grounding...`,
+        stage: 'FACT_VERIFICATION'
+      });
+
+      emitDebugEvent({
+        agent: 'Agent 3',
+        phase: 'FACT_VERIFICATION',
+        action: 'VERIFICATION_STARTED',
+        detail: `Agent 3 starting multi-angle live search grounding and evidence guard verification for ${claims.length} claims`
+      });
+
+      const { verifyClaimsWithGeminiGrounding } = require('./ai/geminiGroundedVerifier');
+
+      try {
+        geminiGroundedVerification = await verifyClaimsWithGeminiGrounding(claims, {
+          sourceTitle: contentRes.sourceTitle || sourceTitle,
+          onClaimStart: (curr, total, claimItem) => {
+            const preview = (claimItem.claimText || claimItem.text || '').slice(0, 45);
+            const startPct = 55;
+            const endPct = 85;
+            const pct = Math.min(85, Math.round(startPct + (curr / Math.max(1, total)) * (endPct - startPct)));
+            sseManager.emitProgress(jobId, {
+              status: 'PROCESSING',
+              progress: pct,
+              step: `Agent 3: Verifying claim ${curr} of ${total}: "${preview}..."`,
+              stage: 'FACT_VERIFICATION'
+            });
+          },
+          onClaimComplete: (curr, total, claimResult) => {
+            emitDebugEvent({
+              agent: 'Agent 3',
+              phase: 'FACT_VERIFICATION',
+              action: 'CLAIM_VERIFIED',
+              detail: `Claim ${curr}/${total} verified: ${claimResult.verdict} (${claimResult.sources?.length || 0} citations, ${claimResult.latencyMs}ms)`
+            });
+          }
+        });
+
+        verifiedClaims = geminiGroundedVerification.claims || [];
+        verifiedCount = geminiGroundedVerification.verifiedCount || 0;
+        suspiciousCount = geminiGroundedVerification.partialCount || 0;
+        falseCount = geminiGroundedVerification.falseCount || 0;
+
+        logger.log('phase3_factVerifier', 'INFO', `Agent 3 completed: ${verifiedCount} VERIFIED, ${suspiciousCount} PARTIALLY_VERIFIED, ${falseCount} FALSE`, {
+          verifiedCount,
+          suspiciousCount,
+          falseCount
+        });
+
+        emitDebugEvent({
+          agent: 'Agent 3',
+          phase: 'FACT_VERIFICATION',
+          action: 'VERIFICATION_COMPLETED',
+          detail: `Agent 3 finished: ${geminiGroundedVerification.overallVerdict} (${verifiedCount} verified, ${suspiciousCount} partial, ${falseCount} false)`
+        });
+      } catch (agent3Err) {
+        console.error('[Agent 3 Execution Error]:', agent3Err);
+        verifiedClaims = claims.map((c, idx) => ({
+          ...c,
+          id: c.id || c.claimId || `claim_${idx + 1}`,
+          claimId: c.id || c.claimId || `claim_${idx + 1}`,
+          status: 'UNVERIFIED',
+          verdict: 'UNVERIFIED',
+          confidence: 50,
+          explanation: `Verification encountered a transient issue: ${agent3Err.message}`,
+          sources: [],
+          keyFindings: []
+        }));
+      }
+
+      logger.endPhase('phase3_factVerifier', { verifiedClaims }, { verifiedCount, suspiciousCount, falseCount });
+
+      // Staged Rollout Shadow-Mode Option (Runs legacy engine in background without blocking user response)
+      if (isShadowMode) {
+        (async () => {
+          try {
+            const legacyResults = await verifyClaims(claims, {}, articleResearchContext);
+            const diffs = [];
+            (verifiedClaims || []).forEach(gc => {
+              const lc = (legacyResults || []).find(l => (l.id && l.id === gc.id) || (l.claimText && l.claimText === gc.claimText));
+              if (lc && lc.verdict !== gc.verdict) {
+                diffs.push({
+                  claim: (gc.claimText || '').slice(0, 60),
+                  newVerdict: gc.verdict,
+                  legacyVerdict: lc.verdict
+                });
+              }
+            });
+            const agreementPct = Math.round(((verifiedClaims.length - diffs.length) / Math.max(1, verifiedClaims.length)) * 100);
+            console.log(`[Agent 3 Shadow Mode]: Agreement: ${agreementPct}% (${diffs.length} divergences across ${verifiedClaims.length} claims).`);
+          } catch (shadowErr) {
+            console.warn('[Agent 3 Shadow Mode Warning]:', shadowErr.message);
+          }
+        })().catch(() => {});
+      }
+    }
 
     // ----------------------------------------------------
     // Phase 4: Report Generator Agent (Agent 4)
@@ -655,9 +757,13 @@ async function runVerificationPipeline({
       textAnalysis: textAnalysisRes,
       linkIntelligence: linkAssetRes.linkIntelligence,
       assetInventory: linkAssetRes.assetInventory,
-      traceProvenance
+      traceProvenance,
+      geminiGroundedVerification,
+      agent3Paused: false
     });
 
+    reportData.geminiGroundedVerification = geminiGroundedVerification;
+    reportData.agent3Paused = false;
     reportData.entities = entityIntentRes.entities;
     reportData.intentAnalysis = entityIntentRes.intentAnalysis;
     reportData.framingAnalysis = entityIntentRes.framingAnalysis;

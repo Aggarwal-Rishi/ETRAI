@@ -36,7 +36,9 @@ const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim()
+    model: (process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim(),
+    liteModel: (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim(),
+    flashModel: (process.env.GEMINI_FLASH_MODEL || 'gemini-3.5-flash').trim()
   },
   serper: {
     apiKey: process.env.SERPER_API_KEY || ''
@@ -107,6 +109,8 @@ function getSanitizedConfigSummary() {
     clientUrl: config.clientUrl,
     geminiConfigured: Boolean(config.gemini.apiKey && config.gemini.apiKey.length > 5),
     geminiModel: config.gemini.model,
+    geminiLiteModel: config.gemini.liteModel,
+    geminiFlashModel: config.gemini.flashModel,
     serperConfigured: Boolean(config.serper.apiKey && config.serper.apiKey.length > 5),
     googleVisionConfigured: Boolean(config.googleVision.apiKey && config.googleVision.apiKey.length > 5),
     googleLensConfigured: Boolean(config.serpApi.apiKey && config.serpApi.apiKey.length > 5)

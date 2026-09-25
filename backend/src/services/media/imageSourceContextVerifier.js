@@ -241,7 +241,7 @@ Return JSON only:
 }`;
 
     const response = await ai.models.generateContent({
-      model: (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim(),
+      model: (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_MEDIA_MODEL || 'gemini-3.5-flash').trim(),
       contents: prompt,
       config: { responseMimeType: 'application/json', temperature: 0.05 }
     });

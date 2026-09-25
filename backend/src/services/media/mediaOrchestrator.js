@@ -116,6 +116,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
   let forensicEvidence = [];
   let forensicVerdict = 'NO_MANIPULATION_SIGNAL_FOUND';
   let forensicConfidence = 85;
+  let vidRes = null;
 
   // 3. Category-Specific Processing
   if (validation.mediaType === 'IMAGE') {
@@ -189,7 +190,7 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     allLimitations.push(...(ocrRes.limitations || []));
   } else if (validation.mediaType === 'VIDEO') {
     // Video Multimodal + Forensics Engine
-    const vidRes = await analyzeVideo(validation.fileInfo, buffer, url, {
+    vidRes = await analyzeVideo(validation.fileInfo, buffer, url, {
       ...options,
       userClaim: text || options.userClaim || ''
     });
@@ -227,6 +228,10 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     forensicConfidence = videoAudioForensics.confidence;
   }
 
+  const onScreenHeadlines = vidRes?.onScreenHeadlines || [];
+  const transcriptVerification = vidRes?.transcriptVerification || null;
+  const audioBreakdown = vidRes?.audioBreakdown || null;
+
   // 4. Claim Extraction from Media Observations
   const claimExtraction = await extractMediaClaims({
     userNotes: text || '',
@@ -236,7 +241,9 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     translatedTranscript,
     transcriptLanguage,
     entities: observed.entities || [],
-    isVideo: validation.mediaType === 'VIDEO'
+    isVideo: validation.mediaType === 'VIDEO',
+    onScreenHeadlines,
+    audioBreakdown
   }, options);
   const extractedClaims = Array.isArray(claimExtraction?.claims) ? claimExtraction.claims : [];
   allLimitations.push(...(claimExtraction?.limitations || []));
@@ -290,6 +297,9 @@ async function processMediaAnalysis({ inputType, text, url, file, buffer: rawBuf
     videoAudioForensics,
     videoContextReport,
     videoProvenance: videoContextReport?.provenance || null,
+    onScreenHeadlines,
+    transcriptVerification,
+    audioBreakdown,
     forensicVerdict,
     forensicConfidence,
     forensicEvidence,

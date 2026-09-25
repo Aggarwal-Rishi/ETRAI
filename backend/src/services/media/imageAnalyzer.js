@@ -52,7 +52,7 @@ async function analyzeImage(fileInfo, buffer = null, url = null, options = {}) {
 
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+    const modelName = (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_MEDIA_MODEL || 'gemini-3.5-flash').trim();
 
     const promptText = `Analyze this image objectively for factual verification and forensic inspection.
 

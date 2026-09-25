@@ -49,52 +49,94 @@ function calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment
       articleVerdict = 'UNVERIFIED';
     }
   } else if (mediaAnalysis) {
-    // Pure Visual Media: Score directly using Google Lens reverse search or Sightengine AI Detector
+    // Pure Visual / Video Media: Score directly using Strict Eliminator (AI -> Tampering -> Provenance Authenticity)
+    const isVideo = mediaAnalysis.mediaType === 'VIDEO' || Boolean(mediaAnalysis.videoAudioForensics || mediaAnalysis.videoContextReport || mediaAnalysis.transcriptVerification);
     const comparison = mediaAnalysis.imageSourceContextComparison;
-    const aiDet = mediaAnalysis.aiDetection;
+    const reverseSearch = mediaAnalysis.reverseSearch || mediaAnalysis.imageForensics?.reverseSearch;
+    const aiDet = mediaAnalysis.aiDetection || mediaAnalysis.videoAudioForensics?.sightengine || mediaAnalysis.videoAudioForensics?.aiDetection || mediaAnalysis.forensics?.aiDetection;
+    const tv = mediaAnalysis.transcriptVerification;
+    const imageForensics = mediaAnalysis.imageForensics || {};
+    const manipulationScore = typeof imageForensics.manipulationScore === 'number'
+      ? imageForensics.manipulationScore
+      : (Array.isArray(mediaAnalysis.manipulationSignals) ? Math.min(100, mediaAnalysis.manipulationSignals.length * 25) : 0);
+    const forensicVerdict = imageForensics.verdict || mediaAnalysis.forensicVerdict;
 
-    if (comparison?.decisive && comparison.status === 'MATCHED') {
-      factualAccuracyScore = Math.max(80, Math.min(95, comparison.confidence || 88));
-      articleVerdict = 'VERIFIED';
-    } else if (comparison?.decisive && comparison.status === 'CONTRADICTED') {
-      factualAccuracyScore = Math.min(25, 100 - (comparison.confidence || 85));
-      articleVerdict = 'FALSE';
-    } else if (comparison?.decisive && comparison.status === 'UNINDEXED_NEW_CAPTURE') {
-      // Unindexed original capture: evaluate with Sightengine AI detector
-      if (aiDet && aiDet.status === 'SUCCESS') {
-        if (aiDet.isAiGenerated) {
-          factualAccuracyScore = Math.max(5, Math.min(25, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.9)) * 100)));
-          articleVerdict = 'FALSE';
-        } else if (aiDet.aiGeneratedProbability <= 0.15 && !aiDet.isDeepfake) {
-          // Authentic camera capture: score between 95% and 98%
-          factualAccuracyScore = Math.max(95, Math.min(98, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.02)) * 100)));
-          articleVerdict = 'VERIFIED';
-        } else {
-          factualAccuracyScore = 75;
-          articleVerdict = 'UNVERIFIED';
-        }
-      } else {
-        factualAccuracyScore = 95;
+    if (isVideo && tv && tv.status && tv.status !== 'NO_SPOKEN_WORDS' && tv.status !== 'NOT_ATTEMPTED') {
+      if (tv.status === 'AUTHENTIC_VERBATIM') {
+        factualAccuracyScore = Math.max(88, Math.min(98, tv.similarityScore || 92));
         articleVerdict = 'VERIFIED';
-      }
-    } else if (aiDet && aiDet.status === 'SUCCESS') {
-      if (aiDet.isAiGenerated) {
-        factualAccuracyScore = Math.max(5, Math.min(25, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.9)) * 100)));
+      } else if (tv.status === 'DEBUNKED_DEEPFAKE' || tv.status === 'FABRICATED') {
+        factualAccuracyScore = 0;
         articleVerdict = 'FALSE';
-      } else if (aiDet.aiGeneratedProbability <= 0.15 && !aiDet.isDeepfake) {
-        factualAccuracyScore = Math.max(95, Math.min(98, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.02)) * 100)));
-        articleVerdict = 'VERIFIED';
-      } else if (aiDet.aiGeneratedProbability <= 0.30 && !aiDet.isDeepfake) {
-        factualAccuracyScore = Math.max(80, Math.min(92, Math.round((1.0 - (aiDet.aiGeneratedProbability || 0.1)) * 100)));
-        articleVerdict = 'VERIFIED';
-      } else {
-        factualAccuracyScore = 50;
+      } else if (tv.status === 'SELECTIVE_SPLICING') {
+        factualAccuracyScore = 25;
+        articleVerdict = 'FALSE';
+      } else if (tv.status === 'UNVERIFIED') {
+        factualAccuracyScore = 55;
         articleVerdict = 'UNVERIFIED';
       }
     } else {
-      factualAccuracyScore = 50;
-      articleVerdict = 'UNVERIFIED';
+      // ── Strict Eliminator for Image Verification ──────────────────────────
+      // Step 1: AI Check (AI Generated -> Score = 0, Verdict = FALSE)
+      const aiProb = aiDet && typeof aiDet.aiGeneratedProbability === 'number'
+        ? aiDet.aiGeneratedProbability
+        : (aiDet?.isAiGenerated ? 0.95 : 0.0);
+      const isAi = Boolean(aiDet?.isAiGenerated || aiProb >= 0.50);
+
+      // Step 2: Tampering / Editing Check (Manipulated -> Score = 25, Verdict = FALSE)
+      const visualComparison = mediaAnalysis.visualComparison || imageForensics.visualComparison || imageForensics.reportItem?.visualComparison;
+      const isTampered = Boolean(
+        visualComparison?.isModified === true ||
+        manipulationScore >= 45 ||
+        forensicVerdict === 'FABRICATED_OR_COMPOSITED' ||
+        forensicVerdict === 'MANIPULATION_DETECTED' ||
+        imageForensics.ela?.isManipulatedLikely ||
+        (imageForensics.signals && imageForensics.signals.some(s => s.severity === 'HIGH'))
+      );
+
+      if (isAi) {
+        factualAccuracyScore = 0;
+        articleVerdict = 'FALSE';
+      } else if (isTampered) {
+        factualAccuracyScore = 25;
+        articleVerdict = 'FALSE';
+      } else {
+        // Step 3: Provenance Authenticity (Clean & Original -> Score 75 - 100)
+        const matchStatus = comparison?.matchStatus || reverseSearch?.originalFoundStatus;
+        if (comparison?.status === 'MATCHED' || reverseSearch?.isWire) {
+          factualAccuracyScore = Math.max(90, Math.min(98, comparison?.confidence || 95));
+          articleVerdict = 'VERIFIED';
+        } else if (comparison?.status === 'UNINDEXED_NEW_CAPTURE' || matchStatus === 'UNINDEXED_ORIGINAL') {
+          // Verified unindexed camera capture with natural sensor
+          factualAccuracyScore = 95;
+          articleVerdict = 'VERIFIED';
+        } else if (comparison?.status === 'CONTRADICTED') {
+          factualAccuracyScore = 25;
+          articleVerdict = 'FALSE';
+        } else if (matchStatus === 'FOUND' || (reverseSearch?.matches && reverseSearch.matches.length > 0)) {
+          factualAccuracyScore = 85;
+          articleVerdict = 'VERIFIED';
+        } else {
+          factualAccuracyScore = 90;
+          articleVerdict = 'VERIFIED';
+        }
+      }
     }
+  }
+
+  // Fatal AI Gate: If media contains synthetic AI generation or voice clone (>= 50%), clamp score to 0 and mark FALSE
+  const isFatalAiMedia = Boolean(
+    (mediaAnalysis?.aiDetection?.status === 'SUCCESS' && mediaAnalysis?.aiDetection?.isAiGenerated) ||
+    (mediaAnalysis?.videoAudioForensics?.sightengine?.isAiGenerated) ||
+    (mediaAnalysis?.videoAudioForensics?.aiDetection?.isAiGenerated) ||
+    (mediaAnalysis?.forensics?.aiDetection?.isAiGenerated) ||
+    (mediaAnalysis?.transcriptVerification?.status === 'DEBUNKED_DEEPFAKE') ||
+    (mediaAnalysis?.audioBreakdown?.voiceCloningRisk === 'HIGH')
+  );
+
+  if (isFatalAiMedia) {
+    factualAccuracyScore = 0;
+    articleVerdict = 'FALSE';
   }
 
   // Manipulation & Sensationalism Assessment (SEPARATE from Factual Accuracy!)
@@ -172,7 +214,7 @@ async function generateReport({
     ? mediaAnalysis.mediaType
     : (inputType || mediaAnalysis?.mediaType || (hasAttachedNews ? 'TEXT_MEDIA' : 'TEXT'));
   const canonicalData = calculateCategoryScores(verifiedClaims, selectedTypes, articleSentiment, sourceTitle, internalConsistencyIssues, sourcingTransparency, mediaAnalysis);
-  const { scores, factualAccuracyScore, evidenceConfidence, articleVerdict, manipulationRisk, manipulationScore, breakdown } = canonicalData;
+  let { scores, factualAccuracyScore, evidenceConfidence, articleVerdict, manipulationRisk, manipulationScore, breakdown } = canonicalData;
 
   const providerStatus = getProviderStatus();
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -189,7 +231,7 @@ async function generateReport({
   if (hasGemini && geminiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+      const modelName = (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
 
       const mediaPromptSection = mediaAnalysis ? `
 Media Payload Verification Details:
@@ -320,6 +362,45 @@ Return ONLY a JSON object with this exact structure:
     explanationOfFindings = `${explanationOfFindings} Video originality/context assessment: ${videoCompletenessSummary.explanation || videoCompletenessSummary.verdict}.`;
   }
 
+  const transcriptVerification = mediaAnalysis?.transcriptVerification;
+  if (transcriptVerification && transcriptVerification.status && transcriptVerification.status !== 'NO_SPOKEN_WORDS' && transcriptVerification.status !== 'NOT_ATTEMPTED') {
+    let tHighlight = '';
+    if (transcriptVerification.status === 'AUTHENTIC_VERBATIM') {
+      tHighlight = `Verified spoken audio verbatim against official record (${transcriptVerification.matchedSource?.title || transcriptVerification.primarySpeaker || 'government gazette'})`;
+    } else if (transcriptVerification.status === 'DEBUNKED_DEEPFAKE') {
+      tHighlight = `Audio flagged as synthetic deepfake / voice clone by fact-checking archives`;
+    } else if (transcriptVerification.status === 'SELECTIVE_SPLICING') {
+      tHighlight = `Spoken words detected as selectively spliced out-of-context compared to official transcript`;
+    } else {
+      tHighlight = `Speech transcript analyzed against official archives (${transcriptVerification.status})`;
+    }
+    keyHighlights = [tHighlight, ...keyHighlights.filter(item => item !== tHighlight)].slice(0, 5);
+    explanationOfFindings = `${explanationOfFindings} Transcript verification: ${transcriptVerification.rationale || transcriptVerification.status}.`;
+  }
+
+  if (mediaAnalysis?.audioBreakdown?.isPureSongOrMusic) {
+    const musicHighlight = `Audio classified as background song/music (${mediaAnalysis.audioBreakdown.dominantType || 'MUSIC_BGM'}); lyrics excluded from factual claims`;
+    keyHighlights = [musicHighlight, ...keyHighlights.filter(item => item !== musicHighlight)].slice(0, 5);
+  }
+
+  if (Array.isArray(mediaAnalysis?.onScreenHeadlines) && mediaAnalysis.onScreenHeadlines.length > 0) {
+    const chyronHighlight = `Extracted and evaluated ${mediaAnalysis.onScreenHeadlines.length} on-screen news chyron/headline(s)`;
+    keyHighlights = [chyronHighlight, ...keyHighlights.filter(item => item !== chyronHighlight)].slice(0, 5);
+  }
+
+  const isAgent3Paused = Boolean(arguments[0]?.agent3Paused);
+  const geminiGrounding = arguments[0]?.geminiGroundedVerification;
+
+  if (isAgent3Paused && geminiGrounding && geminiGrounding.overallVerdict) {
+    articleVerdict = geminiGrounding.overallVerdict;
+    if (articleVerdict === 'VERIFIED') factualAccuracyScore = 90;
+    else if (articleVerdict === 'FALSE') factualAccuracyScore = 15;
+    else if (articleVerdict === 'PARTIALLY_VERIFIED') factualAccuracyScore = 65;
+    else factualAccuracyScore = 50;
+    canonicalData.factualAccuracyScore = factualAccuracyScore;
+    canonicalData.articleVerdict = articleVerdict;
+  }
+
   const manipulationAnalysis = {
     verdict: articleVerdict,
     factualAccuracyScore,
@@ -327,7 +408,9 @@ Return ONLY a JSON object with this exact structure:
     manipulationRisk,
     manipulationScore,
     keyHighlights,
-    explanationOfFindings
+    explanationOfFindings: isAgent3Paused
+      ? `Old verification engine paused by user request. Findings established directly via Gemini Live Search Grounding (${articleVerdict}).`
+      : explanationOfFindings
   };
 
   const chartData = [
@@ -452,7 +535,7 @@ Return ONLY a JSON object with this exact structure:
   });
 
   scores.overallTrustScore = explainableScoring.finalTrustScore;
-  scores.factualAccuracyScore = explainableScoring.finalTrustScore;
+  scores.factualAccuracyScore = canonicalData.factualAccuracyScore;
   scores.confidenceRating = explainableScoring.finalTrustScore;
   scores.evidenceConfidence = evidenceConfidence;
   scores.explainableScoring = explainableScoring;
@@ -462,7 +545,7 @@ Return ONLY a JSON object with this exact structure:
     inputType: resolvedInputType,
     sourceTitle,
     selectedTypes,
-    factualAccuracyScore: explainableScoring.finalTrustScore,
+    factualAccuracyScore: canonicalData.factualAccuracyScore,
     evidenceConfidence,
     articleVerdict: explainableScoring.finalVerdict === 'HIGHLY_SUPPORTED' && articleVerdict === 'VERIFIED' ? 'VERIFIED' : (explainableScoring.finalTrustScore >= 85 ? 'VERIFIED' : articleVerdict),
     verdict: explainableScoring.finalVerdict === 'HIGHLY_SUPPORTED' && articleVerdict === 'VERIFIED' ? 'VERIFIED' : (explainableScoring.finalTrustScore >= 85 ? 'VERIFIED' : articleVerdict),
@@ -487,9 +570,16 @@ Return ONLY a JSON object with this exact structure:
     claims: verifiedClaims,
     sources: uniqueDiscoveredSources,
     mediaAnalysis: mediaAnalysis || null,
-    aiDetection: mediaAnalysis?.aiDetection || null,
+    aiDetection: mediaAnalysis?.aiDetection || mediaAnalysis?.videoAudioForensics?.sightengine || null,
     images: mediaAnalysis?.images || (mediaAnalysis?.imageForensics?.reportItem ? [mediaAnalysis.imageForensics.reportItem] : []),
+    audioBreakdown: mediaAnalysis?.audioBreakdown || null,
+    transcriptVerification: mediaAnalysis?.transcriptVerification || null,
+    onScreenHeadlines: mediaAnalysis?.onScreenHeadlines || [],
+    videoContextReport: mediaAnalysis?.videoContextReport || null,
+    videoAudioForensics: mediaAnalysis?.videoAudioForensics || null,
     articleResearchContext: articleResearchContext || null,
+    geminiGroundedVerification: arguments[0].geminiGroundedVerification || null,
+    agent3Paused: Boolean(arguments[0]?.agent3Paused),
     provenance,
     provenanceGraph: provenance.graph,
     firstKnownAppearance: provenance.firstKnownAppearance,

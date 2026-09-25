@@ -183,9 +183,13 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
         : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(rawOriginalUrl)}`))
     : null);
 
+  // Strict Slider Verification Gate:
+  // ONLY display the right side of the slider if there is a verified visual match (originalSrc),
+  // OR if the user explicitly clicked a candidate in the tray (selectedCandidate).
+  // NEVER auto-load random lookalikes into the comparison slider!
   const activeCandidate = candidateDismissed
     ? null
-    : (selectedCandidate || (candidateImages.length > 0 ? candidateImages[0] : (selectedAsset.candidateImageUrl ? { imageUrl: selectedAsset.candidateImageUrl, domain: selectedAsset.domain || 'web index' } : null)));
+    : (selectedCandidate || null);
 
   const candidateProxyUrl = activeCandidate?.imageUrl
     ? (activeCandidate.imageUrl.startsWith('data:')
@@ -193,8 +197,8 @@ export default function ImageForensicsCompare({ images = [], reportData = {}, pr
         : apiUrl(`/api/v1/verify/proxy-image?url=${encodeURIComponent(activeCandidate.imageUrl)}`))
     : null;
 
-  const effectiveRightSrc = originalSrc || candidateProxyUrl || null;
-  const isComparingCandidate = Boolean(!originalSrc && activeCandidate && candidateProxyUrl);
+  const effectiveRightSrc = originalSrc || (selectedCandidate ? candidateProxyUrl : null);
+  const isComparingCandidate = Boolean(!originalSrc && selectedCandidate && candidateProxyUrl);
 
   const hasOriginal = Boolean(originalSrc) || (isVerifiedOriginal && Boolean(rawOriginalUrl));
 

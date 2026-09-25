@@ -43,7 +43,7 @@ async function generateClaimCorrection(claim, verificationResult = {}, articleRe
   if (hasGemini && geminiKey && fullEvText) {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+      const modelName = (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
 
       const prompt = `You are an AI Fact-Checking Correction Agent.
 Original Claim: "${claimText}"

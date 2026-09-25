@@ -30,8 +30,9 @@ const server = app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`🚀 DeepTrust Backend Server listening on port ${PORT}`);
   console.log(`🌍 Environment: ${summary.env}`);
-  console.log(`📦 Database: ${summary.databaseType}`);
-  console.log(`🤖 Gemini Configured: ${summary.geminiConfigured} (${summary.geminiModel})`);
+  console.log(`🤖 Gemini Configured: ${summary.geminiConfigured}`);
+  console.log(`   ├─ Lite Model (Agent 2 Claims, Agent 4 Report): ${summary.geminiLiteModel}`);
+  console.log(`   └─ Flash Model (Agent 3 Fact Verifier, Agent 3B Grounding, Agent 1 Forensics): ${summary.geminiFlashModel}`);
   console.log(`🔍 Serper Configured: ${summary.serperConfigured}`);
   console.log(`🔗 Health Check: http://localhost:${PORT}/api/v1/health`);
   console.log(`====================================================`);

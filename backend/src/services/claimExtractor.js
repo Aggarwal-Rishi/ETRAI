@@ -19,7 +19,7 @@ const { GoogleGenAI } = require('@google/genai');
 const { analyzeSentiment } = require('./sentimentService');
 const { getProviderStatus, isKeyValid } = require('./providerManager');
 
-const MAX_CLAIMS = 25;
+const MAX_CLAIMS = 12;
 
 /**
  * Infer claim scope heuristically with strict regional/international/national pattern indicators
@@ -509,7 +509,7 @@ async function extractClaims(extractedText, options = {}) {
     return extractMockClaims(extractedText);
   }
 
-  const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+  const modelName = (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
 
   const prompt = `You are Agent 2 (Claim Extractor) in an AI Fact-Checking system.
 

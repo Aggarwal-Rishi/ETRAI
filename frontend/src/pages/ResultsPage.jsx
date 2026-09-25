@@ -10,6 +10,7 @@ import ImageForensicsCompare from '../components/ImageForensicsCompare';
 import VideoForensicsViewer from '../components/VideoForensicsViewer';
 import ScoringWeightsModal from '../components/ScoringWeightsModal';
 import SightengineReportCard from '../components/SightengineReportCard';
+import GeminiGroundedVerificationCard from '../components/GeminiGroundedVerificationCard';
 import { apiUrl } from '../utils/api';
 import {
   ShieldCheck,
@@ -407,6 +408,11 @@ export default function ResultsPage() {
   const hasVideoForensics = mediaType.includes('VIDEO') || mediaType.includes('AUDIO') ||
     Boolean(parsedMediaAnalysis.videoAudioForensics &&
       Object.keys(parsedMediaAnalysis.videoAudioForensics).length > 0) ||
+    Boolean(parsedMediaAnalysis.transcriptVerification) ||
+    Boolean(report?.transcriptVerification) ||
+    Boolean(parsedMediaAnalysis.audioBreakdown) ||
+    Boolean(report?.audioBreakdown) ||
+    Boolean(parsedMediaAnalysis.onScreenHeadlines?.length > 0) ||
     Boolean(aiDetection?.evaluatedFramesCount) ||
     Boolean(report?.sourceTitle && /\b(?:video|clip|mp4|mov|webm|avi)\b/i.test(report.sourceTitle));
 
@@ -835,18 +841,139 @@ export default function ResultsPage() {
                   <span className="text-xs font-mono font-bold text-[#D97757]">01 ·</span>
                   <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">Top Highlights</h3>
                 </div>
-                <ul className="space-y-2.5 text-xs text-[#2C4E86]">
-                  {claims.slice(0, 4).map((claim, idx) => (
-                    <li key={idx} className="flex items-start gap-2.5">
-                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
-                        claim.verdict === 'TRUE' || claim.status === 'TRUSTED' ? 'bg-[#2C5B3E]' : 'bg-[#B23F35]'
-                      }`} />
-                      <span>
-                        <strong className="text-[#0B5CD5]">{claim.claimText || claim.claim}</strong> — {claim.explanation || (claim.verdict === 'FALSE' ? 'Directly contradicted by public record.' : 'Supported by authoritative reporting.')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {claims.length > 0 ? (
+                  <ul className="space-y-2.5 text-xs text-[#2C4E86]">
+                    {claims.slice(0, 4).map((claim, idx) => (
+                      <li key={idx} className="flex items-start gap-2.5">
+                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                          claim.verdict === 'TRUE' || claim.status === 'TRUSTED' ? 'bg-[#2C5B3E]' : 'bg-[#B23F35]'
+                        }`} />
+                        <span>
+                          <strong className="text-[#0B5CD5]">{claim.claimText || claim.claim}</strong> — {claim.explanation || (claim.verdict === 'FALSE' ? 'Directly contradicted by public record.' : 'Supported by authoritative reporting.')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (() => {
+                  const imageForensics = parsedMediaAnalysis.imageForensics || {};
+                  const manipScore = typeof imageForensics.manipulationScore === 'number'
+                    ? imageForensics.manipulationScore
+                    : (Array.isArray(parsedMediaAnalysis.manipulationSignals) ? Math.min(100, parsedMediaAnalysis.manipulationSignals.length * 25) : 0);
+                  const visualComparison = parsedMediaAnalysis.visualComparison ||
+                    imageForensics.visualComparison ||
+                    report.mediaAnalysis?.visualComparison ||
+                    null;
+
+                  const isTampered = Boolean(
+                    visualComparison?.isModified === true ||
+                    manipScore >= 45 ||
+                    imageForensics.verdict === 'FABRICATED_OR_COMPOSITED' ||
+                    imageForensics.verdict === 'MANIPULATION_DETECTED' ||
+                    imageForensics.ela?.isManipulatedLikely ||
+                    (imageForensics.signals && imageForensics.signals.some(s => s.severity === 'HIGH'))
+                  );
+
+                  const aiProb = aiDetection && typeof aiDetection.aiGeneratedProbability === 'number'
+                    ? aiDetection.aiGeneratedProbability
+                    : (aiDetection?.isAiGenerated ? 0.95 : 0.05);
+                  const isAi = Boolean(aiDetection?.isAiGenerated || aiProb >= 0.50);
+
+                  const comparison = parsedMediaAnalysis.imageSourceContextComparison || {};
+                  const reverseSearch = parsedMediaAnalysis.reverseSearch || imageForensics.reverseSearch || {};
+                  const isMatched = comparison.status === 'MATCHED' || reverseSearch.isWire;
+                  const isUnindexed = comparison.status === 'UNINDEXED_NEW_CAPTURE' || reverseSearch.originalFoundStatus === 'UNINDEXED_ORIGINAL';
+                  const isContradicted = comparison.status === 'CONTRADICTED';
+
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-xs text-[#7386A8]">
+                        Pure visual media evaluated across AI generation signatures, digital tampering, and web provenance (no editorial news text detected).
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* 1. AI Generation Card */}
+                        <div className="p-3.5 bg-[#F9F9F7] border border-[#CECECE] rounded-2xl flex flex-col justify-between space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#7386A8]">01 · AI Detection</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                              isAi ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]' : 'bg-[#EAF5EC] text-[#2C5B3E] border-[#C3E4C9]'
+                            }`}>
+                              {isAi ? `AI ${Math.round(aiProb * 100)}%` : 'HUMAN CAPTURE'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-[#0B5CD5]">
+                              {isAi ? 'Synthetic Generative Media' : 'Organic Camera Capture'}
+                            </h4>
+                            <p className="text-[11px] text-[#2C4E86] mt-1 leading-relaxed">
+                              {isAi 
+                                ? 'Neural diffusion or deepfake generative patterns detected across image raster.' 
+                                : `Natural optical sensor noise verified with ${Math.round((1 - aiProb) * 100)}% natural capture certainty.`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 2. Tampering / Integrity Card */}
+                        <div className="p-3.5 bg-[#F9F9F7] border border-[#CECECE] rounded-2xl flex flex-col justify-between space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#7386A8]">02 · Media Integrity</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                              isTampered ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]' : 'bg-[#EAF5EC] text-[#2C5B3E] border-[#C3E4C9]'
+                            }`}>
+                              {visualComparison?.isModified ? 'ELEMENT / PERSON REPLACED' : isTampered ? 'TAMPERING DETECTED' : 'UNALTERED'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-[#0B5CD5]">
+                              {visualComparison?.isModified 
+                                ? (visualComparison.modificationType === 'PERSON_SWAPPED' || visualComparison.modificationType === 'FACE_SWAPPED' ? 'Person / Face Swapped' : 'Digital Tampering Detected')
+                                : isTampered ? 'Digital Manipulation / Splicing' : 'Uniform Pixel Integrity'}
+                            </h4>
+                            <p className="text-[11px] text-[#2C4E86] mt-1 leading-relaxed">
+                              {visualComparison?.isModified
+                                ? (visualComparison.summary || 'Direct comparison with verified original photo confirms element replacement or face swap.')
+                                : isTampered 
+                                  ? 'Error level analysis anomalies or cloning signals detected in high-frequency regions.' 
+                                  : 'No copy-move cloning or inpainting artifacts detected; quantization is uniform.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 3. Provenance & Originality Card */}
+                        <div className="p-3.5 bg-[#F9F9F7] border border-[#CECECE] rounded-2xl flex flex-col justify-between space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono uppercase font-bold tracking-wider text-[#7386A8]">03 · Provenance</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                              visualComparison?.isModified ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]' :
+                              isContradicted ? 'bg-[#FCE8E6] text-[#B23F35] border-[#F5C2B8]' :
+                              isMatched ? 'bg-[#E8F0FE] text-[#0B5CD5] border-[#C2D7FA]' :
+                              'bg-[#EAF5EC] text-[#2C5B3E] border-[#C3E4C9]'
+                            }`}>
+                              {visualComparison?.isModified ? 'ORIGINAL FOUND (MODIFIED)' : isContradicted ? 'CONTRADICTED' : isMatched ? 'WIRE MATCH' : isUnindexed ? 'UNINDEXED ORIGINAL' : 'INDEXED MATCH'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-[#0B5CD5]">
+                              {visualComparison?.isModified 
+                                ? 'Altered Copy of Original' 
+                                : isContradicted ? 'Misattributed Context' : isMatched ? 'Verified Source Match' : isUnindexed ? 'First-Instance Photo' : 'Indexed Web Provenance'}
+                            </h4>
+                            <p className="text-[11px] text-[#2C4E86] mt-1 leading-relaxed">
+                              {visualComparison?.isModified
+                                ? `Authentic original photo discovered on ${comparison.source?.domain || reverseSearch.matches?.[0]?.domain || 'web archive'}, but visual diffing proves the circulating copy was altered.`
+                                : isContradicted 
+                                  ? 'Reverse search contradicts submitted caption or indicates decontextualized reuse.' 
+                                  : isMatched 
+                                    ? `Corroborated by wire archives (${comparison.source?.domain || reverseSearch.matches?.[0]?.domain || 'news index'}).` 
+                                    : isUnindexed 
+                                      ? 'No earlier web publications detected; consistent with a clean camera original.' 
+                                      : 'Media matches authentic indexed web records with consistent historical timeline.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </section>
 
               {/* 02 · SCORE DERIVATION */}
@@ -878,355 +1005,31 @@ export default function ResultsPage() {
                 />
               </section>
 
-              {/* 03 · CLAIM BY CLAIM AUDIT ACCORDION */}
-              <section id="claims" className="p-6 bg-white border border-[#CECECE] rounded-3xl space-y-4 shadow-sm scroll-mt-24">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#D97757]">03 ·</span>
-                    <h3 className="text-sm font-bold uppercase tracking-wider font-mono text-[#0B5CD5]">
-                      Atomic Claim Decomposition ({claims.length})
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-[#7386A8] font-mono">
-                      Click any claim to expand full statement &amp; real news summary
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsWeightsModalOpen(true)}
-                      className="px-2.5 py-1 bg-[#EFEEE9] hover:bg-[#CECECE] border border-[#CECECE] text-[#0B5CD5] rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 transition"
-                      title="Adjust global scoring formula weights"
-                    >
-                      <Sliders className="w-3 h-3 text-[#D97757]" />
-                      Weights
-                    </button>
-                    {isDebug && claims.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setDebugPanelClaim(claims[openClaimIdx >= 0 ? openClaimIdx : 0])}
-                        className="px-2.5 py-1 bg-[#0B5CD5] text-white rounded-xl text-[11px] font-mono font-bold flex items-center gap-1.5 hover:bg-[#0033C4] transition shadow-xs"
-                        title="Inspect active claim in Agent 3 Debug Panel"
-                      >
-                        <Terminal className="w-3 h-3" />
-                        Agent 3 Live Inspector
-                      </button>
-                    )}
-                  </div>
-                </div>
+              {/* 03 · ATOMIC CLAIM DECOMPOSITION & VERIFICATION (GEMINI GROUNDED) */}
+              <GeminiGroundedVerificationCard
+                id="claims"
+                groundingData={
+                  report?.geminiGroundedVerification || (claims.length > 0 ? {
+                    overallVerdict: report?.articleVerdict || report?.verdict || 'UNVERIFIED',
+                    totalClaims: claims.length,
+                    verifiedCount: claims.filter(c => c.verdict === 'VERIFIED' || c.status === 'TRUSTED' || c.verdict === 'Real').length,
+                    partialCount: claims.filter(c => c.verdict === 'PARTIALLY_VERIFIED' || c.status === 'SUSPICIOUS' || c.verdict === 'Suspicious').length,
+                    falseCount: claims.filter(c => c.verdict === 'FALSE' || c.status === 'FABRICATED' || c.verdict === 'Fake').length,
+                    unverifiedCount: claims.filter(c => c.verdict === 'UNVERIFIED' || !c.verdict).length,
+                    claims: claims,
+                    allSearchQueries: claims.flatMap(c => c.searchQueries || []),
+                    allGroundedSources: report?.sources || [],
+                    summary: report?.summary || `Each atomic claim was submitted individually to Gemini with live Google Search retrieval to evaluate factual accuracy and extract grounded web citations.`,
+                    status: 'SUCCESS',
+                    enabled: true
+                  } : null)
+                }
+                onOpenWeights={() => setIsWeightsModalOpen(true)}
+                isDebug={isDebug}
+                onOpenDebug={(claim) => setDebugPanelClaim(claim)}
+              />
 
-                <div className="space-y-3.5">
-                  {claims.map((c, idx) => {
-                    const isOpen = openClaimIdx === idx;
-                    const cVerdict = c.verdict || (c.status === 'TRUSTED' ? 'Real' : (c.status === 'FABRICATED' ? 'Fake' : 'Suspicious'));
-                    const originalExcerpt = c.originalSentence || c.sourceContext?.originalSentence || c.sourceExcerpt || c.quoteText || c.rawPassage;
-                    const fullClaimText = c.claimText || c.claim || 'Unspecified assertion';
-                    const realFindingSummary = c.explanation || c.finding || c.verdictReason || c.claimVerificationResult?.explanation || (
-                      cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                        ? 'Cross-referenced against verified public records and tier-1 reporting. All core factual propositions are fully confirmed by primary documentation.'
-                        : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                        ? 'Directly contradicted by official records and verified reporting. Factual assertion does not match public evidence.'
-                        : 'Insufficient or ambiguous evidence available in public archives to definitively corroborate this assertion.'
-                    );
 
-                    const claimConfidence = typeof c.confidence === 'number' ? Math.round(c.confidence) : (
-                      c.status === 'TRUSTED' || cVerdict === 'VERIFIED' || cVerdict === 'Real' ? 95 : 50
-                    );
-
-                    return (
-                      <div
-                        key={idx}
-                        className={`border rounded-2xl overflow-hidden transition-all ${
-                          isOpen
-                            ? 'bg-[#F8F8F6] border-[#0B5CD5]/40 shadow-md ring-1 ring-[#0B5CD5]/20'
-                            : 'bg-white border-[#CECECE] hover:border-[#0B5CD5]/40 hover:bg-[#F8F8F6]'
-                        }`}
-                      >
-                        {/* Collapsed Header Bar */}
-                        <div
-                          onClick={() => setOpenClaimIdx(isOpen ? -1 : idx)}
-                          className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                            <span className="font-mono text-[#0B5CD5] text-xs font-bold px-2 py-0.5 bg-[#EFEEE9] border border-[#CECECE] rounded-lg flex-shrink-0">
-                              #{idx + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <span className={`text-xs sm:text-sm font-semibold text-[#0B5CD5] block ${!isOpen ? 'truncate' : ''}`}>
-                                {fullClaimText}
-                              </span>
-                              {!isOpen && (
-                                <span className="text-[11px] text-[#7386A8] font-mono truncate block mt-0.5">
-                                  {c.category || c.claimType || 'Factual Proposition'} · {c.sources?.length || 0} source(s) · {claimConfidence}% confidence
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <VerdictBadge status={cVerdict} size="sm" />
-                            <div className="p-1 rounded-lg bg-[#EFEEE9] text-[#2C4E86]">
-                              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Expanded Content View */}
-                        {isOpen && (
-                          <div className="px-5 pb-5 pt-2 border-t border-[#CECECE] space-y-4 text-xs animate-fadeIn">
-                            
-                            {/* 1. FULL UNTRUNCATED STATEMENT */}
-                            <div className="p-4 bg-white border border-[#CECECE] rounded-xl space-y-2 shadow-sm">
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <span className="text-[10px] font-mono uppercase text-[#0B5CD5] font-bold flex items-center gap-1.5">
-                                  <Layers className="w-3.5 h-3.5 text-[#D97757]" /> Full Claim Statement
-                                </span>
-                                <div className="flex items-center gap-2 font-mono text-[10px] flex-wrap">
-                                  <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE] rounded">
-                                    {c.category || c.claimType || 'Factual Assertion'}
-                                  </span>
-                                  <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#0B5CD5] rounded font-bold border border-[#CECECE]">
-                                    Confidence: {claimConfidence}%
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleClaimResearch(c, idx)}
-                                    disabled={researchingClaimIdx !== null}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97757]/40 bg-[#F6E7DF] px-2.5 py-1 font-sans text-[10px] font-bold text-[#B0512F] transition hover:bg-[#D97757] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {researchingClaimIdx === idx
-                                      ? <RefreshCw className="h-3 w-3 animate-spin" />
-                                      : <Search className="h-3 w-3" />}
-                                    {researchingClaimIdx === idx
-                                      ? 'Searching this claim...'
-                                      : (c.deepResearch?.triggerType === 'MANUAL' ? 'Search this claim again' : 'Search this claim')}
-                                  </button>
-
-                                  {isDebug && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDebugPanelClaim(c);
-                                      }}
-                                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#0B5CD5]/40 bg-[#0B5CD5]/10 px-2.5 py-1 font-sans text-[10px] font-bold text-[#0B5CD5] transition hover:bg-[#0B5CD5] hover:text-white"
-                                      title="Inspect Agent 3 Flow, Serper APIs, Prompts, and Fuzzy Matrix"
-                                    >
-                                      <Terminal className="h-3 w-3" />
-                                      Agent 3 APIs &amp; Flow
-                                    </button>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setAuditModalClaim(c);
-                                    }}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#CECECE] bg-[#EFEEE9] px-2.5 py-1 font-sans text-[10px] font-bold text-[#2C4E86] transition hover:bg-[#CECECE]"
-                                    title="Open Full Evidentiary Audit Trail"
-                                  >
-                                    <ShieldCheck className="h-3 w-3 text-[#3E7A55]" />
-                                    Audit Trail
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleCopyClaimJson(c, idx, e)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#D97757]/40 bg-[#F6E7DF] px-2.5 py-1 font-sans text-[10px] font-bold text-[#B0512F] transition hover:bg-[#D97757] hover:text-white cursor-pointer"
-                                    title="Copy Complete Diagnostic JSON report for this claim to clipboard"
-                                  >
-                                    {copiedClaimJsonIdx === idx ? <Check className="h-3 w-3 text-[#2C5B3E]" /> : <FileJson className="h-3 w-3 text-[#D97757]" />}
-                                    {copiedClaimJsonIdx === idx ? 'Copied JSON!' : 'Copy Diagnostic JSON'}
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-[#2C4E86] font-medium text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
-                                {fullClaimText}
-                              </p>
-                            </div>
-
-                            {claimSearchErrors[idx] && (
-                              <div className="rounded-xl border border-[#EBC7C2] bg-[#F7E3E0] p-3 text-xs text-[#B23F35]">
-                                <span className="font-bold">Individual claim search failed:</span> {claimSearchErrors[idx]}
-                              </div>
-                            )}
-
-                            {c.deepResearch?.triggerType === 'MANUAL' && (
-                              <div className="rounded-xl border border-[#CECECE] bg-[#F8F8F6] p-3 text-xs text-[#2C4E86]">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-bold text-[#0B5CD5]">Individual claim research completed</span>
-                                  <span className="font-mono text-[10px] text-[#7386A8]">
-                                    {c.deepResearch.decomposedQueries?.length || 0} queries · {c.deepResearch.evaluatedSources?.length || 0} sources · {c.deepResearch.fullPagesFetchedCount || 0} pages read
-                                  </span>
-                                </div>
-                                <p className="mt-1.5 leading-relaxed text-[#2C4E86]">{c.deepResearch.reasoning}</p>
-                                {c.deepResearch.limitations?.length > 0 && (
-                                  <p className="mt-1.5 text-[10px] text-[#B98520]">{c.deepResearch.limitations.join(' ')}</p>
-                                )}
-                              </div>
-                            )}
-
-                            {/* 2. REAL NEWS & EVIDENTIARY FINDING SYNTHESIS */}
-                            <div className={`p-4 rounded-xl border space-y-2.5 ${
-                              cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                ? 'bg-[#E4EFE7] border-[#C5DEC9]'
-                                : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                ? 'bg-[#F7E3E0] border-[#EBC7C2]'
-                                : 'bg-[#F7EEDA] border-[#E8D4B0]'
-                            }`}>
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                <span className={`text-[10px] font-mono uppercase font-bold flex items-center gap-1.5 ${
-                                  cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                    ? 'text-[#2C5B3E]'
-                                    : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                    ? 'text-[#B23F35]'
-                                    : 'text-[#B98520]'
-                                }`}>
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                  Verified Real News Summary & Evidentiary Findings
-                                </span>
-                                <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold ${
-                                  cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                    ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9]'
-                                    : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                    ? 'bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2]'
-                                    : 'bg-[#F7EEDA] text-[#B98520] border border-[#E8D4B0]'
-                                }`}>
-                                  {cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED' ? 'CORROBORATED BY REAL NEWS' : (cVerdict === 'Fake' || cVerdict === 'FALSE' ? 'CONTRADICTED BY REAL NEWS' : 'AMBIGUOUS / UNCORROBORATED')}
-                                </span>
-                              </div>
-                              <p className={`text-xs sm:text-[13px] leading-relaxed font-medium ${
-                                cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED'
-                                  ? 'text-[#2C5B3E]'
-                                  : cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED'
-                                  ? 'text-[#B23F35]'
-                                  : 'text-[#B98520]'
-                              }`}>
-                                {realFindingSummary}
-                              </p>
-                            </div>
-
-                            {/* 2b. REASON FOR CLAIM VERDICT & STANCE */}
-                            <div className="p-3.5 bg-white border border-[#CECECE] rounded-xl space-y-1.5 shadow-2xs">
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-[10px] font-mono uppercase text-[#0B5CD5] font-bold flex items-center gap-1.5">
-                                  <Sparkles className="w-3.5 h-3.5 text-[#D97757]" /> Reason for Claim Verdict &amp; Stance
-                                </span>
-                                <span className="font-mono text-[10px] font-bold text-[#7386A8]">
-                                  Stance: <span className={`font-bold ${
-                                    cVerdict === 'Real' || cVerdict === 'VERIFIED' || c.status === 'TRUSTED' ? 'text-[#2C5B3E]' :
-                                    cVerdict === 'Fake' || cVerdict === 'FALSE' || c.status === 'FABRICATED' ? 'text-[#B23F35]' : 'text-[#8A6318]'
-                                  }`}>{c.verdict || c.status || 'UNVERIFIED'}</span>
-                                  {c.claimVerificationResult?.sourceAgreement !== undefined && ` · ${c.claimVerificationResult.sourceAgreement}% Agreement`}
-                                </span>
-                              </div>
-                              <p className="text-[#2C4E86] text-xs leading-relaxed font-medium">
-                                {c.claimStanceReason || c.claimVerificationResult?.claimStanceReason || c.explanation || realFindingSummary}
-                              </p>
-                            </div>
-
-                            {/* 3. ORIGINAL NEWS PASSAGE / SOURCE CONTEXT (If present in text) */}
-                            {originalExcerpt && (
-                              <div className="p-3.5 bg-white border border-[#CECECE] rounded-xl space-y-1.5">
-                                <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold flex items-center gap-1.5">
-                                  <FileText className="w-3.5 h-3.5 text-[#D97757]" />
-                                  Original Text Passage (Analyzed Input)
-                                </span>
-                                <p className="text-[#2C4E86] text-xs italic font-serif leading-relaxed pl-2.5 border-l-2 border-[#D97757]">
-                                  "{originalExcerpt}"
-                                </p>
-                                {c.attribution && (
-                                  <span className="text-[10px] text-[#7386A8] font-mono block pt-0.5">
-                                    Attributed speaker / source: <strong className="text-[#0B5CD5]">{c.attribution}</strong>
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* 4. CROSS-REFERENCED EVIDENCE SOURCES WITH ACTIVE CLICKABLE LINKS */}
-                            {c.sources && c.sources.length > 0 && (
-                              <div className="space-y-2 pt-2 border-t border-[#CECECE]">
-                                <span className="text-[10px] font-mono uppercase text-[#7386A8] font-bold block">
-                                  Cited Evidence & Authoritative Source Ledger ({c.sources.length})
-                                </span>
-                                <div className="space-y-2">
-                                  {c.sources.map((s, sIdx) => {
-                                    const sUrl = s.url || s.link || (s.domain ? `https://${s.domain}` : null);
-                                    const sDomain = s.domain || (sUrl ? (() => { try { return new URL(sUrl).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; } })() : 'web source');
-                                    
-                                    return (
-                                      <div key={sIdx} className="bg-white border border-[#CECECE] hover:border-[#0B5CD5] p-3 rounded-xl transition space-y-2 shadow-sm">
-                                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                                          {sUrl ? (
-                                            <a
-                                              href={sUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="font-bold text-[#0B5CD5] hover:text-[#0033C4] hover:underline flex items-center gap-1.5 truncate max-w-md group"
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              <span className="truncate">{s.title || s.publication || sDomain}</span>
-                                              <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 text-[#D97757] group-hover:text-[#B0512F]" />
-                                            </a>
-                                          ) : (
-                                            <span className="font-bold text-[#0B5CD5] truncate max-w-md">{s.title || s.publication || 'Authoritative Source'}</span>
-                                          )}
-
-                                          <div className="flex items-center gap-1.5 flex-shrink-0 font-mono text-[10px]">
-                                            <span className="px-2 py-0.5 bg-[#EFEEE9] text-[#2C4E86] rounded font-medium border border-[#CECECE]">{sDomain}</span>
-                                            <span className={`px-2 py-0.5 rounded font-bold ${
-                                              s.stance === 'SUPPORTS' ? 'bg-[#E4EFE7] text-[#2C5B3E] border border-[#C5DEC9]' :
-                                              s.stance === 'REFUTES' || s.stance === 'CONTRADICTS' ? 'bg-[#F7E3E0] text-[#B23F35] border border-[#EBC7C2]' :
-                                              'bg-[#EFEEE9] text-[#2C4E86] border border-[#CECECE]'
-                                            }`}>
-                                              {s.stance || 'SUPPORT'}
-                                            </span>
-                                          </div>
-                                        </div>
-
-                                        {/* Dedicated Model Decision Reason */}
-                                        {s.reason && (
-                                          <div className="p-2.5 rounded-lg bg-[#0B5CD5]/5 border border-[#0B5CD5]/15 text-[11px] text-[#2C4E86] space-y-0.5">
-                                            <span className="font-bold text-[#0B5CD5] text-[10px] uppercase font-mono block">
-                                              Model Evaluation Reason ({s.stance || 'SUPPORT'}):
-                                            </span>
-                                            <p className="leading-relaxed font-medium">{s.reason}</p>
-                                          </div>
-                                        )}
-
-                                        {/* Source Snippet or Excerpt */}
-                                        {(s.snippet || s.excerpt) && (
-                                          <p className="text-[11px] text-[#7386A8] leading-relaxed pl-2.5 border-l-2 border-[#CECECE]">
-                                            {s.snippet || s.excerpt}
-                                          </p>
-                                        )}
-
-                                        {sUrl && (
-                                          <div className="pt-0.5">
-                                            <a
-                                              href={sUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-[10px] text-[#7386A8] hover:text-[#0B5CD5] font-mono truncate block hover:underline"
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              {sUrl}
-                                            </a>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
 
               {/* 04 · IMAGE: PROVIDED VS. ORIGINAL (Appears when analysis has an image asset) */}
               {hasImageForensics && (

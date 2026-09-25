@@ -1107,7 +1107,7 @@ async function verifyClaimWithGeminiSearchGrounding(claim, scope, entitiesStr, a
   try {
     const { GoogleGenAI } = require('@google/genai');
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+    const modelName = (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_VERIFICATION_MODEL || 'gemini-3.5-flash').trim();
 
     const prompt = `You are Agent 3 (Fact Verification & Semantic Stance Evaluator) in an AI Fact-Checking platform.
 
@@ -1306,7 +1306,7 @@ Return ONLY a valid JSON object matching this schema:
   if (!geminiSuccess && isKeyValid(geminiKey) && getProviderStatus().mode !== 'MOCK' && !Array.isArray(optionsObj.mockSearchResults)) {
     const { GoogleGenAI } = require('@google/genai');
     const ai = new GoogleGenAI({ apiKey: geminiKey });
-    const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+    const modelName = (process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_VERIFICATION_MODEL || 'gemini-3.5-flash').trim();
 
     const evidenceListFormatted = searchResults.map((s, idx) => ({
       sourceIndex: s.index !== undefined ? s.index : idx,
@@ -1488,7 +1488,7 @@ Return ONLY a valid JSON object matching this schema:
   }
 
   supportingIndices = evidenceEvaluations
-    .filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate)
+    .filter(e => (e.stance === 'SUPPORTS' || e.stance === 'QUALIFIES') && !e.isSyndicatedDuplicate)
     .map(e => e.sourceIndex);
 
   refutingIndices = evidenceEvaluations
@@ -1511,8 +1511,8 @@ Return ONLY a valid JSON object matching this schema:
     gptExplanation = `Zero relevant web search evidence items matched. No corroborating evidence could be retrieved for this claim.`;
     modelConfidence = 30;
   } else if (!gptExplanation) {
-    gptExplanation = `Evaluated ${evidenceEvaluations.length} search evidence item(s): ${supportingIndices.length} SUPPORTS, ${refutingIndices.length} REFUTES, ${qualifyingIndices.length} QUALIFIES, ${neutralIndices.length} NEUTRAL, ${irrelevantIndices.length} IRRELEVANT.`;
-    modelConfidence = supportingIndices.length > 0 || refutingIndices.length > 0 || qualifyingIndices.length > 0 ? 80 : 35;
+    gptExplanation = `Evaluated ${evidenceEvaluations.length} search evidence item(s): ${supportingIndices.length} SUPPORTS, ${refutingIndices.length} REFUTES, ${neutralIndices.length} NEUTRAL, ${irrelevantIndices.length} IRRELEVANT.`;
+    modelConfidence = supportingIndices.length > 0 || refutingIndices.length > 0 ? 80 : 35;
   }
 
   const validatedSources = [];
@@ -1628,9 +1628,9 @@ Return ONLY a valid JSON object matching this schema:
     sourceAgreement = 0;
   }
 
-  const nonDuplicateSupportingCount = evidenceEvaluations.filter(e => e.stance === 'SUPPORTS' && !e.isSyndicatedDuplicate).length;
+  const nonDuplicateSupportingCount = evidenceEvaluations.filter(e => (e.stance === 'SUPPORTS' || e.stance === 'QUALIFIES') && !e.isSyndicatedDuplicate).length;
   const nonDuplicateRefutingCount = evidenceEvaluations.filter(e => e.stance === 'REFUTES' && !e.isSyndicatedDuplicate).length;
-  const nonDuplicateQualifyingCount = evidenceEvaluations.filter(e => e.stance === 'QUALIFIES' && !e.isSyndicatedDuplicate).length;
+  const nonDuplicateQualifyingCount = 0;
 
   const distinctCorporateParents = new Set(
     evidenceEvaluations
@@ -1656,9 +1656,9 @@ Return ONLY a valid JSON object matching this schema:
   }));
 
   const dualAxis = calculateDualAxisScore({
-    supportingSources: evidenceEvaluations.filter(e => e.stance === 'SUPPORTS'),
+    supportingSources: evidenceEvaluations.filter(e => e.stance === 'SUPPORTS' || e.stance === 'QUALIFIES'),
     refutingSources: evidenceEvaluations.filter(e => e.stance === 'REFUTES'),
-    qualifyingSources: evidenceEvaluations.filter(e => e.stance === 'QUALIFIES'),
+    qualifyingSources: [],
     neutralSources: evidenceEvaluations.filter(e => e.stance === 'NEUTRAL'),
     allSources: evidenceEvaluations,
     distinctCorporateParents,
@@ -1686,9 +1686,9 @@ Return ONLY a valid JSON object matching this schema:
   let canonicalVerdict = dualAxis.canonicalVerdict;
   if (evidenceState === 'REFUTED' || (maxRefutingAuthority >= 95 && maxSupportingAuthority <= 50 && refutingIndices.length > 0)) {
     canonicalVerdict = 'FALSE';
-  } else if (evidenceState === 'MIXED' || nonDuplicateQualifyingCount > 0) {
+  } else if (evidenceState === 'MIXED') {
     canonicalVerdict = 'PARTIALLY_VERIFIED';
-  } else if (evidenceState === 'SUPPORTED' && derivedConfidence >= 55) {
+  } else if ((evidenceState === 'SUPPORTED' || nonDuplicateSupportingCount > 0) && derivedConfidence >= 50 && refutingIndices.length === 0) {
     canonicalVerdict = 'VERIFIED';
   } else {
     canonicalVerdict = 'UNVERIFIED';
@@ -1709,9 +1709,7 @@ Return ONLY a valid JSON object matching this schema:
     } else if (canonicalVerdict === 'FALSE') {
       claimStanceReason = `Contradicted by ${refutingIndices.length} authoritative source(s) with conflicting public facts or explicit debunks.`;
     } else if (canonicalVerdict === 'PARTIALLY_VERIFIED') {
-      claimStanceReason = nonDuplicateQualifyingCount > 0
-        ? `Qualifying reporting across sources: core event acknowledged with differing contextual details or numbers.`
-        : `Mixed reporting across sources: ${supportingIndices.length} corroborating vs ${refutingIndices.length} contesting source(s).`;
+      claimStanceReason = `Mixed reporting across sources: ${supportingIndices.length} corroborating vs ${refutingIndices.length} contesting source(s).`;
     } else {
       claimStanceReason = `Insufficient or neutral evidence: retrieved sources do not provide definitive confirmation or refutation of this specific assertion.`;
     }
@@ -1834,7 +1832,7 @@ Return ONLY a valid JSON object matching this schema:
       status: geminiSuccess ? 'COMPLETED' : 'HEURISTIC_FALLBACK',
       description: 'LLM semantic stance evaluation comparing meaning vs. meaning for each source.',
       inputs: {
-        model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest',
+        model: process.env.GEMINI_FLASH_MODEL || process.env.GEMINI_VERIFICATION_MODEL || 'gemini-3.5-flash',
         candidateSourcesCount: searchResults.length
       },
       outputs: {

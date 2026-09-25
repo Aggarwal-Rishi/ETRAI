@@ -550,6 +550,47 @@ export default function Agent3DebugPanel({ claim, onClose }) {
               </p>
             </div>
 
+            {/* Evidence Guard Gate Telemetry (Grounded Engine Safeguards) */}
+            {claim.evidenceGuardChecks && (
+              <div className="bg-white p-4 rounded-2xl border border-[#0B5CD5]/20 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#0B5CD5] text-xs uppercase font-mono flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[#3E7A55]" />
+                    Evidence Guard Gate (Safeguard Telemetry)
+                  </span>
+                  <span className="text-[10px] font-mono text-[#7386A8]">
+                    Retrieval: <strong className="text-[#0B5CD5]">{claim.retrievalMethod || 'GROUNDED'}</strong>
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+                  <div className="p-2 rounded-xl bg-[#F8F8F6] border border-[#CECECE]">
+                    <span className="text-[#7386A8] text-[10px] block">Temporal Match</span>
+                    <span className={`font-bold ${claim.evidenceGuardChecks.hasYearMatch !== false ? 'text-[#3E7A55]' : 'text-[#B23F35]'}`}>
+                      {claim.evidenceGuardChecks.hasYearMatch !== false ? 'PASS' : 'YEAR MISMATCH'}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-[#F8F8F6] border border-[#CECECE]">
+                    <span className="text-[#7386A8] text-[10px] block">Quantity Check</span>
+                    <span className={`font-bold ${!claim.evidenceGuardChecks.hasQuantityMismatch ? 'text-[#3E7A55]' : 'text-[#B23F35]'}`}>
+                      {!claim.evidenceGuardChecks.hasQuantityMismatch ? 'PASS' : 'SCALE CONFLICT'}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-[#F8F8F6] border border-[#CECECE]">
+                    <span className="text-[#7386A8] text-[10px] block">Authority Tiering</span>
+                    <span className="font-bold text-[#0B5CD5]">
+                      T0:{claim.evidenceGuardChecks.authorityDistribution?.tier0 || 0} | T1:{claim.evidenceGuardChecks.authorityDistribution?.tier1 || 0} | T2:{claim.evidenceGuardChecks.authorityDistribution?.tier2 || 0}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-[#F8F8F6] border border-[#CECECE]">
+                    <span className="text-[#7386A8] text-[10px] block">Contradictions</span>
+                    <span className={`font-bold ${!claim.evidenceGuardChecks.hasContradiction ? 'text-[#3E7A55]' : 'text-[#B23F35]'}`}>
+                      {!claim.evidenceGuardChecks.hasContradiction ? 'NONE' : 'CONTRADICTION DETECTED'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               {evidenceEvaluations.length > 0 ? (
                 evidenceEvaluations.map((evalObj, idx) => {

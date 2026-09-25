@@ -486,7 +486,7 @@ async function performEntityAndIntentAnalysis(text = '', options = {}) {
   const gemini = createGeminiClient();
   if (gemini && isKeyValid(process.env.GEMINI_API_KEY) && text.length > 80 && options.enableLlmEnrichment) {
     try {
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+      const modelName = (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
       const prompt = `Analyze the following text for named entities and quote attributions. Return ONLY a JSON object:
 {
   "entities": [{"name": "Entity Name", "type": "PERSON|ORGANIZATION|GOVERNMENT_BODY|COMPANY|PRODUCT|LOCATION|EVENT|DOCUMENT"}],

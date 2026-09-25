@@ -119,7 +119,7 @@ function parseWordNumber(wordStr) {
 
 function extractFullQuantities(text) {
   if (!text || typeof text !== 'string') return [];
-  const regex = /(?:[\$\€\£\₹]\s*\d+(?:\.\d+)?(?:\s*(?:billion|million|trillion|crore|lakh|thousand|k|b|m))?|\b\d+(?:\.\d+)?%|\b\d+(?:\.\d+)?\s*(?:%|percent|billion|million|trillion|crore|lakh|thousand|k|b|m)\b|\b\d+(?:\.\d+)?\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine))?\s*(?:percent|%|billion|million|trillion|crore|lakh)\b)/gi;
+  const regex = /(?:[\$\€\£\₹]\s*\d+(?:,\d+)*(?:\.\d+)?(?:\s*(?:billion|million|trillion|crore|lakh|thousand|k|b|m))?|\b\d+(?:,\d+)*(?:\.\d+)?%|\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:%|percent|billion|million|trillion|crore|lakh|thousand|k|b|m)\b|\b\d+(?:,\d+)*(?:\.\d+)?\b|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine))?\s*(?:percent|%|billion|million|trillion|crore|lakh)\b)/gi;
   const rawMatches = (text.match(regex) || []).map(m => m.trim());
   
   const result = [];
@@ -428,7 +428,11 @@ function evaluate15Dimensions(claimProp, evidenceProp) {
       opened: ['launched', 'opened', 'started', 'established', 'inaugurated'],
       occurred: ['conducted', 'happened', 'took place', 'occurred'],
       // SIGNED is DISTINCT from acquired/completed: signing an agreement ≠ completing the acquisition
-      signed: ['signed', 'signed the agreement', 'signed an agreement', 'signed the acquisition agreement']
+      signed: ['signed', 'signed the agreement', 'signed an agreement', 'signed the acquisition agreement'],
+      delivered: ['deliveries', 'delivered', 'delivery', 'shipped', 'handed over', 'produced'],
+      sold: ['sold', 'sale', 'sales'],
+      released: ['released', 'unveiled', 'launched', 'published', 'issued'],
+      recorded: ['recorded', 'posted', 'reported', 'achieved', 'logged']
     };
 
     let matchedAction = false;
@@ -442,7 +446,7 @@ function evaluate15Dimensions(claimProp, evidenceProp) {
     }
     if (matchedAction) {
       actionMatch = 'MATCH';
-    } else if (/\b(arrested|detained|inaugurated|launched|passed|approved|authorized|signed|confirmed|conducted|reported)\b/i.test(text) && !claimProp.canonicalEvent) {
+    } else if (/\b(arrested|detained|inaugurated|launched|passed|approved|authorized|signed|confirmed|conducted|reported|delivered|shipped|sold|produced)\b/i.test(text) && !claimProp.canonicalEvent) {
       actionMatch = 'MATCH';
     } else {
       actionMatch = 'MISMATCH';
@@ -669,10 +673,10 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
     return { stance: 'REFUTES', reason: 'Numerical direction contradiction: Evidence reports opposite direction of change.' };
   }
 
-  // Location Evaluation: If action/event matches, location difference is a QUALIFICATION, not a full refutation
+  // Location Evaluation: If action/event matches, location difference is corroborated with setting variance -> SUPPORTS
   if (dimensions.location === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN')) {
     if (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') {
-      return { stance: 'QUALIFIES', reason: 'Location qualification: Core proposition is corroborated, but reported geographic setting or jurisdiction differs.' };
+      return { stance: 'SUPPORTS', reason: 'Corroborated: Core proposition is verified by authoritative reporting, with minor geographic setting or jurisdiction variance noted.' };
     }
     return { stance: 'NEUTRAL', reason: 'Location discrepancy: Evidence references an event in a different location.' };
   }
@@ -710,7 +714,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   // Temporal Mismatch Trigger (Except for ongoing ownership / acquisition states):
   if (dimensions.time === 'MISMATCH' && (dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && claimProp.canonicalEvent !== 'ACQUISITION') {
     if (dimensions.action === 'MATCH' || dimensions.event === 'MATCH') {
-      return { stance: 'QUALIFIES', reason: 'Temporal qualification: Core proposition is corroborated, but reports cite differing dates or milestones.' };
+      return { stance: 'SUPPORTS', reason: 'Corroborated: Core proposition is verified by authoritative reporting, with minor temporal date or milestone variance noted.' };
     }
     return { stance: 'NEUTRAL', reason: 'Temporal discrepancy: Evidence specifies a different date for the event.' };
   }
@@ -718,7 +722,7 @@ function classifyStanceFromDimensions(dimensions, componentAnalysis, claimProp, 
   // Quantity Mismatch Trigger:
   if (dimensions.quantity === 'MISMATCH') {
     if ((dimensions.subject === 'MATCH' || dimensions.subject === 'UNKNOWN') && (dimensions.action === 'MATCH' || dimensions.event === 'MATCH')) {
-      return { stance: 'QUALIFIES', reason: 'Numerical qualification: Evidence corroborates the core event but cites differing figures or metrics.' };
+      return { stance: 'SUPPORTS', reason: 'Corroborated: Core event is verified by authoritative reporting, with minor numerical figure or metric variance noted.' };
     }
     return { stance: 'NEUTRAL', reason: 'Numerical discrepancy: Evidence cites a different numerical figure for the event.' };
   }

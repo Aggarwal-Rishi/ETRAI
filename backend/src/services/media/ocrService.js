@@ -68,32 +68,7 @@ async function extractOcrText(fileInfo = {}, buffer = null, options = {}) {
     };
   }
 
-  // 3. Fallback: Parse visible text strings from raster/vector payload directly
-  if (buffer && Buffer.isBuffer(buffer)) {
-    const rawAscii = buffer.toString('ascii');
-    const printableMatches = rawAscii.match(/[A-Za-z0-9\s.,!?:;'"()-]{10,}/g) || [];
-    const extractedText = printableMatches.join(' ').trim();
-
-    if (extractedText.length > 20) {
-      const blocks = parseSimulatedBlocks(extractedText);
-      const uncertainty = calculateOcrUncertainty(blocks, 70);
-
-      return {
-        status: 'AVAILABLE',
-        ocrText: extractedText,
-        rawOcrText: extractedText,
-        source: 'raster_string_extraction',
-        confidence: uncertainty.overallConfidence,
-        uncertaintyScore: uncertainty.uncertaintyScore,
-        lowConfidenceWordsCount: uncertainty.lowConfidenceWordsCount,
-        blocksCount: blocks.length,
-        blocks,
-        uncertainWords: uncertainty.uncertainWords,
-        limitations: ['Extracted via direct binary string stream']
-      };
-    }
-  }
-
+  // 3. Fallback: No readable text detected via OCR provider or multimodal vision
   return {
     status: 'NO_TEXT_DETECTED',
     ocrText: '',
@@ -104,8 +79,8 @@ async function extractOcrText(fileInfo = {}, buffer = null, options = {}) {
     blocksCount: 0,
     blocks: [],
     uncertainWords: [],
-    limitations: ['No readable embedded text detected in image or document page']
-  };
+    limitations: ['No readable embedded text detected in image']
+  }
 }
 
 /**

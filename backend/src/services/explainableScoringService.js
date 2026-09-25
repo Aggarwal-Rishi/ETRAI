@@ -54,7 +54,9 @@ const PENALTY_CATALOG = {
   SOURCE_INDEPENDENCE_FAILURE: { code: 'SOURCE_INDEPENDENCE_FAILURE', baseDeduction: 15, description: 'Apparent corroboration is solely circular wire duplication' },
   DECEPTIVE_REDIRECT: { code: 'DECEPTIVE_REDIRECT', baseDeduction: 15, description: 'Deceptive anchor links purporting official status detected' },
   HIGH_SENSATIONALISM: { code: 'HIGH_SENSATIONALISM', baseDeduction: 10, description: 'High sensationalism and alarmist rhetoric detected' },
-  STALE_EVIDENCE: { code: 'STALE_EVIDENCE', baseDeduction: 10, description: 'Superseded or outdated historic evidence used for present-day claim' }
+  STALE_EVIDENCE: { code: 'STALE_EVIDENCE', baseDeduction: 10, description: 'Superseded or outdated historic evidence used for present-day claim' },
+  DEEPFAKE_AUDIO: { code: 'DEEPFAKE_AUDIO', baseDeduction: 35, description: 'Debunked AI deepfake or cloned audio detected' },
+  SELECTIVE_SPLICING: { code: 'SELECTIVE_SPLICING', baseDeduction: 25, description: 'Selective audio/video splicing contradicting official transcript' }
 };
 
 /**
@@ -161,7 +163,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
       authorityCount++;
 
       const rel = (s.relationship || s.stance || 'NEUTRAL').toUpperCase();
-      if (rel === 'SUPPORTS' || rel === 'SUPPORT' || rel === 'VERIFIED') supportingCount++;
+      if (rel === 'SUPPORTS' || rel === 'SUPPORT' || rel === 'VERIFIED' || rel === 'QUALIFIES') supportingCount++;
       else if (rel === 'REFUTES' || rel === 'CONTRADICTS' || rel === 'FALSE') refutingCount++;
       else if (rel === 'QUALIFIES') qualifyingCount++;
     }
@@ -177,7 +179,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
       authorityCount++;
       totalEvidenceCount++;
       const rel = (s.stance || 'NEUTRAL').toUpperCase();
-      if (rel === 'SUPPORTS' || rel === 'SUPPORT') supportingCount++;
+      if (rel === 'SUPPORTS' || rel === 'SUPPORT' || rel === 'QUALIFIES') supportingCount++;
       else if (rel === 'REFUTES' || rel === 'CONTRADICTS') refutingCount++;
     }
   }
@@ -260,13 +262,16 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   const mediaFindings = analysisData.mediaAnalysis?.forensics || analysisData.mediaAnalysis;
   const videoContextVerdict = analysisData.mediaAnalysis?.videoContextReport?.verdict || mediaFindings?.contextReport?.verdict;
   const forensicVerdict = mediaFindings?.forensicVerdict || mediaFindings?.verdict || analysisData.mediaAnalysis?.forensicVerdict;
+  const transcriptVerification = analysisData.mediaAnalysis?.transcriptVerification;
+  const audioBreakdown = analysisData.mediaAnalysis?.audioBreakdown;
   if (mediaFindings) {
     if (mediaFindings.c2pa?.hasC2paManifest) mediaIntegrity = 100;
-    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED' || aiDet?.isAiGenerated || aiDet?.isDeepfake) mediaIntegrity = 25;
-    else if (videoContextVerdict === 'Manipulated') mediaIntegrity = 45;
+    else if (videoContextVerdict === 'Deepfake' || mediaFindings.ela?.isManipulatedLikely || forensicVerdict === 'MANIPULATION_DETECTED' || aiDet?.isAiGenerated || aiDet?.isDeepfake || transcriptVerification?.status === 'DEBUNKED_DEEPFAKE') mediaIntegrity = 25;
+    else if (videoContextVerdict === 'Manipulated' || transcriptVerification?.status === 'SELECTIVE_SPLICING') mediaIntegrity = 45;
     else if (videoContextVerdict === 'Deceptive Context') mediaIntegrity = 60;
     else if (forensicVerdict === 'INCONCLUSIVE_LIMITED_ANALYSIS') mediaIntegrity = 50;
     else if (mediaFindings.integrity && !mediaFindings.integrity.isIntegrityIntact) mediaIntegrity = 40;
+    else if (transcriptVerification?.status === 'AUTHENTIC_VERBATIM') mediaIntegrity = Math.max(96, Math.min(100, transcriptVerification.similarityScore || 96));
     else if (isAuthenticAiVerified) mediaIntegrity = 98;
     else mediaIntegrity = 90;
   }
@@ -469,12 +474,57 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     totalPenaltyDeductions += penalty;
   }
 
+  // 8. Video Transcript & Deepfake Penalties
+  if (hasMedia && transcriptVerification) {
+    if (transcriptVerification.status === 'DEBUNKED_DEEPFAKE') {
+      const penalty = 35;
+      appliedPenalties.push({
+        ...PENALTY_CATALOG.DEEPFAKE_AUDIO,
+        label: 'Debunked AI audio / deepfake',
+        val: `-${penalty}.0`,
+        value: penalty,
+        pointsDeducted: penalty,
+        reason: 'Spoken dialogue debunked as AI synthesized or cloned voice by authoritative fact-checking archives.',
+        evidenceRef: 'mediaAnalysis.transcriptVerification.debunkedMatch',
+        scoringVersion: SCORING_VERSION
+      });
+      totalPenaltyDeductions += penalty;
+    } else if (transcriptVerification.status === 'SELECTIVE_SPLICING') {
+      const penalty = 25;
+      appliedPenalties.push({
+        ...PENALTY_CATALOG.SELECTIVE_SPLICING,
+        label: 'Selective audio/video splicing',
+        val: `-${penalty}.0`,
+        value: penalty,
+        pointsDeducted: penalty,
+        reason: 'Spoken dialogue selectively trimmed or rearranged, altering the original context found in official transcripts.',
+        evidenceRef: 'mediaAnalysis.transcriptVerification',
+        scoringVersion: SCORING_VERSION
+      });
+      totalPenaltyDeductions += penalty;
+    }
+  }
+
+  // Fatal AI Gate: If media contains synthetic AI generation or voice clone (>= 70%), clamp score to <= 20 and verdict = FALSE
+  const isFatalAiMedia = Boolean(
+    (analysisData.mediaAnalysis?.aiDetection?.status === 'SUCCESS' && analysisData.mediaAnalysis?.aiDetection?.isAiGenerated) ||
+    (analysisData.mediaAnalysis?.videoAudioForensics?.sightengine?.isAiGenerated) ||
+    (analysisData.mediaAnalysis?.videoAudioForensics?.aiDetection?.isAiGenerated) ||
+    (analysisData.mediaAnalysis?.forensics?.aiDetection?.isAiGenerated) ||
+    (transcriptVerification?.status === 'DEBUNKED_DEEPFAKE') ||
+    (audioBreakdown?.voiceCloningRisk === 'HIGH')
+  );
+
   // Compute final trust score
-  const finalTrustScore = Math.max(0, Math.min(100, Math.round(weightedBaseScore - totalPenaltyDeductions)));
+  let finalTrustScore = Math.max(0, Math.min(100, Math.round(weightedBaseScore - totalPenaltyDeductions)));
+  if (isFatalAiMedia) {
+    finalTrustScore = 0;
+  }
 
   // ── Verdict Mapping ───────────────────────────────────────────────────────
   let finalVerdict = 'UNCERTAIN';
-  if (falseCount > 0 && finalTrustScore < 40) finalVerdict = 'FALSE';
+  if (isFatalAiMedia) finalVerdict = 'FALSE';
+  else if (falseCount > 0 && finalTrustScore < 40) finalVerdict = 'FALSE';
   else if (falseCount > 0) finalVerdict = 'MISLEADING';
   else if (disputedCount > 0 || (supportingCount > 0 && refutingCount > 0)) finalVerdict = 'MIXED';
   else if (finalTrustScore >= 85 && (unverifiedCount === 0 || (totalClaims === 0 && hasMedia))) finalVerdict = 'HIGHLY_SUPPORTED';
@@ -484,12 +534,128 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
   else if (hasMedia && finalTrustScore >= 80) finalVerdict = 'HIGHLY_SUPPORTED';
   else finalVerdict = 'FALSE';
 
+  // ── Pure Visual Media: Strict Eliminator (AI -> Tampering -> Provenance) ───
+  if (totalClaims === 0 && hasMedia) {
+    const isVideo = analysisData.mediaAnalysis?.mediaType === 'VIDEO' || Boolean(analysisData.mediaAnalysis?.videoAudioForensics || analysisData.mediaAnalysis?.videoContextReport || analysisData.mediaAnalysis?.transcriptVerification);
+    if (!isVideo) {
+      const imageForensics = analysisData.mediaAnalysis?.imageForensics || {};
+      const manipulationScore = typeof imageForensics.manipulationScore === 'number'
+        ? imageForensics.manipulationScore
+        : (Array.isArray(analysisData.mediaAnalysis?.manipulationSignals) ? Math.min(100, analysisData.mediaAnalysis.manipulationSignals.length * 25) : 0);
+      const forensicVerdict = imageForensics.verdict || analysisData.mediaAnalysis?.forensicVerdict;
+      const comparison = analysisData.mediaAnalysis?.imageSourceContextComparison;
+      const reverseSearch = analysisData.mediaAnalysis?.reverseSearch || imageForensics.reverseSearch;
+
+      const aiProb = aiDet && typeof aiDet.aiGeneratedProbability === 'number'
+        ? aiDet.aiGeneratedProbability
+        : (aiDet?.isAiGenerated ? 0.95 : 0.0);
+      const isAi = Boolean(aiDet?.isAiGenerated || aiProb >= 0.50);
+
+      const visualComparison = analysisData.mediaAnalysis?.visualComparison || imageForensics.visualComparison || imageForensics.reportItem?.visualComparison;
+      const isTampered = Boolean(
+        visualComparison?.isModified === true ||
+        manipulationScore >= 45 ||
+        forensicVerdict === 'FABRICATED_OR_COMPOSITED' ||
+        forensicVerdict === 'MANIPULATION_DETECTED' ||
+        imageForensics.ela?.isManipulatedLikely ||
+        (imageForensics.signals && imageForensics.signals.some(s => s.severity === 'HIGH'))
+      );
+
+      let provenanceScore = 85;
+      let provenanceReason = 'Web index match verified with uncontradicted original source context.';
+      if (visualComparison?.isModified) {
+        provenanceScore = 25;
+        provenanceReason = `Authentic original photo discovered on ${comparison?.source?.domain || reverseSearch?.matches?.[0]?.domain || 'web archive'}, but multimodal diffing confirms person or element was swapped.`;
+      } else if (comparison?.status === 'MATCHED' || reverseSearch?.isWire) {
+        provenanceScore = Math.max(90, Math.min(98, comparison?.confidence || 95));
+        provenanceReason = `Corroborated by wire/authoritative archives (${comparison?.source?.domain || reverseSearch?.matches?.[0]?.domain || 'news wire'}).`;
+      } else if (comparison?.status === 'UNINDEXED_NEW_CAPTURE' || reverseSearch?.originalFoundStatus === 'UNINDEXED_ORIGINAL') {
+        provenanceScore = 95;
+        provenanceReason = 'Verified unindexed original capture with natural camera sensor characteristics.';
+      } else if (comparison?.status === 'CONTRADICTED') {
+        provenanceScore = 25;
+        provenanceReason = 'Reverse search contradicts submitted caption or indicates decontextualized reuse.';
+      }
+
+      if (isAi) {
+        finalTrustScore = 0;
+        finalVerdict = 'FALSE';
+      } else if (isTampered) {
+        finalTrustScore = 25;
+        finalVerdict = 'FALSE';
+      } else {
+        finalTrustScore = provenanceScore;
+        finalVerdict = finalTrustScore >= 80 ? 'HIGHLY_SUPPORTED' : 'SUPPORTED';
+      }
+
+      factorBreakdown.length = 0;
+      factorBreakdown.push(
+        {
+          k: 'aiAuthenticity',
+          factorKey: 'aiAuthenticity',
+          n: 'AI Detection & Synthetic Signatures',
+          factorName: 'AI Detection & Synthetic Signatures',
+          sh: 'AI Gen',
+          shortName: 'AI Gen',
+          d: 'Forensic evaluation for synthetic generative diffusion models, face-swapping, and deepfake artifacts',
+          description: 'Forensic evaluation for synthetic generative diffusion models, face-swapping, and deepfake artifacts',
+          raw: isAi ? 0 : Math.round((1.0 - (aiProb || 0.02)) * 100),
+          rawScore: isAi ? 0 : Math.round((1.0 - (aiProb || 0.02)) * 100),
+          w: 40,
+          weight: 40,
+          weightedContribution: isAi ? 0 : Number(((1.0 - (aiProb || 0.02)) * 40).toFixed(1)),
+          contribution: isAi ? 0 : Number(((1.0 - (aiProb || 0.02)) * 40).toFixed(1)),
+          reason: isAi ? 'High generative AI or synthetic deepfake probability detected.' : 'Natural camera sensor textures with low generative AI probability.'
+        },
+        {
+          k: 'mediaTampering',
+          factorKey: 'mediaTampering',
+          n: 'Digital Tampering & Integrity',
+          factorName: 'Digital Tampering & Integrity',
+          sh: 'Tampering',
+          shortName: 'Tampering',
+          d: 'Error Level Analysis (ELA), copy-move forgery detection, and quantization uniformity',
+          description: 'Error Level Analysis (ELA), copy-move forgery detection, and quantization uniformity',
+          raw: isTampered ? 25 : Math.max(0, 100 - manipulationScore),
+          rawScore: isTampered ? 25 : Math.max(0, 100 - manipulationScore),
+          w: 35,
+          weight: 35,
+          weightedContribution: Number(((isTampered ? 25 : Math.max(0, 100 - manipulationScore)) * 0.35).toFixed(1)),
+          contribution: Number(((isTampered ? 25 : Math.max(0, 100 - manipulationScore)) * 0.35).toFixed(1)),
+          reason: visualComparison?.isModified
+            ? (visualComparison.summary || 'Direct comparison with verified original photo confirms element replacement or face swap.')
+            : (isTampered ? 'Splicing, inpainting, or composite manipulation detected.' : 'Uniform quantization and compression characteristics across image edges.')
+        },
+        {
+          k: 'provenanceMatch',
+          factorKey: 'provenanceMatch',
+          n: 'Web Provenance & Originality',
+          factorName: 'Web Provenance & Originality',
+          sh: 'Provenance',
+          shortName: 'Provenance',
+          d: 'Cross-reference with indexed web publications, reverse image search, and wire archives',
+          description: 'Cross-reference with indexed web publications, reverse image search, and wire archives',
+          raw: provenanceScore,
+          rawScore: provenanceScore,
+          w: 25,
+          weight: 25,
+          weightedContribution: Number((provenanceScore * 0.25).toFixed(1)),
+          contribution: Number((provenanceScore * 0.25).toFixed(1)),
+          reason: provenanceReason
+        }
+      );
+    }
+  }
+
   // ── Drivers ───────────────────────────────────────────────────────────────
   const positiveDrivers = [];
   const negativeDrivers = [];
 
   if (verifiedCount > 0) positiveDrivers.push(`Corroborated ${verifiedCount} factual proposition(s) against official sources.`);
   if (isAuthenticAiVerified) positiveDrivers.push(`Sightengine neural detector confirmed authentic optical camera capture (${Math.round((1.0 - (aiDet.aiGeneratedProbability || 0)) * 100)}% natural capture certainty).`);
+  if (transcriptVerification?.status === 'AUTHENTIC_VERBATIM') positiveDrivers.push(`Audio spoken transcript corroborated verbatim against official archives (${transcriptVerification.similarityScore || 90}% match).`);
+  if (audioBreakdown?.isPureSongOrMusic) positiveDrivers.push('Background music/song isolated; non-factual lyrics excluded from claim evaluation.');
+  if (Array.isArray(analysisData.mediaAnalysis?.onScreenHeadlines) && analysisData.mediaAnalysis.onScreenHeadlines.length > 0) positiveDrivers.push(`Extracted and independently verified ${analysisData.mediaAnalysis.onScreenHeadlines.length} on-screen news chyron(s).`);
   if (sourceAuthority >= 80) positiveDrivers.push(`High average source authority score (${sourceAuthority}/100).`);
   if (uniqueDomains.size >= 2) positiveDrivers.push(`Corroborated across ${uniqueDomains.size} independent domains.`);
   if (originConf === 'CONFIRMED') positiveDrivers.push('Primary content provenance origin is cryptographically or archival confirmed.');
@@ -497,6 +663,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
 
   if (falseCount > 0) negativeDrivers.push(`Directly refuted ${falseCount} proposition(s) with contradicting evidence.`);
   if (disputedCount > 0) negativeDrivers.push(`${disputedCount} claim(s) subject to active contradiction between authoritative sources.`);
+  if (transcriptVerification?.status === 'DEBUNKED_DEEPFAKE') negativeDrivers.push('Audio track identified as synthetic deepfake / voice clone by fact-checking records.');
+  if (transcriptVerification?.status === 'SELECTIVE_SPLICING') negativeDrivers.push('Video audio detected as selectively spliced or taken out of context relative to official public record.');
   if (unverifiedCount > 0 && totalClaims > 0) negativeDrivers.push(`${unverifiedCount} assertion(s) lack independent corroborating sources.`);
   appliedPenalties.forEach(p => negativeDrivers.push(`${p.reason || p.description} (-${p.pointsDeducted || p.value} pts)`));
 
@@ -587,6 +755,7 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
     overallTrustScore: finalTrustScore,
     finalTrustScore,
     verdict: finalVerdict,
+    finalVerdict,
     weightedBaseScore: Number(weightedBaseScore.toFixed(1)),
     totalPenalties: Number(totalPenaltyDeductions.toFixed(1)),
     penaltyTotal: Number(totalPenaltyDeductions.toFixed(1)),
@@ -610,6 +779,8 @@ function computeExplainableTrustScore(analysisData = {}, customWeights = {}) {
       positiveDrivers,
       negativeDrivers
     },
+    positiveDrivers,
+    negativeDrivers,
     counterfactualExplanation,
     counterfactualConditions,
     summaryText: `Investigation scored ${finalTrustScore}/100 (${finalVerdict}) under DeepTrust Scoring Methodology v${SCORING_VERSION}.`

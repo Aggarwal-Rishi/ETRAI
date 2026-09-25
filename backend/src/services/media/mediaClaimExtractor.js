@@ -2,10 +2,24 @@ const { extractClaims, extractMockClaims } = require('../claimExtractor');
 
 function isUsefulOcrText(value = '') {
   const text = String(value).replace(/\[model-extracted text\]\s*:\s*/gi, '').replace(/\s+/g, ' ').trim();
-  if (text.length < 3 || /([^\p{L}\p{N}\s])\1{5,}/u.test(text)) return false;
+  if (text.length < 15 || /([^\p{L}\p{N}\s])\1{4,}/u.test(text)) return false;
+  
+  // Reject binary metadata artifacts and camera container strings
+  const lower = text.toLowerCase();
+  const binaryArtifacts = ['jfif', 'icc_profile', 'exif', 'adobe photoshop', 'dall-e', 'midjourney', 'stable diffusion', 'srgb'];
+  if (binaryArtifacts.some(tag => lower.includes(tag)) && text.length < 60) return false;
+
   const compact = text.replace(/\s/g, '');
   const readableCount = (compact.match(/[\p{L}\p{N}]/gu) || []).length;
-  return compact.length > 0 && readableCount / compact.length >= 0.65;
+  if (compact.length === 0 || readableCount / compact.length < 0.75) return false;
+
+  const words = text.split(/\s+/).filter(w => w.length >= 2);
+  if (words.length < 4) return false;
+
+  const incidentalTerms = ['nike', 'adidas', 'puma', 'gucci', 'supreme', 'levi', 'apple', 'samsung', 'shot on', 'getty', 'shutterstock', 'watermark'];
+  if (incidentalTerms.some(term => lower.includes(term)) && words.length < 7) return false;
+
+  return true;
 }
 
 function isSubstantiveNewsHeadline(rawText, observed = {}) {
@@ -20,7 +34,9 @@ function isSubstantiveNewsHeadline(rawText, observed = {}) {
   const incidentalTerms = [
     'nike', 'adidas', 'puma', 'gucci', 'supreme', 'levi', 'apple', 'samsung',
     'shot on', 'getty images', 'shutterstock', 'reuters photo', 'ap photo', 'watermark',
-    'billboard', 'sale', 'discount', 'buy 1', 'shop', 'exit', 'entrance', 'street'
+    'billboard', 'sale', 'discount', 'buy 1', 'shop', 'exit', 'entrance', 'street',
+    'canon', 'nikon', 'sony', 'fujifilm', 'leica', 'adobe', 'photoshop', 'lightroom',
+    'midjourney', 'stable diffusion', 'dall-e', 'exif', 'jfif', 'icc'
   ];
   if (incidentalTerms.some(term => lower === term || (words.length <= 4 && lower.includes(term)))) {
     return false;
@@ -32,7 +48,7 @@ function isSubstantiveNewsHeadline(rawText, observed = {}) {
   if (signs.some(s => lower === s)) return false;
 
   // Must contain an assertion verb characteristic of a news headline or event proposition
-  return /\b(is|are|was|were|has|have|had|announced|announces|reported|reports|arrested|arrests|killed|signed|approved|rejected|declined|passed|won|lost|launched|unveiled|declared|banned|resigned|stepped down|claims|claimed|stated|states)\b/i.test(clean);
+  return /\b(is|are|was|were|has|have|had|announced|announces|reported|reports|arrested|arrests|killed|signed|signs|approved|approves|rejected|rejects|declined|declines|passed|passes|blocked|blocks|won|wins|lost|loses|launched|launches|unveiled|unveils|declared|declares|banned|bans|resigned|resigns|stepped down|claims|claimed|stated|states)\b/i.test(clean);
 }
 
 /**
@@ -40,7 +56,7 @@ function isSubstantiveNewsHeadline(rawText, observed = {}) {
  * Feeds user claim + transcript + OCR text + visual findings into Agent 2.
  * Produces self-contained verifiable claims (e.g., "The video transcript states...").
  */
-async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '', visualDescription = '', entities = [], isVideo = false, observed = {} }, options = {}) {
+async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '', visualDescription = '', entities = [], isVideo = false, observed = {}, onScreenHeadlines = [], audioBreakdown = null }, options = {}) {
   if (Array.isArray(options.mockClaims) && options.mockClaims.length > 0) {
     return {
       claims: options.mockClaims,
@@ -54,6 +70,12 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
 
   const trimmedUserClaim = (userNotes || '').trim();
   const trimmedTranscript = (transcript || '').trim();
+  const isSongOrMusic = Boolean(
+    audioBreakdown?.isSongOrMusic ||
+    audioBreakdown?.isPureSongOrMusic ||
+    audioBreakdown?.dominantType === 'SONG_VOCALS' ||
+    audioBreakdown?.dominantType === 'MUSIC_BGM'
+  );
 
   // 1. Preserve User Claim as Primary Verification Target
   if (trimmedUserClaim) {
@@ -81,7 +103,8 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
   }
 
   // 2. Format Transcript Claim as Self-Contained Verifiable Proposition (Videos)
-  if (trimmedTranscript) {
+  // CRITICAL: Reject song lyrics or musical BGM from generating factual propositions!
+  if (trimmedTranscript && !isSongOrMusic) {
     const formattedTranscriptClaim = trimmedTranscript.toLowerCase().startsWith('the video transcript states') || trimmedTranscript.toLowerCase().startsWith('the speaker claims')
       ? trimmedTranscript
       : `The video transcript states: "${trimmedTranscript}"`;
@@ -99,14 +122,37 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
       scope: 'National',
       importance: 'High',
       verifiability: 'High',
-      origin: 'VIDEO_TRANSCRIPT'
+      origin: 'VIDEO_TRANSCRIPT',
+      sourceRole: 'VIDEO_TRANSCRIPT'
     });
   }
 
-  // 3. Extract OCR Text Claim ONLY if it represents a substantive news headline/assertion
+  // 3. Dedicated On-Screen News Headline Claims (Videos & Images)
+  if (Array.isArray(onScreenHeadlines) && onScreenHeadlines.length > 0) {
+    onScreenHeadlines.slice(0, 3).forEach((hl, idx) => {
+      const headlineText = (hl.headlineText || hl.text || '').trim();
+      if (headlineText && !claims.some(c => c.searchQuery === headlineText)) {
+        claims.push({
+          id: `media_claim_headline_${idx + 1}`,
+          claimText: `The video displays an on-screen breaking news banner stating: "${headlineText}"`,
+          text: `The video displays an on-screen breaking news banner stating: "${headlineText}"`,
+          entities: hl.entities || entities || [],
+          searchQuery: headlineText,
+          scope: 'National',
+          importance: 'High',
+          verifiability: 'High',
+          origin: 'VIDEO_ON_SCREEN_HEADLINE',
+          sourceRole: 'VIDEO_ON_SCREEN_HEADLINE',
+          headlineMetadata: hl
+        });
+      }
+    });
+  }
+
+  // 3B. Extract OCR Text Claim ONLY if it represents a substantive news headline/assertion (if not already added)
   const usableOcrText = isUsefulOcrText(ocrText) ? ocrText : '';
   const isHeadline = isSubstantiveNewsHeadline(usableOcrText, observed);
-  if (usableOcrText && isHeadline) {
+  if (usableOcrText && isHeadline && !claims.some(c => c.origin === 'VIDEO_ON_SCREEN_HEADLINE')) {
     const cleanOcr = usableOcrText.trim().replace(/\s+/g, ' ');
     const formattedOcrClaim = `The submitted media displays visible text stating: "${cleanOcr.substring(0, 240)}"`;
     claims.push({
@@ -118,7 +164,7 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
       scope: 'National',
       importance: 'High',
       verifiability: 'High',
-      origin: 'IMAGE_OCR_TEXT'
+      origin: isVideo ? 'VIDEO_ON_SCREEN_HEADLINE' : 'IMAGE_OCR_TEXT'
     });
   }
 
@@ -139,11 +185,11 @@ async function extractMediaClaims({ userNotes = '', transcript = '', ocrText = '
   }
 
   // 5. Only perform LLM claim decomposition if there is substantive textual/user/transcript context
-  const hasSubstantiveText = Boolean(trimmedUserClaim || trimmedTranscript || (usableOcrText && isHeadline));
+  const hasSubstantiveText = Boolean(trimmedUserClaim || (trimmedTranscript && !isSongOrMusic) || (usableOcrText && isHeadline));
   if (hasSubstantiveText) {
     const combinedContext = [
       trimmedUserClaim ? `User Submitted Context: ${trimmedUserClaim}.` : '',
-      trimmedTranscript ? `Video Audio Transcript: ${trimmedTranscript}.` : '',
+      trimmedTranscript && !isSongOrMusic ? `Video Audio Transcript: ${trimmedTranscript}.` : '',
       usableOcrText && isHeadline ? `Visible Headline OCR Text: ${usableOcrText}.` : ''
     ].filter(Boolean).join('\n\n');
 

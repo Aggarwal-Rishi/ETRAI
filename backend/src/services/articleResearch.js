@@ -123,7 +123,7 @@ async function performArticleDeepResearch(articleContext, claims = []) {
     try {
       const { GoogleGenAI } = require('@google/genai');
       const ai = new GoogleGenAI({ apiKey: geminiKey });
-      const modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+      const modelName = (process.env.GEMINI_LITE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite').trim();
 
       const prompt = `You are Agent 0 (Article-Level Deep Researcher). Synthesize an Article-Level Research Summary based ONLY on retrieved evidence. State clearly what authoritative sources confirm about this story, or if coverage is missing.
 

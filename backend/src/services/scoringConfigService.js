@@ -145,7 +145,7 @@ function calculateDualAxisScore({
 
   const wSup = supportingSources.reduce((sum, s) => sum + getAuth(s), 0);
   const wRef = refutingSources.reduce((sum, s) => sum + getAuth(s), 0);
-  const wQual = qualifyingSources.reduce((sum, s) => sum + (getAuth(s) * 0.5), 0);
+  const wQual = qualifyingSources.reduce((sum, s) => sum + getAuth(s), 0);
   const wTotal = allSources.reduce((sum, s) => sum + getAuth(s), 0);
 
   // 1. Veracity Index (0 to 100)
@@ -168,11 +168,13 @@ function calculateDualAxisScore({
   let evidenceState = 'INSUFFICIENT';
   let statusLabel = 'UNVERIFIED';
 
+  const totalSupport = supportingSources.length + qualifyingSources.length;
+
   if (totalCount === 0 || nIndep === 0 || evidentiaryCertainty < 30.0) {
     canonicalVerdict = 'UNVERIFIED';
     evidenceState = 'INSUFFICIENT';
     statusLabel = 'UNVERIFIED';
-  } else if (veracityIndex >= 80.0 && supportingSources.length > 0) {
+  } else if (veracityIndex >= 70.0 && totalSupport > 0 && refutingSources.length === 0) {
     canonicalVerdict = 'VERIFIED';
     evidenceState = 'SUPPORTED';
     statusLabel = 'TRUSTED';
@@ -180,7 +182,7 @@ function calculateDualAxisScore({
     canonicalVerdict = 'FALSE';
     evidenceState = 'REFUTED';
     statusLabel = 'FABRICATED';
-  } else if (qualifyingSources.length > 0 || (supportingSources.length > 0 && refutingSources.length > 0)) {
+  } else if (supportingSources.length > 0 && refutingSources.length > 0) {
     canonicalVerdict = 'PARTIALLY_VERIFIED';
     evidenceState = 'MIXED';
     statusLabel = 'SUSPICIOUS';

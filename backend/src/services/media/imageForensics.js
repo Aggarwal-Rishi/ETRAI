@@ -493,6 +493,9 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
   let originalPageUrl = null;
   let originalImageUrl = null;
   let candidateImageUrl = null;
+  const changes = [];
+  const diffs = [];
+  let markerCode = 65; // 'A'
 
   if (reverseHits.length > 0) {
     const topMatch = reverseHits[0];
@@ -504,20 +507,67 @@ async function generateStructuredImageForensicReport(buffer, fileInfo = {}, opti
     originalPageUrl = topMatch.sourceUrl || null;
 
     if (isVerifiedVisualMatch) {
-      const dateText = topMatch.publishedDate || topMatch.publishedAt;
-      if (isWire) {
-        originalFound = dateText
-          ? `Wire archive match · Verified visual match, ${dateText}`
-          : `Wire archive match · Verified visual match · ${topMatch.domain || 'Reuters'}`;
-      } else {
-        originalFound = dateText
-          ? `Verified visual match, ${dateText}`
-          : `Verified visual match · ${topMatch.domain || 'indexed source'}`;
+      // ── Automated Multimodal Visual Diffing Against Retrieved Match ──
+      const candUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl;
+      if (candUrl && options.disableVisualDiff !== true) {
+        try {
+          const { fetchRemoteMediaBuffer } = require('./remoteMediaFetcher');
+          const { diffImagesWithGemini } = require('./imageVisualDiffer');
+          const { isSsrfSafeUrl } = require('../ssrfGuard');
+          let candBuf = options.candidateBuffer || null;
+          if (!candBuf && isSsrfSafeUrl(candUrl).safe) {
+            const remote = await fetchRemoteMediaBuffer(candUrl, {
+              expectedKind: 'image',
+              timeoutMs: 6000,
+              maxBytes: 6 * 1024 * 1024
+            });
+            candBuf = remote?.buffer || null;
+          }
+          if (candBuf) {
+            visualComparison = await diffImagesWithGemini(buffer, candBuf, topMatch, {
+              ...options,
+              inputMimeType: mimeType
+            });
+          }
+        } catch (diffErr) {
+          console.warn('[Visual Diffing Check Warning]:', diffErr.message);
+        }
       }
-      originalFoundStatus = 'FOUND';
-      originalFoundColor = 'moss';
+
+      const dateText = topMatch.publishedDate || topMatch.publishedAt;
       originalImageUrl = topMatch.originalImageUrl || topMatch.thumbnailUrl || null;
       originalUrl = originalImageUrl;
+
+      if (visualComparison?.isModified) {
+        originalFound = `Modified version of original photo · ${topMatch.domain || 'indexed source'}`;
+        originalFoundStatus = 'FOUND';
+        originalFoundColor = 'crimson';
+        changes.push(visualComparison.modificationType || 'Person/Element Replaced');
+        if (Array.isArray(visualComparison.differences) && visualComparison.differences.length > 0) {
+          diffs.push(...visualComparison.differences);
+        }
+        forensics.manipulationScore = Math.max(95, forensics.manipulationScore || 0);
+        forensics.verdict = 'FABRICATED_OR_COMPOSITED';
+        forensics.signals = forensics.signals || [];
+        forensics.signals.push({
+          type: 'COMPOSITING',
+          severity: 'HIGH',
+          confidence: visualComparison.confidence || 95,
+          explanation: visualComparison.summary || 'Direct comparison with verified original photo confirms element replacement or face swap.'
+        });
+      } else {
+        if (isWire) {
+          originalFound = dateText
+            ? `Wire archive match · Verified visual match, ${dateText}`
+            : `Wire archive match · Verified visual match · ${topMatch.domain || 'Reuters'}`;
+        } else {
+          originalFound = dateText
+            ? `Verified visual match, ${dateText}`
+            : `Verified visual match · ${topMatch.domain || 'indexed source'}`;
+        }
+        originalFoundStatus = 'FOUND';
+        originalFoundColor = 'moss';
+      }
     } else {
       // Below 73% threshold: Loose visual lookalike, original remains unindexed
       originalFoundStatus = 'UNINDEXED_ORIGINAL';
@@ -579,10 +629,6 @@ function convertBox2dToPercent(box2d, fallback = null) {
     height: `${Math.round(height * 10) / 10}%`
   };
 }
-
-  const changes = [];
-  const diffs = [];
-  let markerCode = 65; // 'A'
 
   if (options.ocrDifference) {
     changes.push('Banner text');
@@ -712,6 +758,7 @@ function convertBox2dToPercent(box2d, fallback = null) {
     originalImageUrl,
     candidateImageUrl: candidateImageUrl || (candidateImages[0]?.imageUrl) || null,
     candidateImages,
+    visualComparison,
     changes: changes.length > 0 ? changes : ['None detected'],
     manipulationLikelihood,
     chipVerdict: forensics.verdict === 'FABRICATED_OR_COMPOSITED'
@@ -732,6 +779,7 @@ function convertBox2dToPercent(box2d, fallback = null) {
     forensicSignals: forensics.signals,
     forensics: {
       ...forensics,
+      visualComparison,
       integrity: {
         ...forensics.integrity,
         status: forensics.integrity?.isValid ? 'INTEGRITY_VERIFIED' : 'INTEGRITY_FAILED'
